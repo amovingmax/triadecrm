@@ -15,8 +15,10 @@
  *      1,5 km), "na mesma região" (até 5 km) ou nenhum perto. Lugar de nível cidade (ou
  *      CEP da cidade inteira): os imóveis nossos nessa cidade.
  *
- * O texto que volta não tem coordenada, distância em número, CEP nem número de casa: a
- * auditoria da conversa o confundiria com telefone. Falha do mapa, teto de buscas ou
+ * As palavras do resultado são as da nota "14. BUSCA NO MAPA" do caderno (aprovada pelo
+ * usuário em 23/11): "bem perto", "na mesma região", "nenhum imóvel nosso perto" e "não
+ * achado". O texto que volta não tem coordenada, distância em número, CEP nem número de
+ * casa: a auditoria da conversa o confundiria com telefone. Falha do mapa, teto de buscas ou
  * consulta recusada: a ferramenta diz isso em uma frase e a IA segue. Nunca lança.
  */
 import { verificarSemPii, verificarSemPiiNaConversa } from '@komune/prompts';
@@ -151,7 +153,7 @@ export function textoDoResultado(
   const eco = `"${semNumeros(consulta.replace(/,\s*RN$/i, ''))}"`;
   const lugar = lugares[0];
   if (lugar === undefined) {
-    return `${eco}: não achado no mapa. Tente uma referência mais geral (o bairro, a praia ou a cidade).`;
+    return `${eco}: não achado no mapa. Tente a referência mais geral que o cliente deu (avenida, praia, bairro ou cidade).`;
   }
   const onde = [lugar.bairro, lugar.cidade].filter(Boolean).map((t) => semNumeros(t as string)).join(', ');
   const nome = lugar.tipo === 'postcode' ? 'a área do CEP' : semNumeros(lugar.nome) || lugar.tipo;
@@ -160,9 +162,9 @@ export function textoDoResultado(
   if (escala === 'cidade') {
     const cidade = lugar.cidade ?? lugar.nome;
     const daCidade = imoveis.filter((i) => i.cidade !== null && semAcento(i.cidade) === semAcento(cidade));
-    return `${eco}: achado no mapa como cidade inteira (${semNumeros(cidade)}). ${
+    return `${eco}: achado no mapa como cidade inteira (${semNumeros(cidade)}), sem distância. ${
       daCidade.length === 0
-        ? 'Nenhum imóvel nosso nesta cidade.'
+        ? 'Resultado: nenhum imóvel nosso perto (nenhum nesta cidade).'
         : `Imóveis nossos nesta cidade: ${daCidade.map(imovelPorExtenso).join('; ')}.`
     }`;
   }
@@ -175,9 +177,9 @@ export function textoDoResultado(
   const mesmaRegiao = medidos.filter((m) => m.faixa === 'na mesma região').map((m) => imovelPorExtenso(m.imovel));
   const partes = [
     `${eco}: achado no mapa: ${nome} (${escala})${onde === '' ? '' : `, em ${onde}`}.`,
-    bemPerto.length > 0 ? `Bem perto: ${bemPerto.join('; ')}.` : null,
-    mesmaRegiao.length > 0 ? `Na mesma região: ${mesmaRegiao.join('; ')}.` : null,
-    bemPerto.length === 0 && mesmaRegiao.length === 0 ? 'Nenhum imóvel nosso perto.' : null,
+    bemPerto.length > 0 ? `Imóveis nossos bem perto: ${bemPerto.join('; ')}.` : null,
+    mesmaRegiao.length > 0 ? `Imóveis nossos na mesma região: ${mesmaRegiao.join('; ')}.` : null,
+    bemPerto.length === 0 && mesmaRegiao.length === 0 ? 'Resultado: nenhum imóvel nosso perto.' : null,
   ];
   const semPino = imoveis.filter((i) => i.pino === null).map((i) => i.codigo);
   if (semPino.length > 0) partes.push(`Sem lugar no mapa, fora da conta: ${semPino.join(', ')}.`);

@@ -234,13 +234,13 @@ describe('preços e conta por chamada', () => {
         // (12/11/2026, a visita presencial sem link) 426 a mais que a v4. A v6 (17/11/2026, o
         // e-mail para ofertas) tem 603 de sistema a mais que a v5 (o bloco do convite), 23
         // de mensagem (a linha do e-mail) e 6 de saída (`ofertasPorEmail`). A v7
-        // (23/11/2026, a busca no mapa) tem 321 de sistema a mais: o parágrafo do mapa e a
+        // (23/11/2026, a busca no mapa) tem 347 de sistema a mais: o parágrafo do mapa e a
         // declaração da ferramenta, no prefixo em cache. Quando a IA busca, a resposta vira
         // duas a quatro voltas: cada uma reenvia a conversa e o resultado do mapa, com o
         // prefixo (regras, caderno e imóveis) lido do cache.
         id: 'atendente-imova',
         modelo: 'claude-haiku-5-5',
-        tokensDeSistema: 4495,
+        tokensDeSistema: 4521,
         tokensDaMensagem: 165,
         tokensDeSaida: 108,
         semCache: 0.00052,

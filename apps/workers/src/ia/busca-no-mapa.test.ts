@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  BASE_DO_ENSAIO_V5,
   MAX_BUSCAS_NO_MAPA,
   MAX_VOLTAS_DO_ATENDENTE,
   atendenteImovaV7,
+  sistemaComBaseV7,
   varrerMontagem,
   verificarSemPiiNaConversa,
 } from '@komune/prompts';
@@ -36,6 +38,23 @@ import type { Logger } from '../lib/log';
  * caía no centro da cidade, a uns 8,6 km da avenida; o certo, que o usuário confirmou
  * (Rua Barra de Tabatinga, ponta da praia), é -6.06896, -35.09864.
  */
+
+/**
+ * As notas do caderno que mandam usar a ferramenta, como o usuário aprovou em 23/11/2026
+ * (coladas pela tela; aqui, cópia fiel para o teste montar o sistema de verdade).
+ */
+const NOTA_13 = "13. COMO IDENTIFICAR O IMÓVEL (vale para todos os imóveis): O cliente nem sempre sabe a metragem, então ela nunca serve para descobrir de qual imóvel ele fala. (a) Nunca pergunte ao cliente a metragem, a área, o tamanho ou as medidas do imóvel ou do terreno. (b) Para identificar, pergunte pelo lugar: o bairro, a rua e o CEP, numa pergunta só, como \"Você consegue me dizer o bairro, a rua e o CEP de onde fica o imóvel? O que souber já me ajuda.\" Se ele já disse algum desses ou deu uma referência (avenida, praia, condomínio vizinho, ponto conhecido), não pergunte de novo: use o que ele deu. (c) Para confirmar, use o tipo e o lugar, nunca a área: \"É o terreno de frente para o mar, em Nísia Floresta?\" ou \"É a casa do Potengi, em Natal?\". (d) A metragem é informação para dar, não para perguntar: diga-a só com o imóvel já identificado, como está no anúncio ou na FICHA. (e) Se o cliente citar uma área que não bate, não descarte o imóvel por isso: confirme pelo lugar. (f) Esta nota vale também nas FICHAS: se o exemplo de uma FICHA trouxer a área numa pergunta de confirmação, tire a área.";
+const NOTA_14 = "14. BUSCA NO MAPA (vale para todos os imóveis): Sempre que o cliente disser onde fica o imóvel ou der uma referência de lugar (rua, avenida, bairro, praia, condomínio, loteamento, ponto conhecido, \"é perto de...\", \"fica nas proximidades de...\", \"ao lado de...\", CEP), use buscar_no_mapa antes de responder, para ver se a referência bate com um imóvel nosso. (a) Busque primeiro a referência mais precisa que ele deu (condomínio, rua ou ponto), com a cidade, se ele disse. (b) Não achou no mapa: tente a referência mais geral que ele deu (avenida, praia, bairro ou cidade), sem passar de três buscas na mesma resposta. (c) O mapa mostrou um imóvel nosso bem perto ou na mesma região: confirme numa frase pelo tipo e pelo lugar, usando a referência que ele mesmo deu, como na nota 13: \"É o terreno de frente para o mar em Tabatinga, perto de Camurupim?\". Confirmado, siga; se ele pediu o preço, diga o valor. (d) Mais de um imóvel nosso perto: pergunte qual, pelo tipo e pelo lugar, um por vez. (e) Nenhum imóvel nosso perto, ou nada achado: siga a nota 7 (a) e pergunte o bairro, a rua e o CEP; se ainda não bater, passe, com as referências no motivo. (f) O mapa serve só para identificar: nunca diga a distância, que buscou no mapa, o código do imóvel nem fato da região que não esteja escrito (nota 6 c). (g) Busque só o lugar do imóvel, nunca o endereço de casa do cliente. (h) Imóvel já identificado nesta conversa (pela foto, pela FICHA ou por uma busca anterior): não busque de novo.";
+
+/** O sistema da v7 com a base do ensaio e as notas 13 e 14 no caderno. */
+const SISTEMA_COM_AS_NOTAS = sistemaComBaseV7({
+  ...BASE_DO_ENSAIO_V5,
+  caderno: [
+    ...BASE_DO_ENSAIO_V5.caderno,
+    { id: 9013, texto: NOTA_13, origem: 'manual' },
+    { id: 9014, texto: NOTA_14, origem: 'manual' },
+  ],
+});
 
 const PINO_ANTIGO = { lat: -6.0559925, lng: -35.1708741 };
 const PINO_NOVO = { lat: -6.06896, lng: -35.09864 };
@@ -187,13 +206,13 @@ function modeloDaAlinne(): { modelo: ClienteDoModelo; pedidos: PedidoComFerramen
           return Promise.resolve(pedirBusca('t2', 'Avenida Praia de Camurupim'));
         }
         const ultimo = resultados.at(-1)!.texto;
-        const achou = /(Bem perto|Na mesma região): [^.]*TE0004_IMOVA/.test(ultimo);
+        const achou = /Imóveis nossos (bem perto|na mesma região): [^.]*TE0004_IMOVA/.test(ultimo);
         return Promise.resolve({
           tipo: 'final',
           json: {
             ...exemplo.saida,
             mensagem: achou
-              ? 'É o terreno de frente para o mar, em Nísia Floresta?'
+              ? 'É o terreno de frente para o mar em Tabatinga, perto de Camurupim?'
               : 'Pode me dizer o bairro ou a praia onde fica o terreno?',
           },
           uso,
@@ -227,7 +246,7 @@ async function rodarAlinne(pino: { lat: number; lng: number }) {
   });
   const executada = await executarComFerramentas(
     contexto,
-    atendenteImovaV7,
+    { ...atendenteImovaV7, sistema: SISTEMA_COM_AS_NOTAS },
     atendenteImovaV7.exemplos[0]!.entrada,
     CONTATO,
     VINCULOS,
@@ -302,21 +321,21 @@ describe('o texto que volta para a IA', () => {
     const texto = textoDoResultado('Avenida Praia de Camurupim, Nísia Floresta, RN', [avenida], imoveis);
     expect(texto).toBe(
       '"Avenida Praia de Camurupim, Nísia Floresta": achado no mapa: Avenida Praia de Camurupim (rua), em Camurupim, Nísia Floresta. ' +
-        'Na mesma região: TE0004_IMOVA (terreno, Praia de Tabatinga). Sem lugar no mapa, fora da conta: TE0007.',
+        'Imóveis nossos na mesma região: TE0004_IMOVA (terreno, Praia de Tabatinga). Sem lugar no mapa, fora da conta: TE0007.',
     );
   });
 
   it('CEP da cidade inteira: os imóveis nossos nesta cidade, sem repetir o CEP', () => {
     const texto = textoDoResultado('59164-000, Nísia Floresta, RN', [cep], imoveis);
     expect(texto).toBe(
-      '"CEP, Nísia Floresta": achado no mapa como cidade inteira (Nísia Floresta). Imóveis nossos nesta cidade: TE0004_IMOVA (terreno, Praia de Tabatinga).',
+      '"CEP, Nísia Floresta": achado no mapa como cidade inteira (Nísia Floresta), sem distância. Imóveis nossos nesta cidade: TE0004_IMOVA (terreno, Praia de Tabatinga).',
     );
     expect(texto).not.toMatch(/\d{5}/);
   });
 
   it('não achado: pede referência mais geral', () => {
     expect(textoDoResultado('Condomínio Serv Club, Nísia Floresta, RN', [], imoveis)).toBe(
-      '"Condomínio Serv Club, Nísia Floresta": não achado no mapa. Tente uma referência mais geral (o bairro, a praia ou a cidade).',
+      '"Condomínio Serv Club, Nísia Floresta": não achado no mapa. Tente a referência mais geral que o cliente deu (avenida, praia, bairro ou cidade).',
     );
   });
 
@@ -332,15 +351,38 @@ describe('o texto que volta para a IA', () => {
   });
 });
 
+describe('o código casa com a nota 14 do caderno', () => {
+  it('a ferramenta tem o nome que a nota usa, e o resultado fala as palavras dela', () => {
+    expect(atendenteImovaV7.ferramentas?.map((f) => f.nome)).toEqual(['buscar_no_mapa']);
+    expect(NOTA_14).toContain('use buscar_no_mapa');
+    expect(NOTA_14.length).toBeLessThanOrEqual(2000);
+    const nota = NOTA_14.toLowerCase();
+    for (const palavra of ['bem perto', 'na mesma região', 'nenhum imóvel nosso perto']) expect(nota).toContain(palavra);
+    const imoveis: ImovelNoMapa[] = [
+      { codigo: 'TE0004_IMOVA', tipo: 'terreno', bairro: 'Praia de Tabatinga', cidade: 'Nísia Floresta', rua: null, cep: null, pino: { ...PINO_NOVO, aproximado: false } },
+    ];
+    const lugar = (lat: number, lng: number): LugarNoMapa => ({ nome: 'X', tipo: 'road', nivel: 'ponto', bairro: null, cidade: 'Nísia Floresta', lat, lng });
+    expect(textoDoResultado('X, RN', [lugar(PINO_NOVO.lat, PINO_NOVO.lng)], imoveis)).toContain('bem perto');
+    expect(textoDoResultado('X, RN', [lugar(AVENIDA.lat, AVENIDA.lng)], imoveis)).toContain('na mesma região');
+    expect(textoDoResultado('X, RN', [lugar(PINO_ANTIGO.lat, PINO_ANTIGO.lng - 0.2)], imoveis)).toContain('nenhum imóvel nosso perto');
+    expect(textoDoResultado('X, RN', [], imoveis)).toContain('não achado');
+  });
+
+  it('a nota 14 e a 13 passam na auditoria montadas com a v7', () => {
+    expect(varrerMontagem(NOTA_14)).toEqual([]);
+    expect(varrerMontagem(SISTEMA_COM_AS_NOTAS)).toEqual([]);
+  });
+});
+
 describe('o caso da Alinne, no laço da v7', () => {
   it('com o pino novo: o condomínio não é achado, a avenida é, e o TE0004 fica na mesma região', async () => {
     const { executada, resultados, banco, aoMapa, pedidos } = await rodarAlinne(PINO_NOVO);
     expect(resultados.map((r) => r.texto)).toEqual([
-      '"Condomínio Serv Club, Nísia Floresta": não achado no mapa. Tente uma referência mais geral (o bairro, a praia ou a cidade).',
+      '"Condomínio Serv Club, Nísia Floresta": não achado no mapa. Tente a referência mais geral que o cliente deu (avenida, praia, bairro ou cidade).',
       '"Avenida Praia de Camurupim, Nísia Floresta": achado no mapa: Avenida Praia de Camurupim (rua), em Camurupim, Nísia Floresta. ' +
-        'Na mesma região: TE0004_IMOVA (terreno, Praia de Tabatinga).',
+        'Imóveis nossos na mesma região: TE0004_IMOVA (terreno, Praia de Tabatinga).',
     ]);
-    expect(executada.saida.mensagem).toBe('É o terreno de frente para o mar, em Nísia Floresta?');
+    expect(executada.saida.mensagem).toBe('É o terreno de frente para o mar em Tabatinga, perto de Camurupim?');
     expect(executada.voltas).toBe(3);
     expect(executada.aiRunIds).toHaveLength(3);
     expect(executada.aiRunId).toBe(executada.aiRunIds.at(-1));
@@ -359,6 +401,10 @@ describe('o caso da Alinne, no laço da v7', () => {
     expect(aoMapa[0]!.url).toContain('bounded=1');
     expect(decodeURIComponent(aoMapa[0]!.url)).toContain('viewbox=-38.6,-4.8,-34.9,-7.0');
     expect(banco.chamadasDeRpc.filter((c) => c.nome === 'ia_lugar_no_mapa_gravar')).toHaveLength(2);
+    // O sistema que foi ao modelo leva as notas 13 e 14, e passa na auditoria.
+    expect(pedidos[0]!.sistema).toContain('14. BUSCA NO MAPA');
+    expect(pedidos[0]!.sistema).toContain('13. COMO IDENTIFICAR O IMÓVEL');
+    expect(varrerMontagem(pedidos[0]!.sistema)).toEqual([]);
     // As ferramentas vão em toda volta; nenhuma volta foi a última forçada.
     expect(pedidos.every((p) => p.ferramentas.map((f) => f.nome).join() === 'buscar_no_mapa')).toBe(true);
     expect(pedidos.some((p) => p.semFerramentas === true)).toBe(false);
@@ -368,7 +414,7 @@ describe('o caso da Alinne, no laço da v7', () => {
     const { executada, resultados } = await rodarAlinne(PINO_ANTIGO);
     expect(resultados.at(-1)!.texto).toBe(
       '"Avenida Praia de Camurupim, Nísia Floresta": achado no mapa: Avenida Praia de Camurupim (rua), em Camurupim, Nísia Floresta. ' +
-        'Nenhum imóvel nosso perto.',
+        'Resultado: nenhum imóvel nosso perto.',
     );
     expect(executada.saida.mensagem).toBe('Pode me dizer o bairro ou a praia onde fica o terreno?');
   });

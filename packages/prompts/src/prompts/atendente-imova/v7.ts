@@ -11,12 +11,14 @@
  * O que muda em relação à v6:
  * - Uma ferramenta, `buscar_no_mapa` ({ referencia, cidade? }). Quem a executa é o
  *   worker (`apps/workers/src/ia/busca-no-mapa.ts`): procura no OpenStreetMap, com cache,
- *   e o CÓDIGO mede a distância até os imóveis (haversine) e devolve faixas ("bem
- *   perto", "na mesma região", nenhum perto; numa cidade inteira, os imóveis da cidade).
+ *   e o CÓDIGO mede a distância até os imóveis (haversine) e devolve faixas com as
+ *   palavras da nota 14 do caderno ("bem perto", "na mesma região", "nenhum imóvel nosso
+ *   perto", "não achado"; numa cidade inteira, os imóveis da cidade).
  *   O modelo nunca vê coordenada nem calcula distância.
  * - Um parágrafo curto no fim do sistema dizendo que a ferramenta existe. QUANDO usar e
- *   o que fazer com o resultado ficam no caderno (nota "14. BUSCA NO MAPA"), como pediu o
- *   usuário.
+ *   o que fazer com o resultado ficam no caderno (nota "14. BUSCA NO MAPA", aprovada pelo
+ *   usuário em 23/11: a referência mais precisa, depois a mais geral, confirmar pelo tipo
+ *   e pelo lugar com a referência do cliente, senão a nota 7 (a)).
  * - A chamada vira um laço (`executarComFerramentas`): cada volta é uma linha em
  *   `ai_runs` e o resultado da ferramenta passa pela auditoria de PII. Teto de buscas por
  *   resposta (`MAX_BUSCAS_NO_MAPA`) e de voltas; a última volta não oferece ferramenta,
@@ -46,8 +48,9 @@ export const FERRAMENTA_BUSCAR_NO_MAPA: FerramentaDoPrompt = {
   descricao:
     'Procura no mapa (OpenStreetMap) um lugar que o cliente citou para dizer onde fica o imóvel, e diz ' +
     'quais imóveis da lista ficam perto dele, pela conta do sistema: "bem perto", "na mesma região" ou ' +
-    'nenhum perto. Se o lugar achado é uma cidade inteira, diz os imóveis nossos nessa cidade. Não achou: ' +
-    'tente uma referência mais geral (o bairro, a praia ou a cidade). Até três buscas por resposta.',
+    '"nenhum imóvel nosso perto". Se o lugar achado é uma cidade inteira, diz os imóveis nossos nessa ' +
+    'cidade. "Não achado": tente a referência mais geral que o cliente deu (avenida, praia, bairro ou ' +
+    'cidade). Até três buscas por resposta. Só o lugar do imóvel, nunca o endereço de casa do cliente.',
   entrada: {
     type: 'object',
     properties: {
