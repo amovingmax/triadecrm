@@ -112,7 +112,7 @@ describe('versionamento: a v2 não mexe na v1', () => {
 });
 
 describe('catálogo do Tríade', () => {
-  it('tem os catorze prompts, na ordem de prioridade do R13 e do CRM Inteligente', () => {
+  it('tem os quinze prompts, na ordem de prioridade do R13 e do CRM Inteligente', () => {
     expect(Object.keys(CATALOGO)).toEqual([
       'transcricao-audio',
       'ficha-da-conversa',
@@ -131,6 +131,8 @@ describe('catálogo do Tríade', () => {
       'atendente-imova',
       // De qual anúncio é a foto que o cliente mandou, só da Imova (09/11/2026).
       'foto-do-anuncio',
+      // O Localizador, só da Imova (23/11/2026): o agente que procura no mapa.
+      'localizador-imova',
       // A IA juíza, só da Imova (06/11/2026): a nota diária do atendimento da de cima.
       'avaliacao-do-atendimento',
       // O "relatório que vende", só da Imova (09/11/2026): o conselho por cliente e por
@@ -171,7 +173,13 @@ describe('catálogo do Tríade', () => {
     // `vigentes()` e não `promptVigente(id)` num laço: com `id` de tipo união o
     // índice `CATALOGO[Id][VIGENTES[Id]]` devolve `unknown`.
     for (const prompt of vigentes()) {
-      expect(prompt.tokensDeSistema, prompt.id).toBe(estimarTokens(prompt.sistema));
+      // Com ferramentas (o Localizador, 23/11/2026), o prefixo cacheável é o sistema
+      // mais a declaração delas, e o número conta as duas coisas.
+      const ferramentas = (prompt.ferramentas ?? [])
+        .map((f) => `${f.nome}\n${f.descricao}\n${JSON.stringify(f.entrada)}`)
+        .join('\n');
+      const prefixo = ferramentas === '' ? prompt.sistema : `${prompt.sistema}\n${ferramentas}`;
+      expect(prompt.tokensDeSistema, prompt.id).toBe(estimarTokens(prefixo));
     }
     for (const metadados of INVENTARIO) {
       expect(metadados.tokensDeSistema, metadados.id).toBeGreaterThan(0);

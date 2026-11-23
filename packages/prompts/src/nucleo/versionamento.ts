@@ -202,7 +202,25 @@ export interface PromptVersionado<Entrada, Saida> extends MetadadosDePrompt {
    * uma assim mesmo recebe `ImagemNaoDeclaradaError`.
    */
   readonly imagens?: ImagensDoPrompt;
+  /**
+   * As ferramentas que esta versão pode chamar (o Localizador da Imova, 23/11/2026).
+   * Ausente em todo prompt de um tiro só: quem chama é `executar`, que não as manda.
+   * Com ferramentas, quem chama é o laço (`executarComFerramentas` do worker), que
+   * audita cada resultado antes de ele voltar ao modelo. A descrição e o esquema fazem
+   * parte da versão: mudar uma ferramenta é publicar outra versão.
+   */
+  readonly ferramentas?: readonly FerramentaDoPrompt[];
   readonly exemplos: readonly ExemploDePrompt<Entrada, Saida>[];
+}
+
+/** Uma ferramenta que o modelo pode chamar, como a API a recebe. */
+export interface FerramentaDoPrompt {
+  /** O nome que o modelo usa (`buscar_no_mapa`). */
+  readonly nome: string;
+  /** Para que serve e quando usar, para o modelo ler. */
+  readonly descricao: string;
+  /** JSON Schema da entrada (objeto). */
+  readonly entrada: Readonly<Record<string, unknown>>;
 }
 
 /** Congela a versão e mede o bloco estável. Prompt é dado, não estado. */
@@ -220,7 +238,20 @@ export function definirPrompt<Entrada, Saida>(
             tipos: Object.freeze([...prompt.imagens.tipos]),
           }),
         };
-  return Object.freeze({ ...prompt, ...imagens, tokensDeSistema: estimarTokens(prompt.sistema) });
+  const ferramentas =
+    prompt.ferramentas === undefined
+      ? {}
+      : { ferramentas: Object.freeze(prompt.ferramentas.map((f) => Object.freeze({ ...f }))) };
+  // As ferramentas vão no prefixo cacheável junto com o sistema, e contam como ele.
+  const textoDasFerramentas = (prompt.ferramentas ?? [])
+    .map((f) => `${f.nome}\n${f.descricao}\n${JSON.stringify(f.entrada)}`)
+    .join('\n');
+  return Object.freeze({
+    ...prompt,
+    ...imagens,
+    ...ferramentas,
+    tokensDeSistema: estimarTokens(textoDasFerramentas === '' ? prompt.sistema : `${prompt.sistema}\n${textoDasFerramentas}`),
+  });
 }
 
 /** A string gravada em `ai_runs.prompt_version`. */

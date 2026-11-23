@@ -129,6 +129,14 @@ export {
 } from './prompts/foto-do-anuncio/v1';
 
 export {
+  CERTEZAS_DO_LOCALIZADOR,
+  LIMITES_DO_LOCALIZADOR,
+  type EntradaDoLocalizador,
+  type SaidaDoLocalizador,
+  localizadorImovaV1,
+} from './prompts/localizador-imova/v1';
+
+export {
   CANAIS_NO_PROMPT,
   MARCAS_DA_FOTO,
   PECAS_DA_FOTO,
@@ -309,6 +317,7 @@ export { CARACTERES_POR_TOKEN_PT_BR, estimarTokens } from './nucleo/tokens';
 
 export {
   type ExemploDePrompt,
+  type FerramentaDoPrompt,
   type ImagensDoPrompt,
   MODELOS,
   type MetadadosDePrompt,

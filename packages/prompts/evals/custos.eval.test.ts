@@ -257,6 +257,21 @@ describe('preços e conta por chamada', () => {
         comCache: 0.00005,
       },
       {
+        // O Localizador da Imova (23/11/2026): agente com ferramentas (o mapa e a conta
+        // da distância). A conta é de UMA volta, do exemplo da Alinne; o sistema inclui
+        // as três ferramentas. Uma leitura típica tem de três a cinco voltas, e cada volta
+        // reenvia a conversa com os resultados do mapa (o prefixo fica em cache): da
+        // ordem de US$ 0,002 a 0,004 por mensagem com pista, com o raciocínio do Haiku
+        // 5.5. Só roda quando uma mensagem nova tem pista de lugar (o filtro do worker).
+        id: 'localizador-imova',
+        modelo: 'claude-haiku-5-5',
+        tokensDeSistema: 1244,
+        tokensDaMensagem: 176,
+        tokensDeSaida: 116,
+        semCache: 0.0002,
+        comCache: 0.00009,
+      },
+      {
         // A IA juíza da Imova (06/11/2026): uma avaliação por conversa e por dia em que
         // a IA atendeu, no Haiku 5.5. A conta é do primeiro exemplo (cinco mensagens);
         // conversa real é mais longa, e na fatura entram ainda o esquema da saída e o

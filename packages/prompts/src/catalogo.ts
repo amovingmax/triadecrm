@@ -5,6 +5,7 @@ import { atendenteImovaV4 } from './prompts/atendente-imova/v4';
 import { atendenteImovaV5 } from './prompts/atendente-imova/v5';
 import { atendenteImovaV6 } from './prompts/atendente-imova/v6';
 import { fotoDoAnuncioV1 } from './prompts/foto-do-anuncio/v1';
+import { localizadorImovaV1 } from './prompts/localizador-imova/v1';
 import { avaliacaoDoAtendimentoV1 } from './prompts/avaliacao-do-atendimento/v1';
 import { avaliacaoDoAtendimentoV2 } from './prompts/avaliacao-do-atendimento/v2';
 import { conselheiroDoImovelV1 } from './prompts/conselheiro-do-imovel/v1';
@@ -65,6 +66,9 @@ export const CATALOGO = {
   },
   // Só da Imova (09/11/2026): de qual anúncio é a foto que o cliente mandou.
   'foto-do-anuncio': { 1: fotoDoAnuncioV1 },
+  // Só da Imova (23/11/2026): o Localizador, agente com ferramentas que procura no mapa
+  // o lugar que o cliente citou e diz qual imóvel nosso fica ali.
+  'localizador-imova': { 1: localizadorImovaV1 },
   // Só da Imova (06/11/2026): a IA juíza, que dá nota ao atendimento da de cima.
   'avaliacao-do-atendimento': { 1: avaliacaoDoAtendimentoV1, 2: avaliacaoDoAtendimentoV2 },
   // Só da Imova (09/11/2026): o "relatório que vende", por cliente e por imóvel.
@@ -118,6 +122,7 @@ export const VIGENTES = {
   // `ofertasPorEmail`: voltar à v5 é trocar este número e o import do worker.
   'atendente-imova': 6,
   'foto-do-anuncio': 1,
+  'localizador-imova': 1,
   // v2 desde 09/11/2026: a juíza diz também a lacuna, onde a IA que atende falhou no
   // dia, para o relatório contar por tema. Voltar é trocar este número.
   'avaliacao-do-atendimento': 2,

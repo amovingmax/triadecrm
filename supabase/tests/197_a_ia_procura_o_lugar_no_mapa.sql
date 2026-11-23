@@ -9,8 +9,8 @@
 --      mais antiga para a mais nova; gravada a leitura, a mensagem deixa de ser
 --      pendente e a anotação aparece na conversa.
 --   3. GRAVAR: só mensagem de texto do cliente; método torto é recusado.
---   4. O CACHE: a chave ignora acento, caixa e espaço; do Google não se grava nome e
---      a linha vence em 30 dias; "não achado" grava sem ponto; o vencido não volta.
+--   4. O CACHE: a chave ignora acento, caixa e espaço; até 3 resultados; "não achado"
+--      grava lista vazia e vence em 30 dias; o vencido não volta.
 --   5. OS IMÓVEIS NO MAPA: os mesmos que a IA conhece, com o pino do anúncio quando
 --      há; anúncio excluído sai.
 --
@@ -106,7 +106,7 @@ select ok((select relrowsecurity from pg_class where oid = 'public.ia_lugares_no
           and (select relrowsecurity from pg_class where oid = 'public.ia_referencias_de_lugar'::regclass),
           'as duas tabelas nascem com RLS');
 select ok(not has_function_privilege('authenticated', 'public.ia_referencia_gravar(uuid, text, jsonb, text, bigint)', 'execute')
-          and not has_function_privilege('authenticated', 'public.ia_lugar_no_mapa_gravar(text, text, boolean, double precision, double precision, text, text, text, text)', 'execute')
+          and not has_function_privilege('authenticated', 'public.ia_lugar_no_mapa_gravar(text, jsonb, text)', 'execute')
           and not has_function_privilege('anon', 'public.ia_textos_do_cliente_para_o_mapa(uuid)', 'execute')
           and not has_function_privilege('authenticated', 'public.ia_imoveis_no_mapa()', 'execute'),
           'as portas são só do worker: ninguém logado nem anônimo usa');
@@ -130,13 +130,13 @@ select ok((select bool_and(t.pendente) from public.ia_textos_do_cliente_para_o_m
 -- ---------------------------------------------------------------------
 select is(public.ia_referencia_gravar(pg_temp.id('oi'), 'sem_pista', '[]'::jsonb, null) ->> 'ok', 'true',
           'mensagem sem pista grava como sem_pista');
-select is(public.ia_referencia_gravar(pg_temp.id('rua'), 'modelo',
-            '[{"texto":"Avenida Praia de Camurupim","tipo":"rua"}]'::jsonb,
+select is(public.ia_referencia_gravar(pg_temp.id('rua'), 'localizador',
+            '{"imovel":"TST197A_IMOVA","certeza":"media"}'::jsonb,
             '[no mapa: "Avenida Praia de Camurupim" fica na mesma região do TST197A_IMOVA]') ->> 'ok', 'true',
-          'a leitura do modelo grava com a anotação');
-select is(public.ia_referencia_gravar(pg_temp.id('foto'), 'modelo', '[]'::jsonb, null) ->> 'motivo',
+          'a leitura do Localizador grava com a anotação');
+select is(public.ia_referencia_gravar(pg_temp.id('foto'), 'localizador', '{}'::jsonb, null) ->> 'motivo',
           'nao_e_texto_do_cliente', 'foto não é texto do cliente');
-select is(public.ia_referencia_gravar(pg_temp.id('time'), 'modelo', '[]'::jsonb, null) ->> 'motivo',
+select is(public.ia_referencia_gravar(pg_temp.id('time'), 'localizador', '{}'::jsonb, null) ->> 'motivo',
           'nao_e_texto_do_cliente', 'mensagem do time não é do cliente');
 select is(public.ia_referencia_gravar(pg_temp.id('rua'), 'chute', '[]'::jsonb, null) ->> 'motivo',
           'metodo_invalido', 'método torto é recusado');
@@ -159,27 +159,23 @@ select pg_temp.sair();
 -- ---------------------------------------------------------------------
 -- 4. O cache
 -- ---------------------------------------------------------------------
-select is(public.ia_lugar_no_mapa_gravar('Avenida Praia de Camurupim, Nísia Floresta, RN', 'nominatim', true,
-            -6.08967, -35.1004, 'ponto', 'Camurupim, Nísia Floresta', null, 'ODbL') ->> 'encontrado', 'true',
-          'o OpenStreetMap grava o ponto e o nome curto');
-select is((select l.lugar from public.ia_lugar_no_mapa_ler('  avenida praia de CAMURUPIM,  nisia floresta, rn') l
-            where l.fonte = 'nominatim'),
-          'Camurupim, Nísia Floresta', 'a chave ignora acento, caixa e espaço');
-select public.ia_lugar_no_mapa_gravar('Condomínio Serv Club, Nísia Floresta, RN', 'google', true,
-         -6.07, -35.10, 'ponto', 'Nome que o Google deu', 'ChIJteste', null);
-select ok((select l.lugar is null and l.cidade is null and l.place_id = 'ChIJteste'
-                  and l.expira_em <= l.buscado_em + interval '30 days'
+select is(public.ia_lugar_no_mapa_gravar('Avenida Praia de Camurupim, Nísia Floresta, RN',
+            '[{"nome":"Avenida Praia de Camurupim","tipo":"secondary","nivel":"ponto","bairro":"Camurupim",
+               "cidade":"Nísia Floresta","lat":-6.08967,"lng":-35.1004}]'::jsonb, 'ODbL') ->> 'resultados', '1',
+          'o mapa grava o lugar achado');
+select is((public.ia_lugar_no_mapa_ler('  avenida praia de CAMURUPIM,  nisia floresta, rn') -> 0 ->> 'bairro'),
+          'Camurupim', 'a chave ignora acento, caixa e espaço');
+select is(public.ia_lugar_no_mapa_gravar('Camurupim, RN',
+            '[{"nome":"a"},{"nome":"b"},{"nome":"c"},{"nome":"d"}]'::jsonb, null) ->> 'resultados', '3',
+          'mais de três resultados ficam os três primeiros');
+select public.ia_lugar_no_mapa_gravar('Condomínio Serv Club, Nísia Floresta, RN', '[]'::jsonb, 'ODbL');
+select ok((select l.expira_em <= l.buscado_em + interval '30 days' and jsonb_array_length(l.resultados) = 0
              from public.ia_lugares_no_mapa l
-            where l.consulta = app.ia_chave_do_lugar('Condomínio Serv Club, Nísia Floresta, RN') and l.fonte = 'google'),
-          'do Google fica só place_id e lat/lng, por até 30 dias');
-select public.ia_lugar_no_mapa_gravar('Condomínio Itapetinga, Nísia Floresta, RN', 'nominatim', false,
-         null, null, null, null, null, null);
-select ok((select not l.encontrado and l.lat is null
-             from public.ia_lugar_no_mapa_ler('Condomínio Itapetinga, Nísia Floresta, RN') l),
-          '"não achado" fica gravado, sem ponto');
-update public.ia_lugares_no_mapa set expira_em = now() - interval '1 minute', buscado_em = now() - interval '31 days'
- where consulta = app.ia_chave_do_lugar('Condomínio Itapetinga, Nísia Floresta, RN');
-select is((select count(*)::int from public.ia_lugar_no_mapa_ler('Condomínio Itapetinga, Nísia Floresta, RN')), 0,
+            where l.consulta = app.ia_chave_do_lugar('Condomínio Serv Club, Nísia Floresta, RN')),
+          '"não achado" grava lista vazia e vale só 30 dias');
+update public.ia_lugares_no_mapa set expira_em = now() - interval '1 minute'
+ where consulta = app.ia_chave_do_lugar('Condomínio Serv Club, Nísia Floresta, RN');
+select ok(public.ia_lugar_no_mapa_ler('Condomínio Serv Club, Nísia Floresta, RN') is null,
           'o que venceu não volta: a pergunta é feita de novo');
 
 -- ---------------------------------------------------------------------

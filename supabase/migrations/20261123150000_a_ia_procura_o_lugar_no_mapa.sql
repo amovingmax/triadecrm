@@ -12,18 +12,18 @@
 --
 -- O caminho é o da foto (20261109130000): roda antes de a IA escrever, uma vez por
 -- mensagem, e o que sai é escrito na conversa que ela lê. O worker
--- (`apps/workers/src/ia/referencias-de-lugar.ts`):
+-- (`apps/workers/src/ia/localizador.ts`):
 --   1. pega as mensagens de texto do cliente ainda não lidas para o mapa;
---   2. só chama o modelo (`referencias-de-lugar@v1`) quando há pista de lugar;
---   3. procura cada lugar no mapa (Google, se houver chave no worker; senão
---      OpenStreetMap), calcula a distância até cada imóvel e grava a anotação
---      "[no mapa: ...]", que entra no fim do texto da mensagem.
+--   2. só chama o agente (`localizador-imova@v1`) quando há pista de lugar;
+--   3. o Localizador procura no mapa (só OpenStreetMap, decisão do usuário em
+--      23/11), reformula quando não acha, e pergunta ao CÓDIGO quais imóveis
+--      ficam perto (a distância é calculada, nunca adivinhada); a conclusão vira
+--      a anotação "[no mapa: ...]", no fim do texto da mensagem.
 --
 -- O QUE ENTRA (só na Imova):
---   1. `public.ia_lugares_no_mapa`: o cache do mapa, uma linha por pergunta e por
---      fonte. A política do Nominatim pede cache; os termos do Google só deixam
---      guardar `place_id` e lat/lng por 30 dias, então da linha do Google não se
---      guarda nome nem endereço (`lugar` é nulo, CHECK) e ela vence em 30 dias.
+--   1. `public.ia_lugares_no_mapa`: o cache do mapa (OpenStreetMap, ODbL), uma
+--      linha por pergunta, com até 3 resultados. A política do Nominatim pede
+--      cache: a mesma pergunta não volta ao serviço enquanto a linha vale.
 --   2. `public.ia_referencias_de_lugar`: o que saiu de cada mensagem do cliente (os
 --      lugares, o que o mapa achou, os imóveis perto e a anotação). Uma linha por
 --      mensagem: a mensagem é lida uma vez só.
@@ -39,8 +39,7 @@
 --
 -- COMO DESFAZER:
 --   drop function public.ia_imoveis_no_mapa();
---   drop function public.ia_lugar_no_mapa_gravar(text, text, boolean, double precision,
---     double precision, text, text, text, text);
+--   drop function public.ia_lugar_no_mapa_gravar(text, jsonb, text);
 --   drop function public.ia_lugar_no_mapa_ler(text);
 --   drop function public.ia_referencias_da_conversa(uuid);
 --   drop function public.ia_referencia_gravar(uuid, text, jsonb, text, bigint);
@@ -74,32 +73,19 @@ revoke all on function app.ia_chave_do_lugar(text) from public, anon, authentica
 -- 1. O cache do mapa
 -- ---------------------------------------------------------------------
 create table if not exists public.ia_lugares_no_mapa (
-  consulta    text not null check (char_length(consulta) between 1 and 300),
-  fonte       text not null check (fonte in ('nominatim', 'google')),
-  encontrado  boolean not null,
-  lat         double precision check (lat between -90 and 90),
-  lng         double precision check (lng between -180 and 180),
-  -- Para que serve o ponto: 'ponto' (rua, condomínio, praia, lugar conhecido) dá
-  -- distância; 'cidade' (cidade inteira, CEP terminado em 000) só diz a cidade.
-  nivel       text check (nivel in ('ponto', 'bairro', 'cidade')),
-  -- Só do OpenStreetMap (ODbL, com atribuição): "Camurupim, Nísia Floresta".
-  lugar       text check (char_length(lugar) <= 160),
-  cidade      text check (char_length(cidade) <= 80),
-  place_id    text check (char_length(place_id) <= 300),
+  consulta    text primary key check (char_length(consulta) between 1 and 300),
+  -- Até 3 lugares, como o OpenStreetMap devolveu: nome, tipo (addresstype), nível
+  -- ('ponto' dá distância; 'cidade' só diz a cidade), bairro, cidade, lat, lng.
+  -- Lista vazia = o mapa não conhece o lugar.
+  resultados  jsonb not null default '[]'::jsonb
+                check (jsonb_typeof(resultados) = 'array' and jsonb_array_length(resultados) <= 3),
   licenca     text check (char_length(licenca) <= 300),
   buscado_em  timestamptz not null default now(),
-  expira_em   timestamptz not null,
-  primary key (consulta, fonte),
-  constraint ia_lugares_no_mapa_achado_ck check (
-    (encontrado and lat is not null and lng is not null and nivel is not null)
-    or (not encontrado and lat is null and lng is null)),
-  -- Os termos do Google: da resposta dele, só place_id e lat/lng, por até 30 dias.
-  constraint ia_lugares_no_mapa_google_ck check (
-    fonte <> 'google' or (lugar is null and cidade is null and expira_em <= buscado_em + interval '30 days'))
+  expira_em   timestamptz not null
 );
 alter table public.ia_lugares_no_mapa enable row level security;
 comment on table public.ia_lugares_no_mapa is
-  'Cache do mapa da IA que atende (Imova, 23/11/2026): onde fica cada lugar que um cliente citou ou que um anúncio sem pino tem. Do Google, só place_id e lat/lng por 30 dias; do OpenStreetMap, o ponto e o nome curto (ODbL). Só o worker lê e grava.';
+  'Cache do mapa da IA que atende (Imova, 23/11/2026): o que o OpenStreetMap (ODbL) devolveu para cada lugar que o Localizador procurou ou que um anúncio sem pino tem. Só o worker lê e grava.';
 
 -- ---------------------------------------------------------------------
 -- 2. O que saiu de cada mensagem do cliente
@@ -107,10 +93,10 @@ comment on table public.ia_lugares_no_mapa is
 create table if not exists public.ia_referencias_de_lugar (
   message_id      uuid primary key references public.messages (id) on delete cascade,
   conversation_id uuid not null references public.conversations (id) on delete cascade,
-  -- 'sem_pista': o filtro não achou palavra de lugar e o modelo nem foi chamado.
-  -- 'modelo': o modelo leu; `referencias` traz o que ele achou (pode ser nada).
-  metodo          text not null check (metodo in ('sem_pista', 'modelo')),
-  referencias     jsonb not null default '[]'::jsonb check (jsonb_typeof(referencias) = 'array'),
+  -- 'sem_pista': o filtro não achou palavra de lugar e o agente nem foi chamado.
+  -- 'localizador': o Localizador leu; `referencias` traz o que ele procurou e achou.
+  metodo          text not null check (metodo in ('sem_pista', 'localizador')),
+  referencias     jsonb not null default '{}'::jsonb check (jsonb_typeof(referencias) in ('object', 'array')),
   -- O que entra na conversa, no fim do texto da mensagem: "[no mapa: ...]".
   anotacao        text check (char_length(anotacao) between 1 and 900),
   ai_run_id       bigint references public.ai_runs (id) on delete set null,
@@ -123,7 +109,7 @@ drop policy if exists ia_referencias_de_lugar_select on public.ia_referencias_de
 create policy ia_referencias_de_lugar_select on public.ia_referencias_de_lugar
   for select to authenticated using ((select app.is_manager()));
 comment on table public.ia_referencias_de_lugar is
-  'Os lugares que o cliente citou em cada mensagem (rua, praia, condomínio, ponto, CEP), o que o mapa achou e os imóveis da Imova perto, segundo a IA que atende (23/11/2026).';
+  'Os lugares que o cliente citou em cada mensagem (rua, praia, condomínio, ponto, CEP), o que o Localizador achou no mapa e o imóvel da Imova que bate, segundo a IA que atende (23/11/2026).';
 
 -- ---------------------------------------------------------------------
 -- 3. As portas do worker
@@ -173,12 +159,12 @@ begin
   if not found or m.direction <> 'in'::app.msg_direction or m.type <> 'text'::app.msg_type then
     return jsonb_build_object('ok', false, 'motivo', 'nao_e_texto_do_cliente');
   end if;
-  if p_metodo is null or p_metodo not in ('sem_pista', 'modelo') then
+  if p_metodo is null or p_metodo not in ('sem_pista', 'localizador') then
     return jsonb_build_object('ok', false, 'motivo', 'metodo_invalido');
   end if;
   insert into public.ia_referencias_de_lugar (message_id, conversation_id, metodo, referencias, anotacao, ai_run_id)
   values (m.id, m.conversation_id, p_metodo,
-          case when jsonb_typeof(p_referencias) = 'array' then p_referencias else '[]'::jsonb end,
+          case when jsonb_typeof(p_referencias) in ('object', 'array') then p_referencias else '{}'::jsonb end,
           left(nullif(btrim(coalesce(p_anotacao, '')), ''), 900),
           p_ai_run_id)
   on conflict (message_id) do update
@@ -205,16 +191,15 @@ $$;
 revoke all on function public.ia_referencias_da_conversa(uuid) from public, anon, authenticated;
 grant execute on function public.ia_referencias_da_conversa(uuid) to service_role;
 
--- O que o cache sabe de uma pergunta, por fonte, sem o que já venceu.
+-- O que o cache sabe de uma pergunta, se ainda vale (nada = perguntar ao mapa).
 create or replace function public.ia_lugar_no_mapa_ler(p_consulta text)
-returns table (fonte text, encontrado boolean, lat double precision, lng double precision,
-               nivel text, lugar text, cidade text)
+returns jsonb
 language sql
 stable
 security definer
 set search_path = ''
 as $$
-  select l.fonte, l.encontrado, l.lat, l.lng, l.nivel, l.lugar, l.cidade
+  select l.resultados
     from public.ia_lugares_no_mapa l
    where l.consulta = app.ia_chave_do_lugar(p_consulta)
      and l.expira_em > now()
@@ -222,13 +207,10 @@ $$;
 revoke all on function public.ia_lugar_no_mapa_ler(text) from public, anon, authenticated;
 grant execute on function public.ia_lugar_no_mapa_ler(text) to service_role;
 
--- Grava a resposta do mapa. Quanto ela vale: do Google, 30 dias (os termos dele);
--- do OpenStreetMap achado, 180 dias; "não achado", 30 dias (o mapa aprende lugar
--- novo, e a pergunta volta a ser feita). Do Google nunca se grava nome nem cidade.
-create or replace function public.ia_lugar_no_mapa_gravar(
-  p_consulta text, p_fonte text, p_encontrado boolean,
-  p_lat double precision, p_lng double precision, p_nivel text,
-  p_lugar text, p_place_id text, p_licenca text)
+-- Grava a resposta do mapa. Achado vale 180 dias; "não achado", 30 (o mapa aprende
+-- lugar novo, e a pergunta volta a ser feita). Mais de 3 resultados ficam os 3
+-- primeiros.
+create or replace function public.ia_lugar_no_mapa_gravar(p_consulta text, p_resultados jsonb, p_licenca text)
 returns jsonb
 language plpgsql
 volatile
@@ -237,38 +219,25 @@ set search_path = ''
 as $$
 declare
   v_chave text := app.ia_chave_do_lugar(p_consulta);
-  v_achou boolean := coalesce(p_encontrado, false) and p_lat is not null and p_lng is not null;
-  v_nivel text := case when p_nivel in ('ponto', 'bairro', 'cidade') then p_nivel else 'ponto' end;
+  v_lista jsonb := case when jsonb_typeof(p_resultados) = 'array' then p_resultados else '[]'::jsonb end;
 begin
   if v_chave is null or char_length(v_chave) > 300 then
     return jsonb_build_object('ok', false, 'motivo', 'consulta_invalida');
   end if;
-  if p_fonte is null or p_fonte not in ('nominatim', 'google') then
-    return jsonb_build_object('ok', false, 'motivo', 'fonte_invalida');
+  if jsonb_array_length(v_lista) > 3 then
+    select coalesce(jsonb_agg(e order by n), '[]'::jsonb) into v_lista
+      from jsonb_array_elements(v_lista) with ordinality as t(e, n) where n <= 3;
   end if;
-  insert into public.ia_lugares_no_mapa (consulta, fonte, encontrado, lat, lng, nivel, lugar, cidade,
-                                         place_id, licenca, buscado_em, expira_em)
-  values (v_chave, p_fonte, v_achou,
-          case when v_achou then p_lat end,
-          case when v_achou then p_lng end,
-          case when v_achou then v_nivel end,
-          case when v_achou and p_fonte = 'nominatim' then left(nullif(btrim(coalesce(p_lugar, '')), ''), 160) end,
-          null,
-          left(nullif(btrim(coalesce(p_place_id, '')), ''), 300),
-          left(nullif(btrim(coalesce(p_licenca, '')), ''), 300),
-          now(),
-          now() + case when p_fonte = 'google' or not v_achou then interval '30 days' else interval '180 days' end)
-  on conflict (consulta, fonte) do update
-    set encontrado = excluded.encontrado, lat = excluded.lat, lng = excluded.lng,
-        nivel = excluded.nivel, lugar = excluded.lugar, cidade = excluded.cidade,
-        place_id = excluded.place_id, licenca = excluded.licenca,
+  insert into public.ia_lugares_no_mapa (consulta, resultados, licenca, buscado_em, expira_em)
+  values (v_chave, v_lista, left(nullif(btrim(coalesce(p_licenca, '')), ''), 300), now(),
+          now() + case when jsonb_array_length(v_lista) = 0 then interval '30 days' else interval '180 days' end)
+  on conflict (consulta) do update
+    set resultados = excluded.resultados, licenca = excluded.licenca,
         buscado_em = excluded.buscado_em, expira_em = excluded.expira_em;
-  return jsonb_build_object('ok', true, 'encontrado', v_achou);
+  return jsonb_build_object('ok', true, 'resultados', jsonb_array_length(v_lista));
 end $$;
-revoke all on function public.ia_lugar_no_mapa_gravar(text, text, boolean, double precision, double precision,
-  text, text, text, text) from public, anon, authenticated;
-grant execute on function public.ia_lugar_no_mapa_gravar(text, text, boolean, double precision, double precision,
-  text, text, text, text) to service_role;
+revoke all on function public.ia_lugar_no_mapa_gravar(text, jsonb, text) from public, anon, authenticated;
+grant execute on function public.ia_lugar_no_mapa_gravar(text, jsonb, text) to service_role;
 
 -- Onde ficam os imóveis que a IA conhece (os mesmos de `app.ia_atendente_imoveis`):
 -- o pino do anúncio quando há, e o endereço INTEIRO (só para o worker achar o pino
