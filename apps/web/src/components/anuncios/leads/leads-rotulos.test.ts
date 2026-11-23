@@ -4,6 +4,8 @@ import {
   chegouEm,
   comoChegou,
   comoChegouOLead,
+  doPortal,
+  peloPortal,
   contagemPorSituacao,
   contatoApagaEm,
   cortarMensagem,
@@ -204,24 +206,53 @@ describe('temperatura e negócio', () => {
 describe('como chegou e a primeira mensagem', () => {
   it('diz por onde a mensagem chegou', () => {
     expect(comoChegou('whatsapp')).toBe('Pelo WhatsApp');
-    expect(comoChegou('chat')).toBe('Pelo chat do portal');
+    expect(comoChegou('chat')).toBe('Pelo chat da OLX');
     expect(comoChegou('formulario')).toBe('Pelo formulário do portal');
     expect(comoChegou('visita')).toBe('Pediu visita pelo portal');
     expect(comoChegou(null)).toBeNull();
     expect(comoChegou('telepatia')).toBeNull();
   });
 
-  it('o lead que nasce da conversa de WhatsApp tem rótulo próprio, com o portal', () => {
+  it('na linha, o portal vai na marca e o texto diz o canal (23/11/2026)', () => {
+    // O filtro continua separando o lead que nasceu da conversa.
     expect(comoChegou('whatsapp_do_portal')).toBe('WhatsApp pelo portal');
-    expect(comoChegouOLead(leadDoWhatsapp())).toBe('WhatsApp pelo ZAP Imóveis');
-    expect(comoChegouOLead(leadDoWhatsapp({ portal: 'vivareal' }))).toBe('WhatsApp pelo Viva Real');
-    expect(comoChegouOLead(leadDoWhatsapp({ portal: 'olx' }))).toBe('WhatsApp pela OLX');
-    // Corrigido por gente para "Canal Pro", sem dizer qual portal.
-    expect(comoChegouOLead(leadDoWhatsapp({ portal: null }))).toBe('WhatsApp pelo portal');
-    // O aviso do Grupo OLX continua "Pelo WhatsApp", mesmo com o portal do par.
-    expect(comoChegouOLead(lead({ portal: 'zap' }))).toBe('Pelo WhatsApp');
-    expect(comoChegouOLead(lead({ chegou_por: 'chat' }))).toBe('Pelo chat do portal');
+    // WhatsApp, de qualquer portal (ou sem saber qual): o mesmo texto.
+    expect(comoChegouOLead(leadDoWhatsapp())).toBe('Chegou pelo WhatsApp');
+    expect(comoChegouOLead(leadDoWhatsapp({ portal: 'vivareal' }))).toBe('Chegou pelo WhatsApp');
+    expect(comoChegouOLead(leadDoWhatsapp({ portal: 'olx' }))).toBe('Chegou pelo WhatsApp');
+    expect(comoChegouOLead(leadDoWhatsapp({ portal: null }))).toBe('Chegou pelo WhatsApp');
+    expect(comoChegouOLead(lead({ portal: 'olx' }))).toBe('Chegou pelo WhatsApp');
+    // O chat é da OLX (a lista diz o portal); o formulário e a visita dizem o portal quando se sabe.
+    expect(comoChegouOLead(lead({ chegou_por: 'chat', portal: 'olx' }))).toBe(
+      'Chegou pelo chat da OLX',
+    );
+    expect(comoChegouOLead(lead({ chegou_por: 'chat', portal: null }))).toBe(
+      'Chegou pelo chat do portal',
+    );
+    expect(comoChegouOLead(lead({ chegou_por: 'formulario', portal: null }))).toBe(
+      'Chegou pelo formulário do portal',
+    );
+    expect(comoChegouOLead(lead({ chegou_por: 'formulario', portal: 'zap' }))).toBe(
+      'Chegou pelo formulário do ZAP Imóveis',
+    );
+    expect(comoChegouOLead(lead({ chegou_por: 'visita', portal: null }))).toBe(
+      'Pediu visita pelo portal',
+    );
+    expect(comoChegouOLead(lead({ chegou_por: 'visita', portal: 'olx' }))).toBe(
+      'Pediu visita pela OLX',
+    );
     expect(comoChegouOLead(lead({ grupo: 'clicou', chegou_por: null }))).toBeNull();
+  });
+
+  it('"do portal" com a preposição de cada um', () => {
+    expect(doPortal('zap')).toBe('do ZAP Imóveis');
+    expect(doPortal('vivareal')).toBe('do Viva Real');
+    expect(doPortal('olx')).toBe('da OLX');
+    expect(doPortal(null)).toBe('do portal');
+    expect(doPortal('toString')).toBe('do portal');
+    expect(peloPortal('zap')).toBe('pelo ZAP Imóveis');
+    expect(peloPortal('olx')).toBe('pela OLX');
+    expect(peloPortal(null)).toBe('pelo portal');
   });
 
   it('separa o lead do WhatsApp pela origem ou pelo tipo', () => {
@@ -333,7 +364,7 @@ describe('de qual anúncio veio', () => {
     // Tocou no WhatsApp, mas escreveu pelo chat do portal.
     expect(
       fraseDaOrigem(lead({ tipos: ['CLICK_WHATSAPP', 'CONTACT_CHAT'], chegou_por: 'chat' })),
-    ).toBe('Veio do anúncio SA0012_IMOVA · Chat do portal');
+    ).toBe('Veio do anúncio SA0012_IMOVA · Chat da OLX');
     expect(fraseDaOrigem(lead({ chegou_por: 'whatsapp', tipos: ['PHONE_VIEW'] }))).toBe(
       'Veio do anúncio SA0012_IMOVA · WhatsApp',
     );

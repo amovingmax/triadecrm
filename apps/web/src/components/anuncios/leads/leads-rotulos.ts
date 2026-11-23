@@ -148,7 +148,7 @@ const ROTULO_DO_TIPO: Record<TipoDeContato, string> = {
   VISIT_REQUEST: 'Pediu visita',
   CLICK_SCHEDULE: 'Agendou visita',
   CONTACT_FORM: 'Formulário',
-  CONTACT_CHAT: 'Chat do portal',
+  CONTACT_CHAT: 'Chat da OLX', // 23/11/2026: só a OLX tem chat
   PHONE_VIEW: 'Viu o telefone',
 };
 
@@ -209,7 +209,8 @@ export const JEITOS_DE_CHEGAR: readonly ChegouPor[] = [
 const ROTULO_DA_CHEGADA: Record<ChegouPor, string> = {
   whatsapp: 'Pelo WhatsApp',
   whatsapp_do_portal: 'WhatsApp pelo portal',
-  chat: 'Pelo chat do portal',
+  // 23/11/2026: só a OLX tem chat (o ZAP Imóveis e o Viva Real, não).
+  chat: 'Pelo chat da OLX',
   formulario: 'Pelo formulário do portal',
   visita: 'Pediu visita pelo portal',
 };
@@ -227,7 +228,7 @@ export function ehJeitoDeChegar(valor: string | null | undefined): valor is Cheg
   return (JEITOS_DE_CHEGAR as readonly (string | null | undefined)[]).includes(valor);
 }
 
-/** "Pelo WhatsApp", "Pelo chat do portal"...; null quando não mandou mensagem. */
+/** "Pelo WhatsApp", "Pelo chat da OLX"... (o filtro); null quando não mandou mensagem. */
 export function comoChegou(chegouPor: string | null | undefined): string | null {
   return ehJeitoDeChegar(chegouPor) ? ROTULO_DA_CHEGADA[chegouPor] : null;
 }
@@ -238,13 +239,37 @@ const ROTULO_DO_PORTAL: Record<Portal, string> = {
   olx: 'OLX',
 };
 
-function ehPortal(valor: string | null | undefined): valor is Portal {
+/** "do ZAP Imóveis", "do Viva Real", "da OLX". */
+const DO_PORTAL: Record<Portal, string> = {
+  zap: 'do ZAP Imóveis',
+  vivareal: 'do Viva Real',
+  olx: 'da OLX',
+};
+
+/** "pelo ZAP Imóveis", "pelo Viva Real", "pela OLX". */
+const PELO_PORTAL: Record<Portal, string> = {
+  zap: 'pelo ZAP Imóveis',
+  vivareal: 'pelo Viva Real',
+  olx: 'pela OLX',
+};
+
+export function ehPortal(valor: string | null | undefined): valor is Portal {
   return valor === 'zap' || valor === 'vivareal' || valor === 'olx';
 }
 
 /** "ZAP Imóveis", "Viva Real", "OLX"; null quando não se sabe. */
 export function rotuloDoPortal(portal: string | null | undefined): string | null {
   return ehPortal(portal) ? ROTULO_DO_PORTAL[portal] : null;
+}
+
+/** "do ZAP Imóveis", "da OLX"...; "do portal" quando não se sabe. */
+export function doPortal(portal: string | null | undefined): string {
+  return ehPortal(portal) ? DO_PORTAL[portal] : 'do portal';
+}
+
+/** "pelo ZAP Imóveis", "pela OLX"...; "pelo portal" quando não se sabe. */
+export function peloPortal(portal: string | null | undefined): string {
+  return ehPortal(portal) ? PELO_PORTAL[portal] : 'pelo portal';
 }
 
 /** O lead nasceu da conversa de WhatsApp (o canal de chegada reconheceu o portal)? */
@@ -264,18 +289,34 @@ export function jeitoDeChegar(
 }
 
 /**
- * Como chegou, com o portal quando se sabe: "WhatsApp pelo ZAP Imóveis",
- * "WhatsApp pela OLX", "Pelo chat do portal"...; null quando não mandou mensagem.
+ * Como chegou, na linha e na ficha do lead (23/11/2026, pedido do usuário). O
+ * portal vai na MARCA ao lado (`MarcaDoPortal`), e o texto diz o canal:
+ * "Chegou pelo WhatsApp" (seja qual for o portal), "Chegou pelo chat da OLX",
+ * "Chegou pelo formulário do portal", "Pediu visita pelo portal"...; null quando
+ * não mandou mensagem.
+ *
+ * O portal vem da lista (`portal_leads_na_lista.portal`): o do lead do
+ * WhatsApp, o do par, ou a OLX para o chat (20261123170000). O formulário e o
+ * pedido de visita existem no ZAP e no Viva Real, e o aviso do Grupo OLX não
+ * diz qual: ficam "do portal".
  */
 export function comoChegouOLead(
   lead: Pick<LeadDoPortal, 'chegou_por' | 'origem' | 'tipos' | 'portal'>,
 ): string | null {
-  const jeito = jeitoDeChegar(lead);
-  const portal = rotuloDoPortal(lead.portal);
-  if (jeito === 'whatsapp_do_portal' && portal) {
-    return `WhatsApp ${lead.portal === 'olx' ? 'pela' : 'pelo'} ${portal}`;
+  switch (jeitoDeChegar(lead)) {
+    case 'whatsapp':
+    case 'whatsapp_do_portal':
+      return 'Chegou pelo WhatsApp';
+    case 'chat':
+      // Só a OLX tem chat; "do portal" só se a lista um dia não disser.
+      return `Chegou pelo chat ${doPortal(lead.portal)}`;
+    case 'formulario':
+      return `Chegou pelo formulário ${doPortal(lead.portal)}`;
+    case 'visita':
+      return `Pediu visita ${peloPortal(lead.portal)}`;
+    default:
+      return null;
   }
-  return comoChegou(jeito);
 }
 
 /** O que a pessoa mandou quando a mensagem é mídia sem texto. */
@@ -408,7 +449,7 @@ const CANAL_DA_CHEGADA: Record<ChegouPor, string> = {
   // O banco diz 'whatsapp' também para o lead que nasce da conversa; isto é só
   // para quem passar o jeito da tela.
   whatsapp_do_portal: 'WhatsApp',
-  chat: 'Chat do portal',
+  chat: 'Chat da OLX',
   formulario: 'Formulário',
   visita: 'Pediu visita',
 };

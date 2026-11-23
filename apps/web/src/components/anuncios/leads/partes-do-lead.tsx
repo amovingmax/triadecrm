@@ -24,15 +24,14 @@ import { TelefoneRevelavel } from '@/components/parceiros/telefone-revelavel';
 import { revelarTelefoneDoLead } from './leads-dados';
 import {
   comoChegouOLead,
-  jeitoDeChegar,
   rotuloDoTipo,
   SITUACOES_DO_LEAD,
   temperaturaDoLead,
-  TIPO_DA_CHEGADA,
   type LeadDoPortal,
   type SituacaoDoLead,
   type Tom,
 } from './leads-rotulos';
+import { MarcaDoPortal } from './marca-do-portal';
 
 /**
  * As peças que a lista e a ficha do lead repetem (05/11/2026): o ícone de cada
@@ -67,8 +66,9 @@ export function TipoDeContato({ tipo, className }: { tipo: string; className?: s
 }
 
 /**
- * "Pelo WhatsApp", "Pelo chat do portal", "WhatsApp pelo ZAP Imóveis"... com o
- * ícone do mesmo canal.
+ * A marca do portal e o canal: [OLX] "Chegou pelo chat da OLX", [OLX] "Chegou
+ * pelo WhatsApp", [ZAP] "Chegou pelo WhatsApp"... (23/11/2026; até ali, o ícone
+ * do canal e "WhatsApp pelo ZAP Imóveis"). Sem portal, a marca neutra.
  */
 export function ComoChegou({
   lead,
@@ -77,15 +77,14 @@ export function ComoChegou({
   lead: Pick<LeadDoPortal, 'chegou_por' | 'origem' | 'tipos' | 'portal'>;
   className?: string;
 }) {
-  const jeito = jeitoDeChegar(lead);
   const rotulo = comoChegouOLead(lead);
-  if (!rotulo || !jeito) {
+  if (!rotulo) {
     return <span className="text-muted-foreground">—</span>;
   }
   return (
-    <span className={cn('inline-flex min-w-0 items-center gap-1.5', className)}>
-      <IconeDoTipo tipo={TIPO_DA_CHEGADA[jeito]} className="text-muted-foreground" />
-      <span className="min-w-0">{rotulo}</span>
+    <span className={cn('inline-flex min-w-0 items-start gap-2', className)}>
+      <MarcaDoPortal portal={lead.portal} />
+      <span className="min-w-0 pt-px">{rotulo}</span>
     </span>
   );
 }

@@ -34,7 +34,6 @@ import {
   ehJeitoDeChegar,
   filtrarLeads,
   FILTROS_INICIAIS,
-  jeitoDeChegar,
   JEITOS_DE_CHEGAR,
   nomeDoLead,
   origemDoLead,
@@ -62,6 +61,7 @@ import {
   TelefoneDoLead,
   TipoDeContato,
 } from './partes-do-lead';
+import { MarcaDoPortal } from './marca-do-portal';
 
 /** Valor do "sem filtro" no Radix Select, que não aceita item com valor vazio. */
 const TODOS = '__todos__';
@@ -786,7 +786,8 @@ function TabelaDeLeads({
             <th scope="col" className="w-[11.5rem] px-3 py-2.5 font-normal">
               Contato
             </th>
-            <th scope="col" className="w-[10rem] px-3 py-2.5 font-normal">
+            {/* 23/11/2026: 12rem (era 10) para a marca do portal e "Chegou pelo chat da OLX". */}
+            <th scope="col" className="w-[12rem] px-3 py-2.5 font-normal">
               Como chegou
             </th>
             <th scope="col" className="w-[11.5rem] px-3 py-2.5 font-normal">
@@ -884,7 +885,6 @@ function CartoesDeLeads({
         const { nome, semNome } = nomeDoLead(lead);
         const telefone = telefoneDaLinha(lead);
         const titulo = tituloCurto(lead.anuncio_titulo, 40);
-        const jeito = jeitoDeChegar(lead);
         return (
           <li key={lead.id}>
             <button
@@ -910,12 +910,10 @@ function CartoesDeLeads({
               </span>
               {/* Como chegou e de qual anúncio, em até duas linhas (17/11/2026): numa
                   só, em 375, o anúncio virava "TE0002_IMOVA Terreno C…". */}
-              <span className="flex w-full min-w-0 items-start gap-1.5 text-sm">
-                <IconeDoTipo
-                  tipo={jeito ? TIPO_DA_CHEGADA[jeito] : null}
-                  className="mt-0.5 text-muted-foreground"
-                />
-                <span className="line-clamp-2 min-w-0">
+              <span className="flex w-full min-w-0 items-start gap-2 text-sm">
+                {/* 23/11/2026: a marca do portal no lugar do ícone do canal. */}
+                <MarcaDoPortal portal={lead.portal} />
+                <span className="line-clamp-2 min-w-0 pt-px">
                   {comoChegouOLead(lead) ?? 'Mensagem'}
                   <span className="text-muted-foreground">
                     {' · '}

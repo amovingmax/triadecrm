@@ -120,7 +120,7 @@ describe('só quem mandou mensagem, achado pela conversa', () => {
     // Outra conversa da mesma ficha cai no lead mais recente da ficha.
     expect(origemDaConversa(m, { conversaId: 'conv2', organizacaoId: 'org1' })).toMatchObject({
       leadId: 'chat',
-      frase: 'Veio do anúncio SA0012_IMOVA · Chat do portal',
+      frase: 'Veio do anúncio SA0012_IMOVA · Chat da OLX',
     });
   });
 });

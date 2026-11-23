@@ -42,6 +42,7 @@ import {
   contatoApagaEm,
   dataDoLead,
   dataHoraDoLead,
+  doPortal,
   ehLeadDoWhatsapp,
   escreveuNoPortal,
   marcaRespondidoAMao,
@@ -137,6 +138,8 @@ function Corpo({ lead, euId, agora }: { lead: LeadDoPortal; euId: string; agora:
   // 12/11/2026: o lead que nasceu da conversa (o texto do anúncio no WhatsApp).
   const doWhatsapp = ehLeadDoWhatsapp(lead);
   const portal = rotuloDoPortal(lead.portal);
+  // 23/11/2026: a lista diz OLX para o chat (só a OLX tem chat).
+  const peloChat = lead.portal === 'olx' && tipos.includes('CONTACT_CHAT');
   const resposta = respostaDoLead(lead, agora);
   const primeira = primeiraMensagemDoLead(lead);
   const transacao = rotuloDaTransacao(lead.transacao);
@@ -364,13 +367,25 @@ function Corpo({ lead, euId, agora }: { lead: LeadDoPortal; euId: string; agora:
           {doWhatsapp ? (
             <p className="text-xs text-muted-foreground">
               O canal de chegada da conversa diz que a pessoa veio do anúncio
-              {portal ? ` no ${portal}` : ' num portal'}: o texto pronto do botão de WhatsApp, ou a
-              correção de alguém do time.
+              {portal ? ` ${lead.portal === 'olx' ? 'na' : 'no'} ${portal}` : ' num portal'}: o
+              texto pronto do portal, o link do anúncio, ou a correção de alguém do time.
             </p>
           ) : null}
-          {!doWhatsapp && portal ? (
+          {/* 23/11/2026: o porquê do portal no aviso do Grupo OLX, que não diz de onde veio. */}
+          {!doWhatsapp && peloChat ? (
             <p className="text-xs text-muted-foreground">
-              Do {portal}, pelo canal de chegada da conversa de WhatsApp da mesma pessoa.
+              Só a OLX tem chat: o ZAP Imóveis e o Viva Real, não.
+            </p>
+          ) : null}
+          {!doWhatsapp && !peloChat && portal ? (
+            <p className="text-xs text-muted-foreground">
+              {primeiraMaiuscula(doPortal(lead.portal))}, pelo canal de chegada da conversa de
+              WhatsApp da mesma pessoa.
+            </p>
+          ) : null}
+          {mandou && !portal ? (
+            <p className="text-xs text-muted-foreground">
+              O aviso do portal não diz se veio do ZAP Imóveis, do Viva Real ou da OLX.
             </p>
           ) : null}
           {mandou && !doWhatsapp && tipos.length > 0 ? (
@@ -771,4 +786,9 @@ function ConteudoDoDescarte({
       </DialogFooter>
     </>
   );
+}
+
+/** "da OLX" → "Da OLX". */
+function primeiraMaiuscula(texto: string): string {
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
