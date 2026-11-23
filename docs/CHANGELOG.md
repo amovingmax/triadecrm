@@ -11205,3 +11205,33 @@ Pedido: uma tela para o DONO da Imova liberar as fontes da Inteligência de merc
 - **Ensaio das fontes (sem gravar, banco de teste, 19/11):** chavesnamao-mcp 3.313 anúncios; lopes 138, catalogue 100, ibeda 285, imobinova-pipa 82, marta-de-graglia 96, primore 73, zil-monteiro 40; fipezap 221 índices, siconfi 99, geomapas 380, dom-natal 58 obras. **abreu-imoveis respondeu 403** (o site recusa o robô: não liberar). bcb: robots.txt deu 502 nas duas tentativas (já liberada; o robô recusa enquanto o robots não responder).
 - **Com o dono, pela tela:** liberar as 7 imobiliárias que passaram no ensaio e ligar a coleta. A primeira rodada sai na segunda ou quinta seguinte, às 6h.
 - **Não deu para conferir aqui:** a página e a aba com login de verdade (a sessão é do dono).
+
+## 23/11/2026 — Clientes e Parceiros nas Conversas da Imova (branch `clientes-e-parceiros`; só na Imova; nada publicado)
+
+Pedido: "Quero que nas conversas do ambiente da Imova funcione de forma semelhante ao do Komune. Onde temos dentro da aba de conversa dois tipos de perfis: Clientes e Parceiros [...] Todos os que entram em contato pela primeira vez com a Imova devem entrar como Cliente e devem permanecer por lá até que seja mudado o perfil dele para Parceiro." Protótipo aprovado no mesmo dia (https://claude.ai/artifact/3uRsKXTfJQURDawN6hkTVo), com as quatro sugestões: (1) a IA que atende não responde Parceiros; (2) negócio ganho não muda o perfil sozinho, só sugere; (3) a mudança guarda o tipo da parceria e o imóvel; (4) quem atende muda o perfil (admin, gestor e SDR).
+
+- **Parceiro é a marca da Consultoria.** Sem linha em `public.consultoria`, a ficha é Cliente; com a linha, Parceiro. A pílula Consultoria virou a caixa Parceiros, e a pílula Clientes saiu (a lista de Conversas da Imova já era a dos clientes, com ficha ou sem).
+- **Banco (migração `20261123120000_clientes_e_parceiros.sql`):**
+  - `public.consultoria` ganha `tipo` (inquilino, proprietario, comprador, outro; nulo = marca sem tipo) e `anuncio_id` (FK para `anuncios` onde a tabela existe). Nas duas empresas; nulas, nada do que existe muda.
+  - `public.parceiro_mudar(p_organization_id, p_parceiro, p_tipo, p_anuncio_id)`: põe, corrige ou tira a marca de uma ficha; `app.is_manager()`; recusa tipo, anúncio (inexistente ou excluído) e ficha errados; corrigir mantém `desde` e `por`; `audit_log` com `VIROU_PARCEIRO`, `PARCERIA_CORRIGIDA` e `VOLTOU_PARA_CLIENTES`. Só na Imova.
+  - `app.ia_atende`: com a marca, a IA fica quieta (o corpo é o da 20261117230000 mais esse passo). Vale também para a marca sem tipo do botão de Prospectados. Só na Imova.
+  - `public.ia_conversa_estado` devolve `parceiro` e o motivo em português. Só na Imova.
+  - Na KOMUNE só entram as duas colunas (conferido no banco local da KOMUNE: a IA não muda).
+- **Tela (módulo `clientesEParceiros` em `packages/schema/src/empresas.ts`, Imova ligada, KOMUNE desligada):**
+  - `SeletorDeCaixas` ficou genérico (as opções vêm de quem chama); a KOMUNE passa as mesmas Fornecedores e Clientes, com as mesmas classes. Na Imova: Clientes (petróleo) e Parceiros (azul), cada uma com "N esperando" ou "em dia". O número é o do menu, dividido pela marca (`fichasDasRespostas`, novo em `provedor-avisos.tsx`).
+  - Clientes: a lista de Conversas de sempre, com as pílulas Conversas, Automáticas e Grupos, Minhas, Meu setor, Todas, a ordem, os filtros e Concluídas.
+  - Parceiros: busca por nome, bairro ou imóvel, pílulas por tipo (Todos, Inquilinos, Proprietários, Compradores, Outros; a marca sem tipo conta como Outro) e a gaveta das concluídas. Na linha, o tipo e o imóvel; a atitude, o canal e o próximo passo da IA saem, porque são da venda.
+  - Na conversa, uma faixa logo abaixo do cabeçalho: "Cliente" e "Mudar para Parceiro"; com negócio ganho, a faixa fica amarela ("Negócio ganho. Mudar o perfil para Parceiro?"); Parceiro mostra "Parceiro · Inquilino", o imóvel, desde quando e por quem, "Corrigir" e "Voltar para Clientes". O selo e o botão da IA somem na conversa de Parceiro.
+  - "Mudar para Parceiro" também na setinha da linha e no toque longo do celular. Ele abre um diálogo com o tipo (obrigatório; vem marcado Proprietário na ficha de Proprietário e Comprador com negócio ganho) e o imóvel (opcional, a mesma escolha de anúncio da Agenda). Voltar para Clientes é um clique; os dois avisos têm "Desfazer".
+  - Montagem (`montarConversas` com `parceiros`): na Imova, só a marca põe em Parceiros. Negócio ganho e temperatura de cliente deixam de pôr; o negócio ganho vira `ganhou` (a sugestão). Sem o mapa (a KOMUNE), a regra da Consultoria é a de sempre.
+  - Prospectados (Imova): o botão e a ação em lote dizem "Parceiro" / "Mudar para Parceiro", com o aperto de mão no lugar do fone.
+  - Link antigo `?aba=fora` cai em Clientes; `?aba=consultoria` abre Parceiros; o aviso de Parceiro abre na caixa Parceiros.
+- **Verificado (nada remoto):**
+  - Migração aplicada nos bancos locais da Imova e da KOMUNE.
+  - pgTAP 196: 30 de 30. Os 111 e 183 continuam passando na Imova; o 110 passa na KOMUNE (23/23; na Imova local ele esbarra em 4 fichas de teste antigas com os mesmos telefones, sem relação com esta mudança).
+  - `typecheck`, `eslint` e Vitest: site 2.367 + os novos `perfil-regra.test.ts` (17) e 5 em `montagem.test.ts`; schema 114.
+  - Site local (porta 3104, banco local da Imova), no Chrome por Playwright, em 1440 px e 390 px, sem erro no console: as caixas, a faixa, o diálogo, a mudança, a caixa Parceiros, a setinha e a volta para Clientes. A ficha de teste marcada voltou para Clientes; a `consultoria` local ficou vazia.
+- **Pendente:**
+  - publicar, só com pedido: banco antes do site (migração na Imova e na KOMUNE; na KOMUNE só as colunas), depois o site da Imova. O site da KOMUNE não muda de tela, mas leva o código novo na próxima publicação;
+  - a IA que atende precisa do worker que já está no ar (a regra é no banco: nada a republicar no `imova-worker-ai`);
+  - a marca posta antes de 23/11 vem sem tipo e aparece como "Parceiro" em "Outros" (em produção a `consultoria` da Imova tinha 0 linhas em 23/11).
