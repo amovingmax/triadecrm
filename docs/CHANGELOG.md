@@ -11235,3 +11235,10 @@ Pedido: "Quero que nas conversas do ambiente da Imova funcione de forma semelhan
   - publicar, só com pedido: banco antes do site (migração na Imova e na KOMUNE; na KOMUNE só as colunas), depois o site da Imova. O site da KOMUNE não muda de tela, mas leva o código novo na próxima publicação;
   - a IA que atende precisa do worker que já está no ar (a regra é no banco: nada a republicar no `imova-worker-ai`);
   - a marca posta antes de 23/11 vem sem tipo e aparece como "Parceiro" em "Outros" (em produção a `consultoria` da Imova tinha 0 linhas em 23/11).
+
+## 23/11/2026 — Clientes e Parceiros NO AR na Imova (pedido: "Quero que suba pro ar")
+- **Main:** `8c4c4ca` (código) + `47a26b5` (CHANGELOG).
+- **Banco da Imova:** migração `20261123120000` aplicada (`publicar-banco imova migrar`), depois de um ensaio em produção numa transação desfeita por erro proposital (colunas, função, regra da IA com as 24 h e `ia_conversa_estado`: tudo aplicou; nada ficou). Conferido depois: 236 migrações, `parceiro_mudar` existe, `app.ia_atende` com a regra de Parceiro e a das 24 h, `consultoria` com 0 linhas (ninguém é Parceiro ainda; a IA atenderia as mesmas 31 conversas de antes).
+- **Site da Imova:** `imova-bvccgemrf` em imova-crm.vercel.app (volta: `imova-fe7l9tnvd`), pela cópia limpa `~/triadecrm-publicar-imova`.
+- **KOMUNE não foi tocada:** nem banco nem site. A migração chega lá na próxima `komune migrar` (só as duas colunas, nulas); o site da KOMUNE leva o código na próxima publicação sem mudar de tela.
+- **Não deu para conferir aqui:** a tela em produção com login de verdade.
