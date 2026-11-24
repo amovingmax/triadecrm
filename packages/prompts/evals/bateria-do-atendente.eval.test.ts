@@ -22,8 +22,8 @@ import { atendenteImovaV7 as v7, sistemaComBaseV7 } from '../src/prompts/atenden
  */
 
 describe('bateria do atendente: os casos', () => {
-  it('são 40, com id único, e cobrem os quatro grupos', () => {
-    expect(CASOS_DA_BATERIA).toHaveLength(40);
+  it('são 41 (o A14 entrou em 24/11), com id único, e cobrem os quatro grupos', () => {
+    expect(CASOS_DA_BATERIA).toHaveLength(41);
     const ids = CASOS_DA_BATERIA.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const grupo of GRUPOS_DA_BATERIA) {
@@ -279,6 +279,53 @@ describe('bateria do atendente: a régua', () => {
         comMapa,
       ),
     ).toEqual([]);
+  });
+
+  it('A14 ("acho que tá caro"): entende + escritura passa; juntar rua, "vende inteiro" ou perguntar não', () => {
+    const resp = (mensagem: string) => ({ acao: 'responder' as const, mensagem, agenda: null });
+    expect(
+      conferirCasoDaBateria(
+        caso('A14'),
+        resp('Entendo. Ele já tem escritura pública, o que dá segurança na compra.'),
+        comMapa,
+      ),
+    ).toEqual([]);
+    const falhas = conferirCasoDaBateria(
+      caso('A14'),
+      resp(
+        'Entendo. Ele tem escritura pública e fica em Capim Macio, na Rua Professor Etelvino Cunha. O proprietário vende só o terreno inteiro. O que pesou mais: o valor, o lugar ou o tamanho?',
+      ),
+      comMapa,
+    );
+    expect(falhas).toEqual(
+      expect.arrayContaining([
+        'faz pergunta quando não devia',
+        'junta localização ou regra do proprietário que ele não perguntou',
+        'já pergunta o que pesou mais',
+      ]),
+    );
+  });
+
+  it('I09 (Satélite): um terreno parecido passa; dois, não', () => {
+    const resp = (mensagem: string) => ({ acao: 'responder' as const, mensagem, agenda: null });
+    expect(
+      conferirCasoDaBateria(
+        caso('I09'),
+        resp(
+          'No momento não temos terreno no Satélite; temos um terreno em Capim Macio, com escritura pública.',
+        ),
+        comMapa,
+      ),
+    ).toEqual([]);
+    expect(
+      conferirCasoDaBateria(
+        caso('I09'),
+        resp(
+          'No Satélite não temos, mas temos dois terrenos em Capim Macio: um na Rua Professor Etelvino Cunha e outro na Rua Missionário Joel Carlson.',
+        ),
+        comMapa,
+      ),
+    ).toContain('oferece mais de um imóvel (item 6: um parecido só)');
   });
 
   it('o "tudo bem?" do cumprimento não conta como pergunta', () => {

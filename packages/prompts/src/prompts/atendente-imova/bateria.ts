@@ -352,10 +352,21 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
     ...TERCA,
     nome: 'Vânia Alves',
     falas: [{ de: 'cliente', antes: 1, texto: 'Vocês têm algum terreno no Satélite?' }],
+    // 24/11 (entrevista, item 6): sem o que ele procura, oferece UM parecido (mesmo tipo,
+    // bairro vizinho ou mesma zona) e, se ele recusar, anota; ou já oferece anotar.
     espera: {
       acoes: RESPONDEU,
       deve: [r(/n[ãa]o temos|hoje n[ãa]o|no momento n[ãa]o/i, 'diz que no momento não tem')],
-      algum: [r(/avis|anot/i, 'oferece anotar e avisar')],
+      algum: [
+        r(/avis|anot/i, 'oferece anotar e avisar'),
+        r(/capim macio|terreno (em|na|no) /i, 'oferece um terreno parecido'),
+      ],
+      nunca: [
+        r(
+          /dois terrenos|etelvino[\s\S]*joel carlson|joel carlson[\s\S]*etelvino/i,
+          'oferece mais de um imóvel (item 6: um parecido só)',
+        ),
+      ],
     },
   },
   {
@@ -643,6 +654,57 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
           'confirma ou contesta o preço',
         ),
         r(/desconto de|aceita(mos)? (a )?proposta/i, 'promete desconto'),
+      ],
+    },
+  },
+  {
+    id: 'A14',
+    titulo: '"Acho que tá caro" depois de confirmar o terreno pela foto',
+    grupo: 'atender',
+    origem:
+      'teste do dono em 24/11 (print): a IA juntou rua, bairro e "vende só inteiro" e já perguntou o que pesou mais',
+    critico: true,
+    ...TERCA,
+    nome: 'Janio Ramalho',
+    falas: [
+      {
+        de: 'cliente',
+        antes: 16,
+        texto: 'Oi, vi um terreno à venda perto da Avenida Gustavo Neves. Ainda está disponível?',
+      },
+      {
+        de: 'ia',
+        antes: 15,
+        texto:
+          'É o nosso terreno bem perto da Gustavo Neves, na Rua Professor Etelvino Cunha, em Capim Macio.',
+      },
+      {
+        de: 'ia',
+        antes: 15,
+        texto: '[foto do anúncio TE0006 que você mandou] É este aqui que você viu?',
+      },
+      { de: 'cliente', antes: 10, texto: 'É esse sim. Qual o valor?' },
+      {
+        de: 'ia',
+        antes: 9,
+        texto: 'Esse mesmo! Ele está disponível, e o valor de venda é R$ 1.000.000.',
+      },
+      { de: 'cliente', antes: 1, texto: 'Acho que ta caro' },
+    ],
+    // 24/11 (entrevista, itens 10 e 12): entende + UM argumento de valor, sem pergunta,
+    // sem desconto, sem juntar o que ele não perguntou.
+    espera: {
+      acoes: RESPONDEU,
+      deve: [r(/entend/i, 'diz que entende')],
+      algum: [r(/escritura/i, 'dá um argumento de valor (a escritura)')],
+      semPergunta: true,
+      nunca: [
+        r(/desconto|negoci/i, 'fala em desconto ou negociação'),
+        r(
+          /etelvino|capim macio|gustavo neves|inteiro|por partes/i,
+          'junta localização ou regra do proprietário que ele não perguntou',
+        ),
+        r(/pesou mais/i, 'já pergunta o que pesou mais'),
       ],
     },
   },
