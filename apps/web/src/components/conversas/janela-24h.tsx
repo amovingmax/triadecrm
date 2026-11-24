@@ -232,11 +232,13 @@ export function FaixaDaJanela({
 }
 
 /**
- * A janela de 24 h numa pílula grudada no alto da conversa (03/11/2026), no lugar
- * da faixa do cabeçalho: o aviso amarelo do WhatsApp quando só sai modelo, a
- * pílula translúcida quando dá para responder livre.
+ * A janela de 24 h numa FAIXA de largura toda acima das mensagens (protótipo
+ * responsivo da Imova, 24/11/2026), logo abaixo do aviso de ligação perdida.
+ * De 03/11 até aqui era uma pílula grudada no alto do papel de parede, e ela
+ * ficava POR CIMA da primeira mensagem e da data. O amarelo do WhatsApp quando
+ * só sai modelo; o tom calmo quando dá para responder livre.
  */
-export function PilulaDaJanela({
+export function AvisoDaJanela({
   estado,
   className,
 }: {
@@ -247,34 +249,34 @@ export function PilulaDaJanela({
   const apertada = aberta && estado.restanteMin <= JANELA_APERTADA_MIN;
   const resta = aberta ? tempoCurto(estado.restanteMin) : null;
   return (
-    <span
+    <p
       title={explicacaoEmTexto(estado)}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-3 py-[5px] text-xs font-medium shadow-wpp',
+        'flex shrink-0 items-center gap-2 border-b border-wpp-linha px-4 py-2 text-[13px] leading-snug md:px-5',
         aberta && !apertada
-          ? 'bg-wpp-sis text-wpp-sis-texto'
+          ? 'bg-wpp-painel2 text-wpp-suave'
           : 'bg-wpp-janela text-wpp-janela-texto',
         className,
       )}
     >
       {aberta ? (
-        <Clock className="size-3.5 shrink-0" aria-hidden="true" />
+        <Clock className="size-4 shrink-0" aria-hidden="true" />
       ) : estado.situacao === 'fechada' ? (
-        <LockKeyhole className="size-3.5 shrink-0" aria-hidden="true" />
+        <LockKeyhole className="size-4 shrink-0" aria-hidden="true" />
       ) : (
-        <MessageSquareOff className="size-3.5 shrink-0" aria-hidden="true" />
+        <MessageSquareOff className="size-4 shrink-0" aria-hidden="true" />
       )}
       {aberta && resta ? (
-        <span>
+        <span className="min-w-0">
           Janela aberta: resposta livre por mais <span className="numerico">{resta.numero}</span>
           {resta.unidade}
         </span>
       ) : estado.situacao === 'fechada' ? (
-        <span>Janela de 24 h fechada: só sai modelo aprovado</span>
+        <span className="min-w-0">Janela de 24 h fechada: só sai modelo aprovado.</span>
       ) : (
-        <span>Ninguém escreveu ainda: começa por modelo aprovado</span>
+        <span className="min-w-0">Ninguém escreveu ainda: começa por modelo aprovado.</span>
       )}
-    </span>
+    </p>
   );
 }
 

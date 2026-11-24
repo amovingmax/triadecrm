@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   closestCenter,
   DndContext,
@@ -12,6 +12,7 @@ import {
   pointerWithin,
   type CollisionDetection,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
@@ -167,6 +168,28 @@ export function Quadro({
 
   const [cartaoArrastado, setCartaoArrastado] = useState<CartaoQuadro | null>(null);
   const [etapasAbertas, setEtapasAbertas] = useState<ReadonlySet<number>>(new Set());
+  /**
+   * Colunas recolhidas que se abriram porque um cartão parou em cima delas. Valem só
+   * enquanto o cartão está no ar: soltou ou cancelou, voltam a obedecer à regra (e a
+   * que recebeu o cartão deixa de estar vazia, então fica aberta sozinha).
+   */
+  const [abertasNoArraste, setAbertasNoArraste] = useState<ReadonlySet<number>>(new Set());
+  const relogioDoArraste = useRef<number | null>(null);
+
+  const pararRelogio = useCallback(() => {
+    if (relogioDoArraste.current !== null) window.clearTimeout(relogioDoArraste.current);
+    relogioDoArraste.current = null;
+  }, []);
+  useEffect(() => pararRelogio, [pararRelogio]);
+
+  /**
+   * Recolhe na tira de 52px: a etapa de saída (como sempre foi) e a etapa VAZIA
+   * (protótipo responsivo, 24/11/2026), a não ser que alguém a tenha aberto.
+   */
+  const recolhida = (etapa: EtapaQuadro) =>
+    (etapaEhDeSaida(etapa) || etapa.total === 0) &&
+    !etapasAbertas.has(etapa.id) &&
+    !abertasNoArraste.has(etapa.id);
 
   const sensores = useSensors(
     // 6px antes de virar arraste: sem essa folga, tocar no nome do parceiro levantaria
@@ -198,8 +221,30 @@ export function Quadro({
     setCartaoArrastado(achado ?? null);
   }
 
-  function aoTerminarArraste(evento: DragEndEvent) {
+  /**
+   * Cartão parado sobre uma coluna recolhida: depois de 600ms ela abre, para a pessoa
+   * ver onde vai soltar. Abrir na hora faria cada tira cruzada no caminho alargar e
+   * encolher debaixo da mão, e o alvo andaria junto. Soltar em cima da tira fechada
+   * também vale: ela é o mesmo alvo.
+   */
+  function aoPassarPorCima(evento: DragOverEvent) {
+    pararRelogio();
+    const daColuna = evento.over ? dadosDaColuna(evento.over.data.current) : null;
+    const etapa = daColuna ? etapas.find((e) => e.id === daColuna.etapaId) : null;
+    if (!etapa || !recolhida(etapa)) return;
+    relogioDoArraste.current = window.setTimeout(() => {
+      setAbertasNoArraste((atual) => new Set(atual).add(etapa.id));
+    }, 600);
+  }
+
+  function encerrarArraste() {
+    pararRelogio();
     setCartaoArrastado(null);
+    setAbertasNoArraste(new Set());
+  }
+
+  function aoTerminarArraste(evento: DragEndEvent) {
+    encerrarArraste();
     const doCartao = dadosDoCartao(evento.active.data.current);
     const daColuna = evento.over ? dadosDaColuna(evento.over.data.current) : null;
     // Soltar na coluna de onde saiu não é movimento: o banco chamaria de `etapa_igual`
@@ -254,7 +299,16 @@ export function Quadro({
   // -------------------------------------------------------------------------
   const deTrabalho = etapas.filter((e) => !etapaEhDeSaida(e));
   const deSaida = etapas.filter(etapaEhDeSaida);
-  const haRecolhida = deSaida.some((e) => !etapasAbertas.has(e.id));
+  const haRecolhida = deSaida.some(recolhida);
+
+  const colunaRecolhida = (etapa: EtapaQuadro) => (
+    <ColunaRecolhida
+      key={etapa.id}
+      etapa={etapa}
+      arrastando={cartaoArrastado !== null}
+      aoAbrir={() => setEtapasAbertas((atual) => new Set(atual).add(etapa.id))}
+    />
+  );
 
   const colunaCheia = (etapa: EtapaQuadro) => (
     <Coluna
@@ -293,30 +347,28 @@ export function Quadro({
           screenReaderInstructions: instrucoesDeLeitor,
         }}
         onDragStart={aoComecarArraste}
+        onDragOver={aoPassarPorCima}
         onDragEnd={aoTerminarArraste}
-        onDragCancel={() => setCartaoArrastado(null)}
+        onDragCancel={encerrarArraste}
       >
-        <div className="flex gap-3 overflow-x-auto pb-3">
-          {deTrabalho.map(colunaCheia)}
+        {/* O quadro sangra até a borda da página (20px de cada lado) para a rolagem
+            lateral não cortar a primeira coluna rente à margem; `items-start` deixa
+            as tiras recolhidas com a altura delas, sem esticar até a coluna mais
+            cheia. */}
+        <div className="-mx-5 flex scroll-px-5 items-start gap-3 overflow-x-auto px-5 pb-3">
+          {deTrabalho.map((etapa) =>
+            recolhida(etapa) ? colunaRecolhida(etapa) : colunaCheia(etapa),
+          )}
 
           {deSaida.length > 0 ? (
-            <div className="flex shrink-0 gap-2 border-l border-hairline pl-3">
+            <div className="flex shrink-0 items-start gap-2 border-l border-hairline pl-3">
               {haRecolhida ? (
                 <CabecaDaFaixaDeSaida
                   aoAbrirTudo={() => setEtapasAbertas(new Set(deSaida.map((e) => e.id)))}
                 />
               ) : null}
               {deSaida.map((etapa) =>
-                etapasAbertas.has(etapa.id) ? (
-                  colunaCheia(etapa)
-                ) : (
-                  <ColunaRecolhida
-                    key={etapa.id}
-                    etapa={etapa}
-                    arrastando={cartaoArrastado !== null}
-                    aoAbrir={() => setEtapasAbertas((atual) => new Set(atual).add(etapa.id))}
-                  />
-                ),
+                recolhida(etapa) ? colunaRecolhida(etapa) : colunaCheia(etapa),
               )}
             </div>
           ) : null}

@@ -73,7 +73,7 @@ function SheetContent({
                 voltando aos 28px do `icon-sm` no desktop. */}
             <Button
               variant="ghost"
-              className="absolute top-2 right-2 size-11 md:top-3 md:right-3 md:size-7"
+              className="absolute top-2 right-2 size-11 md:top-3 md:right-3 md:size-9"
               size="icon-sm"
             >
               <XIcon />

@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Plus, Upload } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { HREF_EXCLUIDOS, HREF_IMPORTAR } from '@/lib/navegacao';
+import { useMidia } from '@/lib/use-midia';
 import { Button } from '@/components/ui/button';
 
 import { BarraFiltros } from './barra-filtros';
@@ -79,7 +80,13 @@ export function TelaParceiros({
   // Cartão ou tabela é decidido em JS, não por classe: esconder um dos dois com CSS
   // montava as 50 linhas da tabela junto dos 50 cartões no celular, dobrando o HTML
   // que trafega no 4G da rua e o trabalho do React a cada tecla da busca.
+  // A tabela só a partir de 1024px desde o protótipo responsivo (24/11/2026): no
+  // tablet ela quebrava. Abaixo de 768px os cartões ficam sem as ações de mesa
+  // (marcar vários, mudar etapa, marca de Parceiro), como sempre foi.
+  const ehLarga = useMidia('(min-width: 1024px)');
   const ehCelular = useEhCelular();
+  // A altura da barra de busca presa: o cabeçalho da tabela para logo abaixo dela.
+  const [alturaDaBarra, setAlturaDaBarra] = useState<number | null>(null);
   const [filtros, setFiltros] = useState<FiltrosParceiros>(filtrosIniciais);
   const [folhaAberta, setFolhaAberta] = useState(abrirCadastro);
   const clienteDeConsultas = useQueryClient();
@@ -198,8 +205,21 @@ export function TelaParceiros({
   );
 
   return (
-    <div className="flex w-full flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+    <div
+      className={cn(
+        'flex w-full flex-col gap-4',
+        // Folga do tamanho do botão flutuante (56px) mais respiro, só no celular e só
+        // quando ele existe: sem ela o último cartão e a paginação nasciam debaixo
+        // dele e não havia como rolá-los para fora.
+        podeCriar && 'pb-20 md:pb-0',
+      )}
+      style={
+        alturaDaBarra === null
+          ? undefined
+          : ({ '--barra-da-lista': `${alturaDaBarra}px` } as React.CSSProperties)
+      }
+    >
+      <header className="flex flex-wrap items-end justify-between gap-x-3 gap-y-4">
         <div>
           <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
             Prospectados
@@ -221,13 +241,13 @@ export function TelaParceiros({
             {veExcluidos ? (
               <>
                 {' · '}
-                {/* `-my-3 py-3` no celular (16/11/2026): o link tinha 17px de altura,
+                {/* `-my-3 py-3` (16/11/2026; em toda largura desde 24/11): o link tinha 17px,
                     menor que qualquer alvo de toque. O acolchoado aumenta a área do
                     toque e a margem negativa devolve a altura, então a linha do
                     subtítulo não cresce. */}
                 <Link
                   href={HREF_EXCLUIDOS}
-                  className="-my-3 inline-block py-3 underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 md:my-0 md:inline md:py-0"
+                  className="-my-3 inline-block py-3 font-semibold text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
                 >
                   Excluídos
                 </Link>
@@ -237,18 +257,17 @@ export function TelaParceiros({
         </div>
 
         {/* No celular o botão de criar é flutuante (o polegar não sobe até o
-            cabeçalho); o de importar não tem versão de celular de propósito —
-            escolher arquivo e mapear coluna é trabalho de mesa.
+            cabeçalho) e "Trazer uma lista" fica aqui em cima, sozinho: desde o
+            protótipo responsivo (24/11/2026) ele aparece também no celular, onde
+            antes não havia caminho para a importação além da paleta ⌘K.
 
             O botão mora aqui porque a rota saiu do menu, e porque
-            até 09/09/2026 esta tela não tinha UM link para `/importar`: os três
-            únicos links vivos do produto estavam em painéis de Relatórios. Quem
-            não usasse a paleta ⌘K chegava à importação pelo item da lateral ou
-            não chegava. As duas portas da base — cadastrar uma e carregar
-            trezentas — passam a ficar na mesma linha. */}
+            até 09/09/2026 esta tela não tinha UM link para `/importar`. As duas
+            portas da base — cadastrar uma e carregar trezentas — ficam na mesma
+            linha. */}
         <div className="flex items-center gap-2">
           {podeImportar ? (
-            <Button asChild variant="outline" className="toque hidden md:inline-flex">
+            <Button asChild variant="outline" className="toque h-11 bg-card md:h-10">
               {/* "Trazer uma lista", e não "Importar planilha": o que entra
                   por aqui pode ser a planilha-ponte ou o CSV do Google Maps, e
                   a tela do outro lado se chama "Trazer uma lista para a base".
@@ -261,7 +280,10 @@ export function TelaParceiros({
             </Button>
           ) : null}
           {podeCriar ? (
-            <Button onClick={() => setFolhaAberta(true)} className="toque hidden md:inline-flex">
+            <Button
+              onClick={() => setFolhaAberta(true)}
+              className="toque hidden h-10 md:inline-flex"
+            >
               <Plus aria-hidden="true" />
               Novo parceiro
             </Button>
@@ -269,16 +291,19 @@ export function TelaParceiros({
         </div>
       </header>
 
-      <BarraFiltros filtros={filtros} catalogos={catalogos} aoMudar={mudar} aoLimpar={limpar} />
+      <BarraFiltros
+        filtros={filtros}
+        catalogos={catalogos}
+        total={total}
+        carregando={consulta.isFetching}
+        aoMudar={mudar}
+        aoLimpar={limpar}
+        aoMedir={setAlturaDaBarra}
+      />
 
       <section
         aria-label="Lista de parceiros"
         className={cn(
-          'border-t border-hairline',
-          // Folga do tamanho do botão flutuante (56px) mais respiro, só no celular e
-          // só quando ele existe: sem ela o último cartão da página nascia debaixo do
-          // flutuante e não havia como rolá-lo para fora.
-          podeCriar && 'pb-20 md:pb-0',
           // Enquanto a próxima página chega, a lista antiga fica apagada e sem toque:
           // o dado que está na tela ainda é o anterior, e a interface não finge que não.
           consulta.isPlaceholderData && 'pointer-events-none opacity-60',
@@ -299,11 +324,21 @@ export function TelaParceiros({
           />
         ) : linhas.length === 0 ? (
           <VazioDeVerdade aoCadastrar={podeCriar ? () => setFolhaAberta(true) : null} />
-        ) : ehCelular ? (
-          <ListaCartoes linhas={linhas} saudacao={saudacaoNaTabela} />
         ) : (
           <>
-            {saudacaoNaTabela ? (
+            {ehLarga ? (
+              <TabelaParceiros linhas={linhas} saudacao={saudacaoNaTabela} acoes={acoesNaTabela} />
+            ) : (
+              <ListaCartoes
+                linhas={linhas}
+                saudacao={saudacaoNaTabela}
+                selecao={ehCelular ? null : saudacaoNaTabela}
+                acoes={ehCelular ? null : acoesNaTabela}
+              />
+            )}
+            {/* A barra do lote, presa ao pé da tela enquanto a lista rola. Do tablet
+                para cima, onde dá para marcar. */}
+            {saudacaoNaTabela && !ehCelular ? (
               <BarraDaSelecao
                 quantos={escolhidos.size}
                 ocupado={saudacao.ocupado}
@@ -316,7 +351,6 @@ export function TelaParceiros({
                 aoLimpar={() => marcar([...escolhidos], false)}
               />
             ) : null}
-            <TabelaParceiros linhas={linhas} saudacao={saudacaoNaTabela} acoes={acoesNaTabela} />
           </>
         )}
       </section>

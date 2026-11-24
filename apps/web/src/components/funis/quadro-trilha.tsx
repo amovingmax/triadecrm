@@ -1,10 +1,8 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-
+import { FaixaDeslizante } from '@/components/ui/faixa-deslizante';
 import { cn } from '@/lib/utils';
 
-import { ContagemDaEtapa } from './coluna';
 import { etapaEhDeSaida, type EtapaQuadro } from './tipos';
 
 /**
@@ -16,9 +14,12 @@ import { etapaEhDeSaida, type EtapaQuadro } from './tipos';
  * ordem do funil, com a contagem, a atual destacada — e, embaixo, a lista dos cartões
  * daquela etapa em largura cheia.
  *
- * A trilha rola sozinha para deixar a etapa escolhida à vista: com catorze etapas no
- * funil de produtor, "Carteira indicada" fica fora da tela e a pessoa perderia a
- * referência de onde está.
+ * Desde o protótipo responsivo (24/11/2026) a trilha é a `FaixaDeslizante` com
+ * sangria: começa alinhada ao texto (antes colava na borda da tela e lia como
+ * cortada), esmaece na borda para dizer que há mais, e mantém a etapa escolhida à
+ * vista sem rolar a página. A barrinha de cima é o mapa da trilha: um traço por
+ * etapa, cheio até a escolhida, para a pessoa saber em que ponto do funil está
+ * mesmo com a etapa fora da tela.
  */
 export function TrilhaDeEtapas({
   etapas,
@@ -29,44 +30,57 @@ export function TrilhaDeEtapas({
   etapaAtivaId: number | null;
   aoEscolher: (etapaId: number) => void;
 }) {
-  const ativa = useRef<HTMLButtonElement | null>(null);
-
-  useEffect(() => {
-    ativa.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
-  }, [etapaAtivaId]);
+  const indiceAtivo = etapas.findIndex((e) => e.id === etapaAtivaId);
 
   return (
-    <div
-      role="tablist"
-      aria-label="Etapas do funil"
-      // Sangra até a borda da tela: no celular a trilha rola de ponta a ponta, e uma
-      // faixa que começa a 16px da borda parece cortada em vez de rolável.
-      className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1"
-    >
-      {etapas.map((etapa) => {
-        const selecionada = etapa.id === etapaAtivaId;
-        return (
-          <button
+    <div className="flex flex-col gap-3">
+      <div aria-hidden="true" className="grid auto-cols-fr grid-flow-col gap-1">
+        {etapas.map((etapa, indice) => (
+          <span
             key={etapa.id}
-            ref={selecionada ? ativa : null}
-            role="tab"
-            type="button"
-            aria-selected={selecionada}
-            onClick={() => aoEscolher(etapa.id)}
             className={cn(
-              'toque flex h-11 shrink-0 snap-start items-center gap-1.5 rounded-lg border px-3 text-sm whitespace-nowrap transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
-              selecionada
-                ? 'border-ring bg-secondary font-medium text-secondary-foreground'
-                : 'border-hairline text-muted-foreground',
-              // Etapa de saída é destino, não trabalho: fica visualmente mais leve.
-              !selecionada && etapaEhDeSaida(etapa) && 'border-dashed',
+              'h-1 rounded-full',
+              indice < indiceAtivo
+                ? 'bg-input'
+                : indice === indiceAtivo
+                  ? 'bg-primary'
+                  : 'bg-border',
             )}
-          >
-            {etapa.name}
-            <ContagemDaEtapa total={etapa.total} className={selecionada ? undefined : 'bg-muted'} />
-          </button>
-        );
-      })}
+          />
+        ))}
+      </div>
+
+      <FaixaDeslizante rotulo="Etapas do funil" ativo={etapaAtivaId} sangria>
+        {etapas.map((etapa) => {
+          const selecionada = etapa.id === etapaAtivaId;
+          return (
+            <button
+              key={etapa.id}
+              type="button"
+              aria-pressed={selecionada}
+              onClick={() => aoEscolher(etapa.id)}
+              className={cn(
+                'toque flex h-11 items-center gap-2 rounded-lg border px-3.5 text-sm whitespace-nowrap transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
+                selecionada
+                  ? 'border-primary bg-primary/10 font-semibold text-primary'
+                  : 'border-border bg-card font-medium text-foreground',
+                // Etapa de saída é destino, não trabalho: fica visualmente mais leve.
+                !selecionada && etapaEhDeSaida(etapa) && 'border-dashed text-muted-foreground',
+              )}
+            >
+              {etapa.name}
+              <span
+                className={cn(
+                  'numerico inline-grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-xs font-semibold',
+                  selecionada ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground',
+                )}
+              >
+                {etapa.total}
+              </span>
+            </button>
+          );
+        })}
+      </FaixaDeslizante>
     </div>
   );
 }

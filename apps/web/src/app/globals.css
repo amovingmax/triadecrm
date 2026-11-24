@@ -1350,3 +1350,48 @@
 :root[data-empresa='imova'] [data-slot='select-trigger'] {
   border-radius: var(--raio-linha);
 }
+
+/* ============================================================================
+   TELAS RESPONSIVAS (24/11/2026, protótipo aprovado da Imova)
+   ----------------------------------------------------------------------------
+   A FAIXA QUE DESLIZA: chips, etapas e abas que não cabem rolam de lado DENTRO
+   da tela, com um esmaecido na borda que diz "tem mais". Com `faixa-sangria` ela
+   vai até a borda da página (anula a margem de 16px do celular e 20px do
+   computador) e devolve a margem por dentro, para o primeiro item ficar alinhado
+   ao texto e o último poder ser rolado até aparecer inteiro.
+   ========================================================================== */
+@utility faixa-deslizante {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  padding-block: 2px;
+  mask-image: linear-gradient(to right, black calc(100% - 1.75rem), transparent);
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  & > * {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+  }
+}
+
+@utility faixa-sangria {
+  margin-inline: -1rem;
+  padding-inline: 1rem;
+  scroll-padding-inline: 1rem;
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 0.75rem,
+    black calc(100% - 1.75rem),
+    transparent 100%
+  );
+  @media (width >= 48rem) {
+    margin-inline: -1.25rem;
+    padding-inline: 1.25rem;
+    scroll-padding-inline: 1.25rem;
+  }
+}

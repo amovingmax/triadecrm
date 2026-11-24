@@ -73,8 +73,12 @@ export function TelaGrupos({
           className="flex min-h-0 min-w-0 flex-col md:border-r md:border-wpp-linha"
         >
           {cabecalho ? (
-            <div className="flex shrink-0 flex-col gap-3 px-3.5 pt-3.5 pb-2.5">
-              <h1 className="font-heading text-[21px] font-semibold tracking-tight">Conversas</h1>
+            // A mesma margem e o mesmo título do alto da lista de Conversas: a faixa
+            // das abas vai até a borda contando com ela (protótipo responsivo, 24/11/2026).
+            <div className="flex shrink-0 flex-col gap-2.5 px-4 pt-3.5 pb-2 md:px-5">
+              <h1 className="font-heading text-2xl font-bold tracking-tight md:max-lg:text-[21px]">
+                Conversas
+              </h1>
               {cabecalho}
             </div>
           ) : null}

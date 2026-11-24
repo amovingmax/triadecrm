@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { ROTULO_PAPEL, type AppRole } from '@/lib/auth/role';
 import { type Sessao } from '@/lib/auth/session';
 import { ADMINS_TEM_NOME, EMPRESA, OUTRAS_EMPRESAS_DO_SELETOR } from '@/lib/empresa';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -184,76 +185,130 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
   const nomes = new Map(todas.map((p) => [p.id, p.nome]));
   const admins = ativos.filter((p) => p.papel === 'admin');
 
+  // Papel, setores e ações saem daqui para a tabela (tablet e computador) e para o
+  // cartão do celular mostrarem a mesma coisa e oferecerem os mesmos botões.
+  const celulaPapel = (p: Pessoa) => (
+    <span title={O_QUE_O_PAPEL_FAZ[p.papel]}>
+      {ehAdmin ? (
+        <SeletorDePapel
+          valor={p.papel}
+          desabilitado={p.id === sessao.id || mudarPapel.isPending}
+          aoMudar={(papel) => mudarPapel.mutate({ pessoa: p, papel })}
+          rotulo={`Papel de ${p.nome}`}
+        />
+      ) : (
+        <Badge variant="pilula" className="h-6 px-2.5 font-normal">
+          {ROTULO_PAPEL[p.papel]}
+        </Badge>
+      )}
+    </span>
+  );
+
+  const celulaSetores = (p: Pessoa) => {
+    const meus = setores.data?.daPessoa[p.id] ?? [];
+    const opcoes = (setores.data?.setores ?? []).map((s) => ({ valor: s.id, rotulo: s.nome }));
+    if (!podeMudarSetor) {
+      const nomes = opcoes.filter((o) => meus.includes(o.valor)).map((o) => o.rotulo);
+      return <span className="text-muted-foreground">{nomes.join(', ') || '—'}</span>;
+    }
+    return (
+      <EscolhaMultipla
+        rotulo="Setor"
+        opcoes={opcoes}
+        valor={meus}
+        aoMudar={(ids) => mudarSetores.mutate({ pessoa: p, ids })}
+      />
+    );
+  };
+
+  const acoesDaPessoa = ehAdmin
+    ? (p: Pessoa) =>
+        p.id === sessao.id ? (
+          <span className="text-xs text-muted-foreground">É a sua conta</span>
+        ) : p.ativo ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="toque h-11 md:h-7"
+            onClick={() => setARevogar(p)}
+          >
+            <UserMinus aria-hidden="true" />
+            Tirar o acesso
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="toque h-11 md:h-7"
+            onClick={() => mudarAcesso.mutate({ pessoa: p, ativo: true })}
+          >
+            <UserCheck aria-hidden="true" />
+            Devolver o acesso
+          </Button>
+        )
+    : undefined;
+
+  // O CARTÃO DA PESSOA NO CELULAR (24/11/2026, protótipo responsivo). A lista de
+  // "rótulo e valor" deixava "Papel", "Setores" e "Acesso" soltos numa coluna de
+  // 8rem; agora é avatar, nome e acesso numa linha, papel e setor embaixo.
+  const cartaoDaPessoa = (p: Pessoa) => (
+    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2">
+      <Iniciais nome={p.nome} className="size-9 text-[13px]" />
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className="truncate font-semibold">{p.nome}</span>
+        {p.id === sessao.id ? <SeloVoce /> : null}
+      </span>
+      <SeloAcesso ativo={p.ativo} />
+      <div className="col-span-2 col-start-2 flex flex-wrap items-center gap-2">
+        {celulaPapel(p)}
+        {celulaSetores(p)}
+      </div>
+      {acoesDaPessoa ? (
+        <div className="col-span-2 col-start-2 flex flex-wrap items-center gap-2">
+          {acoesDaPessoa(p)}
+        </div>
+      ) : null}
+    </div>
+  );
+
   const colunasPessoas: ColunaAdmin<Pessoa>[] = [
     {
       id: 'nome',
       rotulo: 'Pessoa',
       principal: true,
-      largura: 'w-56',
+      // Larguras de 24/11/2026: com a coluna de seções à esquerda, a tabela tem uns
+      // 620px no tablet e no notebook, e a soma antiga (672px) cortava "Ativo".
+      largura: 'w-48',
       celula: (p) => (
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">{p.nome}</span>
-          {p.id === sessao.id ? (
-            <Badge variant="pilula" className="h-5 px-2 text-[11px] font-normal">
-              você
-            </Badge>
-          ) : null}
+        <span className="flex min-w-0 items-center gap-2.5">
+          <Iniciais nome={p.nome} className="size-7 text-[11px]" />
+          <span className="truncate font-semibold">{p.nome}</span>
+          {p.id === sessao.id ? <SeloVoce /> : null}
         </span>
       ),
     },
     {
       id: 'papel',
       rotulo: 'Papel',
-      largura: 'w-44',
+      largura: ehAdmin ? 'w-36' : 'w-28',
       // A EXPLICAÇÃO DO PAPEL VIROU TÍTULO (23/09/2026): numa equipe em que quase
       // todo mundo é SDR, a coluna "O que esse papel faz" repetia a mesma frase de
       // duas linhas em cada pessoa — 288 px de largura para dizer cinco vezes a
       // mesma coisa. Quem precisa da definição passa o mouse; quem decide olha
       // pessoa, papel e acesso.
-      celula: (p) => (
-        <span title={O_QUE_O_PAPEL_FAZ[p.papel]}>
-          {ehAdmin ? (
-            <SeletorDePapel
-              valor={p.papel}
-              desabilitado={p.id === sessao.id || mudarPapel.isPending}
-              aoMudar={(papel) => mudarPapel.mutate({ pessoa: p, papel })}
-              rotulo={`Papel de ${p.nome}`}
-            />
-          ) : (
-            <Badge variant="pilula" className="h-6 px-2.5 font-normal">
-              {ROTULO_PAPEL[p.papel]}
-            </Badge>
-          )}
-        </span>
-      ),
+      celula: (p) => celulaPapel(p),
     },
     {
       id: 'setores',
       rotulo: 'Setores',
-      largura: 'w-44',
-      celula: (p) => {
-        const meus = setores.data?.daPessoa[p.id] ?? [];
-        const opcoes = (setores.data?.setores ?? []).map((s) => ({ valor: s.id, rotulo: s.nome }));
-        if (!podeMudarSetor) {
-          const nomes = opcoes.filter((o) => meus.includes(o.valor)).map((o) => o.rotulo);
-          return <span className="text-muted-foreground">{nomes.join(', ') || '—'}</span>;
-        }
-        return (
-          <EscolhaMultipla
-            rotulo="Setor"
-            opcoes={opcoes}
-            valor={meus}
-            aoMudar={(ids) => mudarSetores.mutate({ pessoa: p, ids })}
-          />
-        );
-      },
+      largura: 'w-40',
+      celula: (p) => celulaSetores(p),
     },
     {
       id: 'acesso',
       rotulo: 'Acesso',
-      largura: 'w-24',
-      celula: (p) =>
-        p.ativo ? <span>Ativo</span> : <span className="text-muted-foreground">Desativado</span>,
+      largura: 'w-28',
+      celula: (p) => <SeloAcesso ativo={p.ativo} />,
     },
     {
       id: 'desde',
@@ -371,34 +426,8 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
           colunas={colunasPessoas}
           linhas={pessoas}
           chave={(p) => p.id}
-          acoes={
-            ehAdmin
-              ? (p) =>
-                  p.id === sessao.id ? (
-                    <span className="text-xs text-muted-foreground">É a sua conta</span>
-                  ) : p.ativo ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="toque h-11 md:h-7"
-                      onClick={() => setARevogar(p)}
-                    >
-                      <UserMinus aria-hidden="true" />
-                      Tirar o acesso
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="toque h-11 md:h-7"
-                      onClick={() => mudarAcesso.mutate({ pessoa: p, ativo: true })}
-                    >
-                      <UserCheck aria-hidden="true" />
-                      Devolver o acesso
-                    </Button>
-                  )
-              : undefined
-          }
+          acoes={acoesDaPessoa}
+          cartaoNoCelular={cartaoDaPessoa}
         />
       </section>
 
@@ -563,6 +592,52 @@ export function PainelPessoas({ sessao }: { sessao: Sessao }) {
         }}
       />
     </div>
+  );
+}
+
+/** As iniciais do nome num círculo ("Janio Ramalho" → JR; "gestor.teste" → GT). */
+function Iniciais({ nome, className }: { nome: string; className?: string }) {
+  const partes = nome.trim().split(/[\s._-]+/).filter(Boolean);
+  const primeira = partes[0] ?? '';
+  const ultima = partes.at(-1) ?? '';
+  const iniciais =
+    partes.length === 0
+      ? '?'
+      : partes.length === 1
+        ? primeira.slice(0, 2)
+        : `${primeira.charAt(0)}${ultima.charAt(0)}`;
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'grid shrink-0 place-items-center rounded-full bg-primary/12 font-semibold text-primary uppercase',
+        className,
+      )}
+    >
+      {iniciais}
+    </span>
+  );
+}
+
+function SeloVoce() {
+  return (
+    <Badge variant="pilula" className="h-5 shrink-0 px-2 text-[11px] font-normal">
+      você
+    </Badge>
+  );
+}
+
+/** Ativo em verde de "sim", desativado apagado: a palavra continua dizendo o estado. */
+function SeloAcesso({ ativo }: { ativo: boolean }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex h-[22px] shrink-0 items-center rounded-full px-2 text-[11.5px] font-semibold whitespace-nowrap',
+        ativo ? 'bg-cliente-fundo text-cliente-texto' : 'bg-muted text-muted-foreground',
+      )}
+    >
+      {ativo ? 'Ativo' : 'Desativado'}
+    </span>
   );
 }
 

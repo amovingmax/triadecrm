@@ -127,8 +127,10 @@ export function BotaoSaudacao({
 }
 
 /**
- * A barra que aparece quando há linha marcada. Fica grudada no alto da lista
- * enquanto ela rola: quem marcou a quinta linha não precisa voltar ao topo.
+ * A barra que aparece quando há linha marcada (protótipo responsivo, 24/11/2026):
+ * escura, presa ao pé da tela enquanto a lista rola, com as ações do lote. Quem
+ * marcou a quinta linha não precisa voltar ao topo, e a barra não cobre o cabeçalho
+ * da tabela, que também é preso.
  */
 export function BarraDaSelecao({
   quantos,
@@ -152,15 +154,14 @@ export function BarraDaSelecao({
       <div
         role="region"
         aria-label="Parceiros marcados"
-        className="sombra-base sticky top-2 z-30 mb-2 flex flex-wrap items-center gap-2 rounded-xl bg-card px-3 py-2"
+        className="sticky bottom-3 z-20 mt-3 flex flex-wrap items-center gap-2 rounded-2xl bg-foreground py-2.5 pr-2.5 pl-4 text-background sombra-base-forte"
       >
-        <p className="text-sm">
-          <span className="numerico font-medium">{quantos}</span>
+        <p className="mr-auto text-sm font-semibold">
+          <span className="numerico">{quantos}</span>
           {quantos === 1 ? ' marcado' : ' marcados'}
         </p>
         <Button
-          size="sm"
-          className="toque h-9"
+          className="toque h-10 bg-background text-foreground hover:bg-background/90"
           disabled={ocupado}
           onClick={() => setConfirmando(true)}
         >
@@ -170,17 +171,22 @@ export function BarraDaSelecao({
         {aoConsultoria ? (
           <Button
             variant="outline"
-            size="sm"
-            className="toque h-9"
+            className="toque h-10 border-background/35 bg-transparent text-background hover:bg-background/10 hover:text-background"
             onClick={() => void aoConsultoria()}
           >
             {MARCA_E_PARCEIRO ? <Handshake aria-hidden="true" /> : <Headset aria-hidden="true" />}
             {ROTULO_DE_MARCAR}
           </Button>
         ) : null}
-        <Button variant="ghost" size="sm" className="toque h-9" onClick={aoLimpar}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="toque size-10 text-background hover:bg-background/10 hover:text-background"
+          onClick={aoLimpar}
+          aria-label="Desmarcar"
+          title="Desmarcar"
+        >
           <X aria-hidden="true" />
-          Desmarcar
         </Button>
       </div>
 

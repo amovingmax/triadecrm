@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/sheet';
 
 import { detalharEnvio, ErroDoEnvio, mudarEnvio } from './dados';
-import { fraseDaRecusa, fraseDoMotivo, porcento, rotuloDaMensagem } from './formatos';
+import { formatarNumero, fraseDaRecusa, fraseDoMotivo, porcento, rotuloDaMensagem } from './formatos';
 import { STATUS_DO_ENVIO, type Contagem, type ItemDoEnvio } from './tipos';
 
 /**
@@ -25,7 +25,6 @@ import { STATUS_DO_ENVIO, type Contagem, type ItemDoEnvio } from './tipos';
  * que aconteceu com ela. Relê a cada 15 s enquanto está andando.
  */
 export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: () => void }) {
-  const clientes = useQueryClient();
   const detalhe = useQuery({
     queryKey: ['envios', 'detalhe', id],
     queryFn: () => detalharEnvio(id ?? ''),
@@ -34,17 +33,7 @@ export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: (
       q.state.data && ['agendado', 'enviando'].includes(q.state.data.envio.status) ? 15_000 : false,
   });
 
-  const mudar = useMutation({
-    mutationFn: (acao: 'pausar' | 'retomar' | 'cancelar') => mudarEnvio(id ?? '', acao),
-    onSuccess: (_r, acao) => {
-      toast.success(acao === 'pausar' ? 'Disparo pausado.' : acao === 'retomar' ? 'Disparo retomado.' : 'Disparo cancelado.');
-      void clientes.invalidateQueries({ queryKey: ['envios'] });
-    },
-    onError: (erro: Error) =>
-      toast.error('Não deu.', {
-        description: erro instanceof ErroDoEnvio ? fraseDaRecusa(erro.motivo) : erro.message,
-      }),
-  });
+  const mudar = useMudarEnvio();
 
   const envio = detalhe.data?.envio;
 
@@ -83,13 +72,13 @@ export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: (
 
             <div className="flex flex-wrap gap-2">
               {['agendado', 'enviando'].includes(envio.status) ? (
-                <Button variant="outline" className="toque h-11 md:h-9" disabled={mudar.isPending} onClick={() => mudar.mutate('pausar')}>
+                <Button variant="outline" className="toque h-11 md:h-9" disabled={mudar.isPending} onClick={() => mudar.mutate({ id: envio.id, acao: 'pausar' })}>
                   <Pause aria-hidden="true" />
                   Pausar
                 </Button>
               ) : null}
               {['pausado', 'parado'].includes(envio.status) ? (
-                <Button className="toque h-11 md:h-9" disabled={mudar.isPending} onClick={() => mudar.mutate('retomar')}>
+                <Button className="toque h-11 md:h-9" disabled={mudar.isPending} onClick={() => mudar.mutate({ id: envio.id, acao: 'retomar' })}>
                   <Play aria-hidden="true" />
                   Retomar
                 </Button>
@@ -101,7 +90,7 @@ export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: (
                   disabled={mudar.isPending}
                   onClick={() => {
                     if (window.confirm('Cancelar o disparo? Quem ainda não recebeu não vai receber.')) {
-                      mudar.mutate('cancelar');
+                      mudar.mutate({ id: envio.id, acao: 'cancelar' });
                     }
                   }}
                 >
@@ -120,6 +109,26 @@ export function PainelDoEnvio({ id, aoFechar }: { id: string | null; aoFechar: (
       </SheetContent>
     </Sheet>
   );
+}
+
+/**
+ * Pausar, retomar e cancelar, a mesma chamada do painel e do cartão da lista
+ * (24/11/2026: o cartão ganhou Pausar e Retomar à vista, como no protótipo).
+ */
+export function useMudarEnvio() {
+  const clientes = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, acao }: { id: string; acao: 'pausar' | 'retomar' | 'cancelar' }) =>
+      mudarEnvio(id, acao),
+    onSuccess: (_r, { acao }) => {
+      toast.success(acao === 'pausar' ? 'Disparo pausado.' : acao === 'retomar' ? 'Disparo retomado.' : 'Disparo cancelado.');
+      void clientes.invalidateQueries({ queryKey: ['envios'] });
+    },
+    onError: (erro: Error) =>
+      toast.error('Não deu.', {
+        description: erro instanceof ErroDoEnvio ? fraseDaRecusa(erro.motivo) : erro.message,
+      }),
+  });
 }
 
 function hora(iso: string): string {
@@ -148,26 +157,43 @@ export function Numeros({ c, compacto = false }: { c: Contagem; compacto?: boole
   const DO_CARTAO = ['Enviadas', 'Lidas', 'Tocaram no botão', 'Clicaram no link', 'Cadastraram'];
   const visiveis = compacto ? blocos.filter((b) => DO_CARTAO.includes(b.rotulo)) : blocos;
   return (
-    <dl className={cn('grid gap-2', compacto ? 'grid-cols-3 sm:grid-cols-5' : 'grid-cols-3')}>
+    // No cartão, as caixas se arrumam pela largura do próprio cartão (24/11/2026):
+    // cinco lado a lado quando cabem 96px cada, e 3 + 2 abaixo disso. A grade de
+    // `sm:grid-cols-5` espremia as cinco num cartão de meia largura do tablet, e o
+    // rótulo quebrava letra por letra ("Tocaram / no / botã / o"). Com 4 colunas
+    // sobraria uma caixa sozinha na segunda linha, por isso o corte vai direto
+    // para 3. `auto-rows-fr` deixa todas as caixas da altura da mais alta.
+    <dl
+      className={cn(
+        'grid auto-rows-fr gap-2',
+        compacto
+          ? 'grid-cols-[repeat(auto-fit,minmax(96px,1fr))] @max-[512px]:grid-cols-3'
+          : 'grid-cols-3',
+      )}
+    >
       {visiveis.map((b) => (
-        // Número no pé da caixa: no celular "Tocaram no botão" quebra em duas linhas e,
-        // com o número logo abaixo do rótulo, os três da mesma fileira ficavam em
-        // alturas diferentes (16/11/2026).
+        // Número em cima e rótulo embaixo, como no protótipo. O `dt` vem antes no
+        // HTML (é o que a lista de definições pede) e a coluna invertida o desenha
+        // depois. O rótulo quebra só entre palavras: nunca no meio de uma.
         <div
           key={b.rotulo}
-          className="flex min-w-0 flex-col justify-between rounded-lg border border-hairline bg-card/60 px-2.5 py-2"
+          className="flex min-w-0 flex-col-reverse justify-end gap-0.5 rounded-lg bg-muted px-2.5 py-2.5 sm:px-3"
         >
-          <dt className="text-[11px] leading-snug break-words text-muted-foreground">{b.rotulo}</dt>
+          <dt className="text-[12.5px] leading-snug break-normal hyphens-none text-muted-foreground">
+            {b.rotulo}
+          </dt>
           <dd
             className={cn(
-              'numerico text-lg font-semibold',
+              'numerico font-heading text-[22px] leading-tight font-bold',
               b.alerta && 'text-destructive',
               b.destaque && 'text-primary',
             )}
           >
-            {b.valor}
+            {formatarNumero(b.valor)}
             {b.de !== undefined && b.de > 0 && !compacto ? (
-              <span className="ml-1 text-xs font-normal text-muted-foreground">{porcento(b.valor, b.de)}</span>
+              <span className="ml-1 font-sans text-xs font-normal text-muted-foreground">
+                {porcento(b.valor, b.de)}
+              </span>
             ) : null}
           </dd>
         </div>

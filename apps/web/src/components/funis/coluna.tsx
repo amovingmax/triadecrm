@@ -30,8 +30,15 @@ import { etapaEhDeSaida, type EtapaQuadro } from './tipos';
  *    estica a página e o quadro passa a rolar na vertical inteiro.
  */
 
-/** Largura da coluna aberta. 288px cabe nome, categoria, local e os dois semáforos. */
+/** Largura da coluna do esqueleto. 288px cabe nome, categoria, local e os dois semáforos. */
 const LARGURA = 'w-72';
+
+/**
+ * Largura da coluna aberta (protótipo responsivo, 24/11/2026): cresce a partir de
+ * 248px até 340px. Com as vazias recolhidas, as cheias dividem a sobra em vez de
+ * todas terem 288px fixos e a sexta etapa nascer cortada na borda.
+ */
+const LARGURA_FLEXIVEL = 'min-w-[248px] max-w-[340px] flex-[1_0_248px]';
 
 /** Ícone da etapa de saída: publicado, perdido, opt-out e nutrição são destino, não trabalho. */
 function IconeDaEtapa({ etapa }: { etapa: EtapaQuadro }) {
@@ -99,14 +106,14 @@ export function Coluna({
       aria-label={`Etapa ${etapa.name}, ${contarNegocios(etapa.total)}`}
       data-sobre={isOver ? '' : undefined}
       className={cn(
-        LARGURA,
+        LARGURA_FLEXIVEL,
         // A COLUNA DEIXOU DE SER CAIXA (29/09/2026, Design System). Ela era um
         // retângulo cinza com borda e um cabeçalho separado por filete: um
         // contêiner dentro do contêiner, com os cartões brancos nadando dentro.
         // No protótipo a coluna é TRANSPARENTE — o que existe são o título, uma
         // barra de 3px e os cartões. A caixa não desenhava nada que o
         // agrupamento já não dissesse.
-        'flex max-h-[calc(100dvh-19rem)] min-h-80 shrink-0 flex-col rounded-xl transition-colors',
+        'flex max-h-[calc(100dvh-19rem)] min-h-80 flex-col rounded-xl transition-colors',
         // ENQUANTO SE ARRASTA, a coluna precisa dizer "pode soltar aqui". Antes
         // quem dizia era a borda dela; sem caixa, a dica sumiu junto — e uma
         // área de soltura invisível é pior que uma caixa feia. Volta como
@@ -126,17 +133,17 @@ export function Coluna({
         </div>
         {/* A BARRA DE 3px, no lugar do filete do cabeçalho: ela diz de que
             NATUREZA é a etapa sem gastar uma palavra. Tinta cheia na etapa de
-            saída (o negócio fechou ou morreu ali), cinza no resto.
+            saída (o negócio fechou ou morreu ali).
 
-            SEM MENTA aqui, e isso é decisão. A primeira versão pintava de menta
-            toda etapa com cartão — o que, num quadro de doze etapas, é o acento
-            aparecendo dez vezes. O acento do sistema é UM por tela; um acento
-            que se repete é só mais uma cor. */}
+            Nas de trabalho, petróleo quando há cartão e cinza quando não há
+            (protótipo responsivo, 24/11/2026). Com as vazias recolhidas numa
+            tira, as colunas abertas são quase sempre as que têm cartão, e a
+            barra cheia diz "aqui tem trabalho" de longe. */}
         <span
           aria-hidden="true"
           className={cn(
             'h-[3px] w-full rounded-full',
-            etapaEhDeSaida(etapa) ? 'bg-foreground' : 'bg-border',
+            etapaEhDeSaida(etapa) ? 'bg-foreground' : etapa.total > 0 ? 'bg-primary' : 'bg-border',
           )}
         />
       </header>
@@ -179,13 +186,17 @@ export function Coluna({
 }
 
 /**
- * Etapa de saída, recolhida na faixa do fim do quadro.
+ * Coluna recolhida numa tira de 52px: o nome na vertical e a contagem.
  *
  * Doze colunas de 288px pedem 3.456px de largura: em 1440px cabem quatro e meia, e a
- * pessoa passa o dia rolando na horizontal para chegar em Prospectado. Publicado,
- * Nutrição, Perdido e Opt-out ficam numa faixa estreita, continuam recebendo cartão
- * arrastado (é o mesmo droppable, com o mesmo id) e abrem com um toque quando alguém
- * precisa conferir o que está lá dentro.
+ * pessoa passa o dia rolando na horizontal para chegar em Prospectado. Recolhem duas
+ * espécies de coluna: as etapas de saída (Publicado, Nutrição, Perdido e Opt-out,
+ * desde o início) e, desde o protótipo responsivo de 24/11/2026, toda etapa de
+ * trabalho VAZIA, que ocupava o mesmo espaço de uma cheia para dizer "nada aqui".
+ *
+ * Continua sendo alvo de soltar (é o mesmo droppable, com o mesmo id) e abre com um
+ * toque, ou com Enter, porque é um `<button>`. Parado o arraste em cima dela, o quadro
+ * também a abre (ver `quadro.tsx`).
  */
 export function ColunaRecolhida({
   etapa,
@@ -206,22 +217,23 @@ export function ColunaRecolhida({
       ref={setNodeRef}
       type="button"
       onClick={aoAbrir}
+      aria-label={`${etapa.name}, ${etapa.total === 0 ? 'vazia' : contarNegocios(etapa.total)}. Abrir a coluna`}
       title={`${etapa.name}: ${contarNegocios(etapa.total)}. Abrir a coluna.`}
       data-sobre={isOver ? '' : undefined}
       className={cn(
-        'flex max-h-[calc(100dvh-19rem)] min-h-80 w-12 shrink-0 flex-col items-center gap-2 rounded-xl border border-hairline bg-muted/20 py-3 transition-colors',
-        'hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
-        arrastando && 'border-input',
-        isOver && 'border-ring bg-accent',
+        // A leitura vai de baixo para cima (texto girado), como lombada de livro:
+        // o nome começa no pé da tira e a contagem fica no alto, à vista.
+        'flex h-60 w-[52px] shrink-0 rotate-180 items-center justify-end gap-2 rounded-2xl border border-transparent bg-muted px-0 py-3 text-sm font-medium text-muted-foreground transition-colors [writing-mode:vertical-rl]',
+        'hover:bg-accent hover:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
+        arrastando && 'border-dashed border-input',
+        isOver && 'border-solid border-foreground bg-accent text-foreground',
       )}
     >
-      <IconeDaEtapa etapa={etapa} />
-      <ContagemDaEtapa total={etapa.total} className="bg-transparent px-0" />
-      <span
-        className="min-h-0 flex-1 truncate text-xs text-muted-foreground"
-        style={{ writingMode: 'vertical-rl' }}
-      >
-        {etapa.name}
+      <span className="min-h-0 truncate">{etapa.name}</span>
+      {/* Em `vertical-rl` o número sai deitado; o giro de 90° o põe de pé. */}
+      <span className="inline-flex rotate-90 items-center gap-1.5">
+        <IconeDaEtapa etapa={etapa} />
+        <span className="numerico text-xs">{etapa.total}</span>
       </span>
     </button>
   );
@@ -234,7 +246,7 @@ export function CabecaDaFaixaDeSaida({ aoAbrirTudo }: { aoAbrirTudo: () => void 
       type="button"
       onClick={aoAbrirTudo}
       title="Abrir todas as etapas de encerramento"
-      className="flex max-h-[calc(100dvh-19rem)] min-h-80 w-8 shrink-0 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-hairline text-muted-foreground hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+      className="flex h-60 w-8 shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border text-muted-foreground hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
     >
       <ChevronLeft className="size-4" aria-hidden="true" />
       <span className="text-xs" style={{ writingMode: 'vertical-rl' }}>

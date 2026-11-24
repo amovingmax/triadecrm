@@ -13,11 +13,12 @@ import {
   Copy,
   EllipsisVertical,
   Eye,
+  Flame,
   ImageOff,
   Layers,
-  MessagesSquare,
+  MapPin,
+  MessageSquare,
   Pencil,
-  Star,
   Trash2,
   TriangleAlert,
   UserRound,
@@ -88,12 +89,15 @@ import {
 
 type Agindo = null | 'publicar' | 'tirar' | 'destaque' | 'excluir' | 'restaurar';
 
+/** Grade (foto 4:3 em cima) ou lista (foto pequena à esquerda), 24/11/2026. */
+export type ModoDaLista = 'grade' | 'lista';
+
 /** As cores de cada situação: quem publica muda a tinta, o resto fica neutro. */
 export const TOM_DA_SITUACAO: Record<TomDoEstado, string> = {
-  arbo: 'border border-primary/45 text-primary',
+  arbo: 'bg-cliente-fundo text-cliente-texto',
   espera: 'bg-primary/12 text-primary',
   crm: 'bg-primary text-primary-foreground',
-  fora: 'bg-muted text-muted-foreground',
+  fora: 'border border-border text-muted-foreground',
   rascunho: 'bg-morno-fundo text-morno-texto',
   alerta: 'bg-destructive/10 text-destructive-texto',
   excluido: 'bg-destructive/10 text-destructive-texto',
@@ -104,34 +108,57 @@ export function EtiquetaDaSituacao({ estado }: { estado: EstadoDoCartao }) {
     <span
       title={estado.dica}
       className={cn(
-        'inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold whitespace-nowrap',
+        'inline-flex h-6 max-w-full items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold whitespace-nowrap',
         TOM_DA_SITUACAO[estado.tom],
       )}
     >
-      <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
-      {estado.rotulo}
+      <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden="true" />
+      <span className="truncate">{estado.rotulo}</span>
     </span>
   );
 }
 
+/** O preço com o "/mês" (ou "/dia") menor, como no protótipo. */
+function Preco({ texto, className }: { texto: string; className?: string }) {
+  const partes = texto.split(/(\/\S+)/);
+  return (
+    <p
+      className={cn('font-heading leading-tight font-bold tracking-[-0.01em] numerico', className)}
+    >
+      {partes.map((p, i) =>
+        p.startsWith('/') ? (
+          <small key={i} className="font-sans text-[13px] font-medium text-muted-foreground">
+            {p}
+          </small>
+        ) : (
+          p
+        ),
+      )}
+    </p>
+  );
+}
+
 /**
- * Um anúncio da lista (18/11/2026): um cartão por imóvel. A foto, o título (é por
- * ele que o time reconhece o imóvel), o código, o tipo, a área e o bairro, o
+ * Um anúncio da lista (18/11/2026; redesenhado em 24/11/2026 pelo protótipo
+ * responsivo): um cartão por imóvel, em grade ou em lista. A foto, o título (é
+ * por ele que o time reconhece o imóvel), o código, o tipo, a área e o bairro, o
  * preço, UMA etiqueta de situação, os números do Canal Pro e dos leads, e uma
  * ação só, a que o anúncio pede agora. O resto mora na ficha (que abre por cima,
  * ao clicar) e no menu ⋮. As cópias antigas do mesmo imóvel no Canal Pro ficam
  * dentro do cartão, numa linha.
  *
  * Saíram do cartão (estão na ficha): a origem, as datas de criação e atualização
- * e a nota de qualidade. Até 18/11 o pé do cartão repetia a situação em três
- * lugares ("Publicado", "No portal pelo sistema atual · No Canal Pro: Ativo · no
- * CRM: rascunho").
+ * e a nota de qualidade.
+ *
+ * Os alvos pequenos (código, leads, cópia antiga) têm caixa de 40px com margem
+ * negativa: o desenho fica o mesmo e o dedo acerta.
  */
 export function CartaoDoAnuncio({
   anuncio: a,
   doCanalPro,
   podePublicar,
   plano,
+  modo,
   aoAbrir,
   aoSincronizar,
 }: {
@@ -139,6 +166,7 @@ export function CartaoDoAnuncio({
   doCanalPro: DoCanalPro | undefined;
   podePublicar: boolean;
   plano: SituacaoDoCanalPro['plano'] | null;
+  modo: ModoDaLista;
   aoAbrir: () => void;
   aoSincronizar: () => void;
 }) {
@@ -159,12 +187,15 @@ export function CartaoDoAnuncio({
   const tipo = tipoDeImovel(a.tipo).rotulo;
   // Terreno se mede pela área total; o resto, pela útil (como o Canal Pro mostra).
   const area = ehTerreno(a.tipo) ? (a.area_total ?? a.area_util) : (a.area_util ?? a.area_total);
-  const meta = [
+  const medidas = [
     tipo,
     area ? `${area.toLocaleString('pt-BR')} m²` : null,
     a.quartos ? `${a.quartos} ${a.quartos === 1 ? 'quarto' : 'quartos'}` : null,
-    [a.bairro, a.cidade].filter(Boolean).join(', ') || null,
-  ].filter((x): x is string => !!x);
+  ]
+    .filter((x): x is string => !!x)
+    .join(' · ');
+  const lugar = [a.bairro, a.cidade].filter(Boolean).join(', ');
+  const destaque = a.destaque !== 'padrao' && !excluido ? rotuloDoDestaque(a.destaque) : null;
 
   function atualizar() {
     void cliente.invalidateQueries({ queryKey: CHAVE_DOS_ANUNCIOS });
@@ -251,7 +282,8 @@ export function CartaoDoAnuncio({
     atualizar();
   }
 
-  // A ação que o anúncio pede agora (uma só).
+  // A ação que o anúncio pede agora (uma só). Na grade ela ocupa a largura do
+  // cartão; na lista fica do tamanho do texto, embaixo dos números.
   const { semVaga } = travasDoPlano(plano, {
     situacao: a.situacao,
     destaque: a.destaque,
@@ -260,13 +292,14 @@ export function CartaoDoAnuncio({
   });
   const pendencias = a.pendencias ?? [];
   const soFaltaFoto = pendencias.length > 0 && pendencias.every((p) => /foto/i.test(p));
+  const larguraDaAcao = modo === 'grade' ? 'w-full' : 'w-fit';
   let acao: React.ReactNode = null;
   if (podePublicar) {
     if (excluido) {
       acao = (
         <Button
           variant="outline"
-          className="toque h-11 md:h-9"
+          className={cn('toque h-11 md:h-9', larguraDaAcao)}
           disabled={agindo !== null}
           onClick={() => void restaurar()}
         >
@@ -276,7 +309,7 @@ export function CartaoDoAnuncio({
       );
     } else if (faltamFotos > 0 && a.fotos === 0) {
       acao = (
-        <Button className="toque h-11 md:h-9" onClick={aoSincronizar}>
+        <Button className={cn('toque h-11 md:h-9', larguraDaAcao)} onClick={aoSincronizar}>
           <Camera aria-hidden="true" />
           Trazer fotos
         </Button>
@@ -289,7 +322,7 @@ export function CartaoDoAnuncio({
         <Button
           asChild
           variant={foraDoArquivo(a) ? 'default' : 'outline'}
-          className="toque h-11 md:h-9"
+          className={cn('toque h-11 md:h-9', larguraDaAcao)}
         >
           <Link href={linkDoAnuncio}>
             <Pencil aria-hidden="true" />
@@ -305,7 +338,7 @@ export function CartaoDoAnuncio({
       acao = (
         <Button
           variant="outline"
-          className="toque h-11 md:h-9"
+          className={cn('toque h-11 md:h-9', larguraDaAcao)}
           disabled={agindo !== null || semVaga}
           title={semVaga ? 'Plano cheio: tire outro do ar antes' : undefined}
           onClick={() => void publicar()}
@@ -317,143 +350,202 @@ export function CartaoDoAnuncio({
     }
   }
 
-  return (
-    <li>
-      <article
-        aria-label={`Anúncio ${a.codigo}`}
-        className="sombra-base flex flex-col overflow-hidden rounded-xl bg-card md:flex-row"
-      >
-        <Foto
-          caminho={a.capa}
-          fotos={a.fotos}
-          noCanalPro={propria?.fotos ?? null}
-          apagada={excluido || estado.tom === 'fora'}
-          aoAbrir={aoAbrir}
-          codigo={a.codigo}
-        />
+  const menu = (
+    <MenuDoAnuncio
+      anuncio={a}
+      podePublicar={podePublicar}
+      plano={plano}
+      agindo={agindo}
+      linkDoAnuncio={linkDoAnuncio}
+      linkDosLeads={linkDosLeads}
+      aoCopiar={() => void copiarCodigo()}
+      aoPublicar={() => void publicar()}
+      aoTirar={() => void tirar()}
+      aoDestacar={(d) => void trocarDestaque(d)}
+      aoExcluir={() => setExcluir(true)}
+      aoRestaurar={() => void restaurar()}
+    />
+  );
 
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-4 md:py-4 md:pr-4 md:pl-5">
-          <div className="flex items-start gap-2">
-            <h2 className="min-w-0 flex-1 text-[15px] leading-snug font-medium tracking-tight">
+  const titulo = (
+    <h2
+      className={cn(
+        'min-w-0 flex-1 leading-[1.35] font-semibold tracking-tight',
+        modo === 'grade' ? 'text-[15px]' : 'text-sm',
+      )}
+    >
+      <button
+        type="button"
+        onClick={aoAbrir}
+        className={cn(
+          'line-clamp-2 rounded-sm text-left outline-none hover:underline hover:underline-offset-4 focus-visible:ring-3 focus-visible:ring-ring/50',
+          modo === 'grade' ? 'min-h-10' : 'min-h-9',
+          !a.titulo.trim() && 'font-normal text-muted-foreground italic',
+        )}
+      >
+        {a.titulo.trim() || 'Sem título'}
+      </button>
+    </h2>
+  );
+
+  const leads = (
+    <Link
+      href={linkDosLeads}
+      title="Leads deste anúncio no CRM"
+      className="toque -mx-1.5 -my-2 inline-flex h-10 items-center gap-1 rounded-full px-1.5 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      <UserRound className="size-3.5" aria-hidden="true" />
+      <span className="numerico">{a.leads}</span>
+      <span className="sr-only">{a.leads === 1 ? 'lead' : 'leads'} no CRM</span>
+    </Link>
+  );
+
+  const visualizacoesNoCanalPro =
+    visualizacoes !== null ? (
+      <span className="inline-flex items-center gap-1" title="Visualizações no Canal Pro">
+        <Eye className="size-3.5" aria-hidden="true" />
+        <span className="numerico">{visualizacoes.toLocaleString('pt-BR')}</span>
+        <span className="sr-only">visualizações no Canal Pro</span>
+      </span>
+    ) : null;
+
+  const linhaDasCopias = copias.length ? (
+    <button
+      type="button"
+      onClick={aoAbrir}
+      className={cn(
+        '-my-2 inline-flex min-h-10 w-fit items-center gap-1 rounded-sm text-left text-xs outline-none hover:underline hover:underline-offset-4 focus-visible:ring-3 focus-visible:ring-ring/50',
+        ativas.length ? 'font-medium text-morno-texto' : 'text-muted-foreground',
+      )}
+    >
+      {ativas.length ? (
+        <TriangleAlert className="size-3.5 shrink-0" aria-hidden="true" />
+      ) : (
+        <Layers className="size-3.5 shrink-0" aria-hidden="true" />
+      )}
+      {ativas.length
+        ? ativas.length === 1
+          ? 'Cópia antiga ainda ativa no Canal Pro'
+          : `${ativas.length} cópias antigas ainda ativas no Canal Pro`
+        : copias.length === 1
+          ? '1 cópia antiga juntada'
+          : `${copias.length} cópias antigas juntadas`}
+    </button>
+  ) : null;
+
+  return (
+    <li className="min-w-0">
+      {modo === 'grade' ? (
+        <article
+          aria-label={`Anúncio ${a.codigo}`}
+          className="sombra-base flex h-full min-w-0 flex-col overflow-hidden rounded-xl bg-card"
+        >
+          <Foto
+            modo="grade"
+            caminho={a.capa}
+            fotos={a.fotos}
+            noCanalPro={propria?.fotos ?? null}
+            apagada={excluido || estado.tom === 'fora'}
+            destaque={destaque}
+            aoAbrir={aoAbrir}
+            codigo={a.codigo}
+          />
+
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5 px-3.5 pt-3 pb-3.5">
+            <div className="flex items-start gap-1.5">
+              {titulo}
+              <div className="-mt-1.5 -mr-2">{menu}</div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-muted-foreground">
               <button
                 type="button"
-                onClick={aoAbrir}
-                className={cn(
-                  'line-clamp-2 rounded-sm text-left outline-none hover:underline hover:underline-offset-4 focus-visible:ring-3 focus-visible:ring-ring/50',
-                  !a.titulo.trim() && 'text-muted-foreground italic',
-                )}
+                onClick={() => void copiarCodigo()}
+                title="Copiar o código"
+                aria-label={`Copiar o código ${a.codigo}`}
+                className="toque group -my-[7px] inline-flex h-10 max-w-full items-center rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               >
-                {a.titulo.trim() || 'Sem título'}
-              </button>
-            </h2>
-            <MenuDoAnuncio
-              anuncio={a}
-              podePublicar={podePublicar}
-              plano={plano}
-              agindo={agindo}
-              linkDoAnuncio={linkDoAnuncio}
-              linkDosLeads={linkDosLeads}
-              aoCopiar={() => void copiarCodigo()}
-              aoPublicar={() => void publicar()}
-              aoTirar={() => void tirar()}
-              aoDestacar={(d) => void trocarDestaque(d)}
-              aoExcluir={() => setExcluir(true)}
-              aoRestaurar={() => void restaurar()}
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-muted-foreground">
-            <button
-              type="button"
-              onClick={() => void copiarCodigo()}
-              title="Copiar o código"
-              aria-label={`Copiar o código ${a.codigo}`}
-              className="toque inline-flex h-6 max-w-full items-center gap-1 rounded-full border border-hairline px-2 text-xs font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
-            >
-              <Copy className="size-3.5 shrink-0" aria-hidden="true" />
-              <span className="numerico truncate">{a.codigo}</span>
-            </button>
-            {meta.map((m, i) => (
-              <span key={m} className="inline-flex items-center gap-2.5">
-                {i > 0 ? (
-                  <span className="size-1 rounded-full bg-current opacity-50" aria-hidden="true" />
-                ) : null}
-                <span className="numerico">{m}</span>
-              </span>
-            ))}
-          </div>
-
-          <p className="text-xl leading-tight font-semibold tracking-tight numerico">
-            {precoDoAnuncio(a)}
-          </p>
-
-          <div className="mt-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 border-t border-hairline pt-3">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-2">
-              <EtiquetaDaSituacao estado={estado} />
-              {a.destaque !== 'padrao' && !excluido ? (
-                <span className="inline-flex h-7 items-center gap-1 rounded-full border border-menta/60 px-2.5 text-xs font-medium text-menta-texto">
-                  <Star className="size-3.5" aria-hidden="true" />
-                  {rotuloDoDestaque(a.destaque)}
+                <span className="inline-flex h-[26px] max-w-full items-center gap-1 rounded-lg border border-border bg-card px-2 text-xs font-semibold text-foreground group-hover:bg-muted">
+                  <Copy className="size-3.5 shrink-0" aria-hidden="true" />
+                  <span className="numerico truncate">{a.codigo}</span>
                 </span>
-              ) : null}
-              <span className="flex items-center gap-3 text-sm">
-                {visualizacoes !== null ? (
-                  <span
-                    className="inline-flex items-center gap-1"
-                    title="Visualizações no Canal Pro"
-                  >
-                    <Eye className="size-4 text-muted-foreground" aria-hidden="true" />
-                    <span className="numerico font-medium">
-                      {visualizacoes.toLocaleString('pt-BR')}
-                    </span>
-                    <span className="sr-only">visualizações no Canal Pro</span>
-                  </span>
-                ) : null}
+              </button>
+              {medidas ? <span className="numerico">{medidas}</span> : null}
+            </div>
+
+            {lugar ? (
+              <p className="flex min-w-0 items-center gap-1.5 text-[12.5px] text-muted-foreground">
+                <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate">{lugar}</span>
+              </p>
+            ) : null}
+
+            <Preco texto={precoDoAnuncio(a)} className="text-[19px]" />
+            {linhaDasCopias}
+
+            <div className="mt-auto flex flex-wrap items-center justify-between gap-x-2.5 gap-y-2 border-t border-hairline pt-2.5">
+              <EtiquetaDaSituacao estado={estado} />
+              <span className="flex items-center gap-2.5 text-[12.5px] text-muted-foreground">
+                {visualizacoesNoCanalPro}
                 {contatos !== null ? (
                   <span className="inline-flex items-center gap-1" title="Contatos no Canal Pro">
-                    <MessagesSquare className="size-4 text-muted-foreground" aria-hidden="true" />
-                    <span className="numerico font-medium">{contatos}</span>
+                    <MessageSquare className="size-3.5" aria-hidden="true" />
+                    <span className="numerico">{contatos}</span>
                     <span className="sr-only">contatos no Canal Pro</span>
                   </span>
                 ) : null}
-                <Link
-                  href={linkDosLeads}
-                  title="Leads deste anúncio no CRM"
-                  className="toque inline-flex h-8 items-center gap-1 rounded-full px-1.5 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  <UserRound className="size-4 text-muted-foreground" aria-hidden="true" />
-                  <span className="numerico font-medium">{a.leads}</span>
-                  <span className="sr-only">{a.leads === 1 ? 'lead' : 'leads'} no CRM</span>
-                </Link>
+                {leads}
               </span>
-              {copias.length ? (
-                <button
-                  type="button"
-                  onClick={aoAbrir}
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded-sm text-xs outline-none hover:underline hover:underline-offset-4 focus-visible:ring-3 focus-visible:ring-ring/50',
-                    ativas.length ? 'font-medium text-morno-texto' : 'text-muted-foreground',
-                  )}
-                >
-                  {ativas.length ? (
-                    <TriangleAlert className="size-3.5" aria-hidden="true" />
-                  ) : (
-                    <Layers className="size-3.5" aria-hidden="true" />
-                  )}
-                  {ativas.length
-                    ? ativas.length === 1
-                      ? 'Cópia antiga ainda ativa no Canal Pro'
-                      : `${ativas.length} cópias antigas ainda ativas no Canal Pro`
-                    : copias.length === 1
-                      ? '1 cópia antiga juntada'
-                      : `${copias.length} cópias antigas juntadas`}
-                </button>
-              ) : null}
             </div>
-            {acao}
+            {acao ? <div className="pt-1">{acao}</div> : null}
           </div>
-        </div>
-      </article>
+        </article>
+      ) : (
+        <article
+          aria-label={`Anúncio ${a.codigo}`}
+          className="sombra-base grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)_auto] items-start gap-3 rounded-xl bg-card p-2.5"
+        >
+          <Foto
+            modo="lista"
+            caminho={a.capa}
+            fotos={a.fotos}
+            noCanalPro={propria?.fotos ?? null}
+            apagada={excluido || estado.tom === 'fora'}
+            destaque={null}
+            aoAbrir={aoAbrir}
+            codigo={a.codigo}
+          />
+          <div className="flex min-w-0 flex-col gap-1">
+            {titulo}
+            <Preco texto={precoDoAnuncio(a)} className="text-base" />
+            <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="numerico shrink-0 font-semibold text-foreground">{a.codigo}</span>
+              {a.bairro || a.cidade ? (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className="truncate">{a.bairro || a.cidade}</span>
+                </>
+              ) : null}
+            </p>
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-muted-foreground">
+              <EtiquetaDaSituacao estado={estado} />
+              {destaque ? (
+                <span className="inline-flex h-6 items-center gap-1 rounded-full bg-menta-fundo px-2 font-semibold text-menta-texto">
+                  <Flame className="size-3.5" aria-hidden="true" />
+                  {destaque}
+                </span>
+              ) : null}
+              <span className="flex items-center gap-2.5">
+                {visualizacoesNoCanalPro}
+                {leads}
+              </span>
+            </div>
+            {linhaDasCopias}
+            {acao ? <div className="pt-1">{acao}</div> : null}
+          </div>
+          <div className="-mt-1 -mr-1">{menu}</div>
+        </article>
+      )}
 
       {podePublicar && !excluido ? (
         <DialogoExcluir
@@ -496,27 +588,36 @@ export function CartaoDoAnuncio({
 // ---------------------------------------------------------------------------
 
 function Foto({
+  modo,
   caminho,
   fotos,
   noCanalPro,
   apagada,
+  destaque,
   aoAbrir,
   codigo,
 }: {
+  modo: ModoDaLista;
   caminho: string | null;
   fotos: number;
   /** Quantas o Canal Pro tem (do último relatório ou sincronização). */
   noCanalPro: number | null;
   apagada: boolean;
+  /** O nome do destaque no portal, quando há (só na grade). */
+  destaque: string | null;
   aoAbrir: () => void;
   codigo: string;
 }) {
+  const grade = modo === 'grade';
   return (
     <button
       type="button"
       onClick={aoAbrir}
       aria-label={`Abrir a ficha de ${codigo}`}
-      className="relative block aspect-[16/9] w-full shrink-0 overflow-hidden bg-muted outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:aspect-auto md:min-h-[176px] md:w-[30%] md:max-w-[260px]"
+      className={cn(
+        'relative block shrink-0 overflow-hidden bg-muted outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+        grade ? 'aspect-[4/3] w-full' : 'h-[5.5rem] w-[6.5rem] rounded-lg',
+      )}
     >
       {caminho ? (
         // eslint-disable-next-line @next/next/no-img-element -- foto do balde público, sem otimizador do Next
@@ -530,23 +631,42 @@ function Foto({
           )}
         />
       ) : (
-        <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[repeating-linear-gradient(135deg,var(--muted)_0_12px,transparent_12px_24px)] px-3 text-center text-xs text-muted-foreground">
-          <ImageOff className="size-6" aria-hidden="true" />
+        <span
+          className={cn(
+            'absolute inset-0 flex flex-col items-center justify-center bg-[repeating-linear-gradient(135deg,var(--muted)_0_10px,transparent_10px_20px)] text-center text-muted-foreground',
+            grade ? 'gap-1 px-3 text-xs' : 'gap-0.5 px-1.5 text-[11px] leading-tight',
+          )}
+        >
+          <ImageOff className={grade ? 'size-6' : 'size-4'} aria-hidden="true" />
           <span className="font-medium text-foreground">Sem fotos no CRM</span>
           {noCanalPro ? (
             <span>
-              o Canal Pro tem <span className="numerico font-medium">{noCanalPro}</span>
+              {grade ? 'o Canal Pro tem ' : 'Canal Pro: '}
+              <span className="numerico font-medium">{noCanalPro}</span>
             </span>
           ) : null}
         </span>
       )}
       {fotos > 0 ? (
-        <span className="absolute bottom-2 left-2 inline-flex h-6 items-center gap-1 rounded-full bg-background/85 px-2 text-xs font-medium text-foreground backdrop-blur-sm">
-          <Camera className="size-3.5" aria-hidden="true" />
+        <span
+          className={cn(
+            'absolute inline-flex items-center rounded-full bg-foreground/70 font-semibold text-background backdrop-blur-sm',
+            grade
+              ? 'bottom-2.5 left-2.5 h-[26px] gap-1.5 px-2.5 text-xs'
+              : 'bottom-1.5 left-1.5 h-5 gap-1 px-1.5 text-[11px]',
+          )}
+        >
+          <Camera className={grade ? 'size-3.5' : 'size-3'} aria-hidden="true" />
           <span className="numerico">
             {fotos}
             {noCanalPro !== null && noCanalPro > fotos ? ` de ${noCanalPro}` : ''}
           </span>
+        </span>
+      ) : null}
+      {grade && destaque ? (
+        <span className="absolute top-2.5 left-2.5 inline-flex h-6 items-center gap-1 rounded-full bg-menta-fundo px-2.5 text-xs font-semibold text-menta-texto">
+          <Flame className="size-3.5" aria-hidden="true" />
+          {destaque}
         </span>
       ) : null}
     </button>
@@ -605,9 +725,9 @@ function MenuDoAnuncio({
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
-          className="toque -mt-1 size-11 shrink-0 md:size-9"
+          className="toque size-11 shrink-0 rounded-full md:size-10"
           title="Ações do anúncio"
         >
           <EllipsisVertical aria-hidden="true" />

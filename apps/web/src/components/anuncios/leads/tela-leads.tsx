@@ -7,7 +7,9 @@ import { ChevronDown, Inbox, RotateCw, Search, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { ChipsDeSecao, SeletorDeAba } from '@/components/ui/abas';
+import { SeletorDeAba } from '@/components/ui/abas';
+import { Chip } from '@/components/ui/chip';
+import { FaixaDeslizante } from '@/components/ui/faixa-deslizante';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -50,7 +52,6 @@ import {
   type FiltrosDosLeads,
   type GrupoDoLead,
   type LeadDoPortal,
-  type RecorteDosLeads,
   type ResumoDoAnuncio,
 } from './leads-rotulos';
 import {
@@ -406,29 +407,36 @@ export function TelaLeads({
               ) : null}
             </div>
 
-            <ChipsDeSecao<RecorteDosLeads>
-              rotulo="Que leads mostrar"
-              ativo={filtros.recorte}
-              aoTrocar={(recorte) => mudar({ recorte })}
-              itens={
-                mandaram
-                  ? [
-                      { id: 'todos', rotulo: 'Todos', contagem: contagem.todos },
-                      { id: 'novo', rotulo: 'Sem resposta', contagem: contagem.novo },
-                      {
-                        id: 'em_atendimento',
-                        rotulo: 'Em atendimento',
-                        contagem: contagem.em_atendimento,
-                      },
-                      { id: 'respondido', rotulo: 'Respondidos', contagem: contagem.respondido },
-                      { id: 'descartado', rotulo: 'Descartados', contagem: contagem.descartado },
-                    ]
-                  : [
-                      { id: 'todos', rotulo: 'Para ligar', contagem: contagem.todos },
-                      { id: 'descartado', rotulo: 'Descartados', contagem: contagem.descartado },
-                    ]
-              }
-            />
+            {/* Os chips numa linha que desliza (24/11/2026): no celular eles quebravam
+                em duas linhas e empurravam a lista para baixo. */}
+            <FaixaDeslizante rotulo="Que leads mostrar" ativo={filtros.recorte} sangria>
+              {(mandaram
+                ? ([
+                    { id: 'todos', rotulo: 'Todos', contagem: contagem.todos },
+                    { id: 'novo', rotulo: 'Sem resposta', contagem: contagem.novo },
+                    {
+                      id: 'em_atendimento',
+                      rotulo: 'Em atendimento',
+                      contagem: contagem.em_atendimento,
+                    },
+                    { id: 'respondido', rotulo: 'Respondidos', contagem: contagem.respondido },
+                    { id: 'descartado', rotulo: 'Descartados', contagem: contagem.descartado },
+                  ] as const)
+                : ([
+                    { id: 'todos', rotulo: 'Para ligar', contagem: contagem.todos },
+                    { id: 'descartado', rotulo: 'Descartados', contagem: contagem.descartado },
+                  ] as const)
+              ).map((item) => (
+                <Chip
+                  key={item.id}
+                  ativo={filtros.recorte === item.id}
+                  contagem={item.contagem}
+                  onClick={() => mudar({ recorte: item.id })}
+                >
+                  {item.rotulo}
+                </Chip>
+              ))}
+            </FaixaDeslizante>
           </section>
 
           {linhas.length === 0 ? (

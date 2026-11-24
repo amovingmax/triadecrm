@@ -333,7 +333,15 @@ export function TelaRevisao({
   const novos = resumo.data?.novos ?? null;
 
   return (
-    <div className="flex w-full flex-col gap-4">
+    <div
+      className={cn(
+        'flex w-full flex-col gap-4',
+        // Espaço no fim da página para o + flutuante do celular (56px mais respiro)
+        // não cobrir o último cartão nem a paginação (24/11/2026). Antes a folga
+        // ficava só na lista, e a paginação, que vem depois dela, nascia debaixo do +.
+        podeDecidir && 'pb-20 md:pb-0',
+      )}
+    >
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">Revisão</h1>
@@ -358,15 +366,20 @@ export function TelaRevisao({
               gestor. O banco recusa de todo jeito — este `if` existe para não
               oferecer um botão que sempre erra. */}
           {podeAjustarTriagem && EMPRESA.modulos.ia ? (
-            <PedirLeituraDaIa className="hidden md:inline-flex" />
+            <PedirLeituraDaIa className="hidden bg-card md:inline-flex md:h-10" />
           ) : null}
           {podeAjustarTriagem ? (
-            <PesosDaTriagem catalogos={catalogos} className="hidden md:inline-flex" />
+            <PesosDaTriagem catalogos={catalogos} className="hidden bg-card md:inline-flex md:h-10" />
           ) : null}
+          {/* "Cadastrar um nome", o mesmo verbo do + do celular e da fila vazia
+              (protótipo responsivo, 24/11/2026; era "Novo candidato"). */}
           {podeDecidir ? (
-            <Button onClick={() => setFolhaAberta(true)} className="toque hidden md:inline-flex">
+            <Button
+              onClick={() => setFolhaAberta(true)}
+              className="toque hidden h-10 md:inline-flex"
+            >
               <Plus aria-hidden="true" />
-              Novo candidato
+              Cadastrar um nome
             </Button>
           ) : null}
         </div>
@@ -377,17 +390,16 @@ export function TelaRevisao({
             fontes={catalogos.origens}
             categorias={catalogos.categorias}
             marcados={resumo.data?.novos_marcados ?? null}
+            novos={novos}
+            total={total}
+            carregando={fila.isFetching}
             aoMudar={mudar}
             aoLimpar={limpar}
           />
 
           <section
             aria-label="Fila de revisão"
-            className={cn(
-              'border-t border-hairline',
-              podeDecidir && 'pb-20 md:pb-0',
-              fila.isPlaceholderData && 'pointer-events-none opacity-60',
-            )}
+            className={cn(fila.isPlaceholderData && 'pointer-events-none opacity-60')}
           >
             {fila.isPending ? (
               <EsqueletoDaFila />

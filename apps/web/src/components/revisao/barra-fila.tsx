@@ -1,45 +1,49 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
-import { Search, TriangleAlert, X } from 'lucide-react';
+import { useState } from 'react';
+import { TriangleAlert } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
+import { BotaoFiltros } from '@/components/ui/botao-filtros';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Chip } from '@/components/ui/chip';
+import { FaixaDeslizante } from '@/components/ui/faixa-deslizante';
+import { FolhaFiltros, GrupoDeFiltro } from '@/components/ui/folha-filtros';
+import { CampoDeBusca } from '@/components/parceiros/campo-de-busca';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  EtiquetasDeFiltro,
+  type EtiquetaDeFiltro,
+} from '@/components/parceiros/etiquetas-de-filtro';
+import { formatarNumero } from '@/components/parceiros/formatos';
 
 import {
   ROTULO_SITUACAO,
-  temRecorteNaFila,
   type FiltroSituacao,
   type FiltrosDaFila,
   type OpcaoCategoriaRadar,
   type OpcaoSimples,
 } from './tipos';
 
-/** Valor do "sem filtro" no Radix Select, que não aceita item com valor vazio. */
-const TODAS = 'todas';
-
 const SITUACOES: FiltroSituacao[] = ['novo', 'aprovado', 'mesclado', 'recusado', 'todos'];
 
 /**
- * Recorte da fila: situação, fonte, categoria, busca e o atalho para os candidatos
- * que a higiene de entrada marcou.
+ * Recorte da fila: situação, busca, e na folha a origem, a categoria e o atalho para
+ * os candidatos que a higiene de entrada marcou.
  *
- * A situação é o filtro mais usado e por isso não é uma pílula igual às outras: ela
- * define QUAL fila se está olhando, e vem primeiro.
+ * O mesmo desenho de Prospectados (protótipo responsivo da Imova, 24/11/2026): busca
+ * na largura e o botão Filtros ao lado, com o número dos ligados. A situação é o
+ * filtro mais usado e por isso fica à vista, em fichas que deslizam de lado: ela
+ * define QUAL fila se está olhando ("Esperando você" é o atalho do dia a dia). Antes
+ * as quatro caixas ficavam numa fila cortada à direita no celular, sem sinal de que
+ * havia mais.
  */
 export function BarraDaFila({
   filtros,
   fontes,
   categorias,
   marcados,
+  novos,
+  total,
+  carregando,
   aoMudar,
   aoLimpar,
 }: {
@@ -48,188 +52,128 @@ export function BarraDaFila({
   categorias: OpcaoCategoriaRadar[];
   /** Quantos candidatos novos vieram marcados pela higiene; `null` enquanto carrega. */
   marcados: number | null;
+  /** Quantos nomes estão esperando decisão; `null` enquanto carrega ou sem acesso. */
+  novos: number | null;
+  /** Quantos nomes o recorte atual devolveu (para o botão da folha). */
+  total: number;
+  carregando: boolean;
   aoMudar: (parcial: Partial<FiltrosDaFila>) => void;
   aoLimpar: () => void;
 }) {
-  const idBusca = useId();
+  const [folhaAberta, setFolhaAberta] = useState(false);
+  const ligados =
+    (filtros.fonteId ? 1 : 0) + (filtros.categoriaId ? 1 : 0) + (filtros.soMarcados ? 1 : 0);
+
+  const etiquetas: EtiquetaDeFiltro[] = [];
+  const fonte = fontes.find((f) => f.id === filtros.fonteId);
+  if (fonte)
+    etiquetas.push({
+      chave: 'origem',
+      rotulo: `Origem: ${fonte.nome}`,
+      aoTirar: () => aoMudar({ fonteId: null }),
+    });
+  const categoria = categorias.find((c) => c.id === filtros.categoriaId);
+  if (categoria)
+    etiquetas.push({
+      chave: 'categoria',
+      rotulo: `Categoria: ${categoria.nome}`,
+      aoTirar: () => aoMudar({ categoriaId: null }),
+    });
+  if (filtros.soMarcados)
+    etiquetas.push({
+      chave: 'problema',
+      rotulo: 'Só os que têm um problema',
+      aoTirar: () => aoMudar({ soMarcados: false }),
+    });
 
   return (
-    <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
-      <CampoBusca id={idBusca} valor={filtros.q} aoMudar={(q) => aoMudar({ q })} />
-
-      <div className="flex min-w-0 flex-col gap-2 md:flex-1 md:flex-row md:items-center md:gap-2">
-        <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 [mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)] md:mx-0 md:flex-wrap md:px-0 md:pb-0 md:[mask-image:none]">
-          <Select
-            value={filtros.situacao}
-            onValueChange={(v) => aoMudar({ situacao: v as FiltroSituacao, pagina: 1 })}
-          >
-            <SelectTrigger className="toque h-11 w-fit shrink-0 md:h-8" aria-label="Situação">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SITUACOES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {ROTULO_SITUACAO[s]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* "Origem", e não "Fonte": a lista vem de `public.sources` INTEIRA
-              (catalogos.ts), ligadas e desligadas — é assim que se acha
-              candidato antigo, de uma origem que já não recebe ninguém. */}
-          <FiltroLista
-            rotulo="Origem"
-            valor={filtros.fonteId}
-            aoMudar={(v) => aoMudar({ fonteId: v, pagina: 1 })}
-            opcoes={fontes.map((f) => ({ valor: f.id, rotulo: f.nome }))}
-          />
-          <FiltroLista
-            rotulo="Categoria"
-            valor={filtros.categoriaId}
-            aoMudar={(v) => aoMudar({ categoriaId: v, pagina: 1 })}
-            opcoes={categorias.map((c) => ({ valor: c.id, rotulo: c.nome }))}
-          />
-
-          <Button
-            variant="outline"
-            aria-pressed={filtros.soMarcados}
-            onClick={() => aoMudar({ soMarcados: !filtros.soMarcados, pagina: 1 })}
-            className={cn(
-              'toque h-11 w-fit shrink-0 md:h-8',
-              filtros.soMarcados && 'bg-muted text-foreground',
-            )}
-          >
-            <TriangleAlert aria-hidden="true" />
-            Só os que têm um problema
-            {marcados !== null ? <span className="numerico">({marcados})</span> : null}
-          </Button>
-        </div>
-
-        {temRecorteNaFila(filtros) ? (
-          <Button
-            variant="ghost"
-            onClick={aoLimpar}
-            className="toque h-11 w-fit shrink-0 text-muted-foreground md:h-8"
-          >
-            <X aria-hidden="true" />
-            Limpar
-          </Button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function CampoBusca({
-  id,
-  valor,
-  aoMudar,
-}: {
-  id: string;
-  valor: string;
-  aoMudar: (v: string) => void;
-}) {
-  const [texto, setTexto] = useState(valor);
-  const ultimoEnviado = useRef(valor);
-
-  useEffect(() => {
-    if (valor !== ultimoEnviado.current) {
-      ultimoEnviado.current = valor;
-      setTexto(valor);
-    }
-  }, [valor]);
-
-  useEffect(() => {
-    if (texto === ultimoEnviado.current) return;
-    const relogio = window.setTimeout(() => {
-      ultimoEnviado.current = texto;
-      aoMudar(texto);
-    }, 300);
-    return () => window.clearTimeout(relogio);
-  }, [texto, aoMudar]);
-
-  return (
-    <div className="md:w-full md:max-w-sm md:shrink-0">
-      <label htmlFor={id} className="sr-only">
-        Buscar candidato
-      </label>
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-          aria-hidden="true"
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-2">
+        {/* Texto de ajuda curto (24/11/2026): "…@instagram ou CNPJ" era cortado em
+            "…ou CNP" no celular. A frase inteira continua para o leitor de tela. */}
+        <CampoDeBusca
+          valor={filtros.q}
+          aoMudar={(q) => aoMudar({ q })}
+          rotulo="Buscar candidato"
+          placeholder="Nome, telefone, @ ou CNPJ"
+          dica="Nome, telefone, @instagram ou CNPJ."
         />
-        <Input
-          id={id}
-          type="search"
-          inputMode="search"
-          autoComplete="off"
-          enterKeyHint="search"
-          placeholder="Nome, telefone, @instagram ou CNPJ"
-          aria-describedby={`${id}-dica`}
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          // `pr-12` e o X nativo do `type="search"` escondido (16/11/2026): o texto
-          // corria por baixo do nosso "limpar", e o X azul do navegador aparecia
-          // encavalado nele, dois "limpar" um em cima do outro.
-          className="h-11 pr-12 pl-9 md:h-9 md:pr-9 [&::-webkit-search-cancel-button]:appearance-none"
-        />
-        {texto ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => setTexto('')}
-            className="absolute top-1/2 right-1.5 size-11 -translate-y-1/2 md:size-7"
-          >
-            <X aria-hidden="true" />
-            <span className="sr-only">Limpar a busca</span>
-          </Button>
-        ) : null}
+        <BotaoFiltros ligados={ligados} onClick={() => setFolhaAberta(true)} />
       </div>
-      <p id={`${id}-dica`} className="sr-only">
-        Nome, telefone, @instagram ou CNPJ.
-      </p>
-    </div>
-  );
-}
 
-type Opcao = { valor: number; rotulo: string };
-
-function FiltroLista({
-  rotulo,
-  valor,
-  opcoes,
-  aoMudar,
-}: {
-  rotulo: string;
-  valor: number | null;
-  opcoes: Opcao[];
-  aoMudar: (v: number | null) => void;
-}) {
-  const selecionado = valor === null ? TODAS : String(valor);
-
-  return (
-    <Select value={selecionado} onValueChange={(v) => aoMudar(v === TODAS ? null : Number(v))}>
-      <SelectTrigger
-        className={cn(
-          'toque h-11 w-fit shrink-0 md:h-8',
-          valor !== null && 'bg-muted text-foreground',
-        )}
-        aria-label={rotulo}
-      >
-        <SelectValue placeholder={rotulo}>
-          {valor === null ? rotulo : (opcoes.find((o) => o.valor === valor)?.rotulo ?? rotulo)}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent className="max-h-72">
-        <SelectItem value={TODAS}>{rotulo}: todas</SelectItem>
-        {opcoes.map((o) => (
-          <SelectItem key={o.valor} value={String(o.valor)}>
-            {o.rotulo}
-          </SelectItem>
+      <FaixaDeslizante rotulo="Situação" ativo={filtros.situacao} sangria>
+        {SITUACOES.map((s) => (
+          <Chip
+            key={s}
+            ativo={filtros.situacao === s}
+            contagem={s === 'novo' ? novos : null}
+            onClick={() => aoMudar({ situacao: s })}
+          >
+            {ROTULO_SITUACAO[s]}
+          </Chip>
         ))}
-      </SelectContent>
-    </Select>
+      </FaixaDeslizante>
+
+      <EtiquetasDeFiltro etiquetas={etiquetas} aoLimpar={aoLimpar} />
+
+      <FolhaFiltros
+        aberta={folhaAberta}
+        aoMudar={setFolhaAberta}
+        rodape={
+          <>
+            {ligados > 0 ? (
+              <Button variant="outline" className="toque h-11" onClick={aoLimpar}>
+                Limpar
+              </Button>
+            ) : null}
+            <Button className="toque h-11" onClick={() => setFolhaAberta(false)}>
+              {carregando
+                ? 'Ver nomes'
+                : `Ver ${formatarNumero(total)} ${total === 1 ? 'nome' : 'nomes'}`}
+            </Button>
+          </>
+        }
+      >
+        {/* "Origem", e não "Fonte": a lista vem de `public.sources` INTEIRA
+            (catalogos.ts), ligadas e desligadas — é assim que se acha candidato
+            antigo, de uma origem que já não recebe ninguém. */}
+        {fontes.length > 0 ? (
+          <GrupoDeFiltro titulo="Origem">
+            {fontes.map((f) => (
+              <Chip
+                key={f.id}
+                ativo={filtros.fonteId === f.id}
+                onClick={() => aoMudar({ fonteId: filtros.fonteId === f.id ? null : f.id })}
+              >
+                {f.nome}
+              </Chip>
+            ))}
+          </GrupoDeFiltro>
+        ) : null}
+        {categorias.length > 0 ? (
+          <GrupoDeFiltro titulo="Categoria">
+            {categorias.map((c) => (
+              <Chip
+                key={c.id}
+                ativo={filtros.categoriaId === c.id}
+                onClick={() => aoMudar({ categoriaId: filtros.categoriaId === c.id ? null : c.id })}
+              >
+                {c.nome}
+              </Chip>
+            ))}
+          </GrupoDeFiltro>
+        ) : null}
+        <GrupoDeFiltro titulo="Problema na entrada">
+          <Chip
+            ativo={filtros.soMarcados}
+            contagem={marcados}
+            onClick={() => aoMudar({ soMarcados: !filtros.soMarcados })}
+          >
+            <TriangleAlert className="size-4" aria-hidden="true" />
+            Só os que têm um problema
+          </Chip>
+        </GrupoDeFiltro>
+      </FolhaFiltros>
+    </div>
   );
 }

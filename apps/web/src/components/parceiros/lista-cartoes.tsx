@@ -5,50 +5,39 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { RevelarLista, useRevelarLinha } from '@/components/movimento';
 import { EtiquetaEtapa } from '@/components/funis/etapa';
+import { MudarEtapa } from '@/components/funis/mudar-etapa';
 
+import { BotaoConsultoria } from './consultoria-botoes';
 import { formatarLocal, formatarTelefone } from './formatos';
 import { BotaoSaudacao } from './saudacao-botoes';
+import { CaixaDeMarcar, type AcoesNaTabela } from './tabela-parceiros';
 import type { LinhaParceiro } from './tipos';
 import { resumoDoContato, TagDoContato } from './ultimo-contato';
 
 /**
- * A mesma lista no celular, que é onde a Heloísa trabalha: entre visitas, no sol,
- * com uma mão só. A tabela vira cartão, mas a leitura é a mesma da tela grande:
- * barra térmica na borda esquerda, nome, e os dias sem contato em mono à direita.
+ * A lista em cartões, abaixo de 1024px (protótipo responsivo da Imova, 24/11/2026;
+ * até então só abaixo de 768px). No tablet a tabela quebrava: seis filtros em três
+ * linhas em cima e colunas espremidas embaixo.
  *
- * Os cartões vivem direto sobre a base Ocean Breeze e são separados por hairline
- * translúcida (`border-hairline`), a mesma linha da tabela, nunca por borda cheia.
+ * Três linhas, um assunto por linha:
  *
- * O cartão inteiro é o alvo de toque, com 64px de altura (bem acima dos 44px mínimos).
+ *     nome ............................................ [enviar]
+ *     categoria · bairro · telefone
+ *     [etapa] [o que o contato deu] quando · tentativa
  *
- * A `<ul>` leva `corpo-tabela`: a regra base de tracking do `globals.css` só pega
- * `<table>`, e esta é a superfície mais estreita do produto, onde a largura da Poppins
- * empurra nome, categoria e bairro para o truncate.
+ * O nome fica numa linha só (a etiqueta da etapa desceu para a terceira e deixou de
+ * empurrar o nome para duas). O cartão INTEIRO é o alvo de toque e abre a ficha: o
+ * link é uma camada por cima dele, com o nome como rótulo. O que precisa ficar acima
+ * desse link (enviar a saudação, e no tablet a caixa de marcar, a etapa e a marca
+ * de Parceiro) sobe de camada com `relative z-10`, e o botão de enviar tem 44px e
+ * mora fora do texto, na coluna da direita: botão dentro de link é toque ambíguo.
  *
- * A largura útil do texto foi medida em 390px e refeita. Ela era de 219px, com 14 dos
- * 50 nomes e 37 dos 50 subtítulos estourando; o pior subtítulo pedia 506px, e como
- * categoria e bairro vinham concatenados por " · " numa linha só com `truncate`, o
- * corte caía SEMPRE no fim, ou seja no BAIRRO, que é a informação de rota. Três
- * mudanças devolvem ~90px ao nome sem custar uma linha de altura:
- *
- * 1. bairro ANTES da categoria: o que sobra fora da tela passa a ser a categoria, que
- *    a Heloísa em geral já filtrou e que está na ficha, e não o bairro, que decide
- *    para onde ela dirige;
- * 2. o bloco da direita perde o `shrink-0` e o caso nulo vira um traço (`curto`), no
- *    lugar dos 75px fixos que a frase "sem contato" gastava em todas as 50 linhas;
- * 3. o chevron sai: o cartão inteiro já é o link, e o ícone gastava 28px com a coluna
- *    da borda direita, que é justamente onde o botão flutuante pousa.
+ * Os cartões vivem num cartão branco, separados por hairline, como as linhas da
+ * tabela. Categoria e bairro vêm juntos e truncam primeiro; o telefone não trunca.
  *
  * O escalonamento de entrada vem do `useRevelarLinha` (className + delay no próprio
- * `<li>`), e não do `<RevelarItem>`: o componente embrulha o filho numa `<div>`, o que
- * (a) deixava o aninhamento em `<ul> > <div> > <li>`, inválido e sem semântica de
- * lista, e (b) fazia cada `<li>` ser `:last-child` do próprio invólucro, então
- * `last:border-b-0` casava com TODOS os cartões e a lista de 50 parceiros ficava sem
- * nenhuma fronteira (medido: `border-bottom-width: 0px` em todo `<li>`).
- */
-/**
- * A saudação no celular (07/10/2026): só o botão da linha. Marcar vários de uma
- * vez é trabalho de mesa, e mora na tabela.
+ * `<li>`), e não do `<RevelarItem>`, que embrulharia o `<li>` numa `<div>` e
+ * quebraria a semântica da lista.
  */
 export type SaudacaoNoCartao = {
   pedidos: ReadonlySet<string>;
@@ -56,20 +45,67 @@ export type SaudacaoNoCartao = {
   pedirUm: (id: string) => void;
 };
 
+/** Marcar vários (para a saudação em lote): só do tablet para cima, como na tabela. */
+export type SelecaoNoCartao = {
+  escolhidos: ReadonlySet<string>;
+  alternar: (id: string) => void;
+  marcarVarios: (ids: readonly string[], marcar: boolean) => void;
+  marcaveis: readonly string[];
+};
+
 export function ListaCartoes({
   linhas,
   saudacao = null,
+  selecao = null,
+  acoes = null,
 }: {
   linhas: LinhaParceiro[];
   saudacao?: SaudacaoNoCartao | null;
+  /**
+   * A caixa de marcar, a etapa que muda e a marca de Parceiro. No celular ficam de
+   * fora (marcar vários e mudar etapa é trabalho de mesa, como sempre foi); no
+   * tablet entram, porque até 24/11/2026 o tablet via a tabela, que tem as três.
+   */
+  selecao?: SelecaoNoCartao | null;
+  acoes?: AcoesNaTabela | null;
 }) {
+  const marcadas = selecao
+    ? selecao.marcaveis.filter((id) => selecao.escolhidos.has(id)).length
+    : 0;
+  const todas =
+    selecao !== null && selecao.marcaveis.length > 0 && marcadas === selecao.marcaveis.length;
+
   return (
     <RevelarLista>
-      <ul className="corpo-tabela flex flex-col">
-        {linhas.map((linha, indice) => (
-          <Cartao key={linha.id} linha={linha} indice={indice} saudacao={saudacao} />
-        ))}
-      </ul>
+      <div className="sombra-base rounded-xl bg-card px-4 py-1">
+        {selecao && selecao.marcaveis.length > 0 ? (
+          <div className="-mx-1 flex items-center gap-1 border-b border-hairline py-1 text-sm text-muted-foreground">
+            <CaixaDeMarcar
+              marcada={todas}
+              meia={marcadas > 0 && !todas}
+              habilitada
+              rotulo="Marcar todos desta página que têm WhatsApp"
+              aoMudar={() => selecao.marcarVarios(selecao.marcaveis, !todas)}
+            />
+            <span>
+              Marcar os <span className="numerico">{selecao.marcaveis.length}</span> desta página
+              que têm WhatsApp
+            </span>
+          </div>
+        ) : null}
+        <ul className="corpo-tabela flex flex-col">
+          {linhas.map((linha, indice) => (
+            <Cartao
+              key={linha.id}
+              linha={linha}
+              indice={indice}
+              saudacao={saudacao}
+              selecao={selecao}
+              acoes={acoes}
+            />
+          ))}
+        </ul>
+      </div>
     </RevelarLista>
   );
 }
@@ -78,85 +114,105 @@ function Cartao({
   linha,
   indice,
   saudacao,
+  selecao,
+  acoes,
 }: {
   linha: LinhaParceiro;
   indice: number;
   saudacao: SaudacaoNoCartao | null;
+  selecao: SelecaoNoCartao | null;
+  acoes: AcoesNaTabela | null;
 }) {
   const revelar = useRevelarLinha(indice);
   const local = formatarLocal(linha.neighborhood, linha.city);
+  const contexto = [linha.primary_category, local || null].filter(Boolean).join(' · ');
   const contato = resumoDoContato(linha);
 
   return (
     <li
       {...revelar}
       className={cn(
-        'flex items-center border-b border-hairline last:border-b-0',
+        'relative flex items-center gap-3 border-b border-hairline py-3 last:border-b-0',
         revelar.className,
       )}
     >
+      {/* O link da ficha é uma camada por cima do cartão inteiro, com o nome como
+          rótulo: o alvo de toque é o retângulo todo, e não a linha de 23px do nome. */}
       <Link
         href={`/parceiros/${linha.id}`}
-        className="relative flex min-h-16 min-w-0 flex-1 items-center gap-3 py-2.5 pr-3 pl-4 outline-none active:bg-muted/60 focus-visible:bg-muted/60"
-      >
-        {/* Três linhas, um assunto por linha — a mesma anatomia da tabela:
+        aria-label={linha.name}
+        className="absolute inset-0 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:bg-muted/40"
+      />
 
-              nome ...................................... etapa
-              categoria · bairro ................... WhatsApp
-              [o que o contato deu] quando · tentativa
+      {selecao ? (
+        <span className="relative z-10 -ml-2 self-start">
+          <CaixaDeMarcar
+            marcada={selecao.escolhidos.has(linha.id)}
+            habilitada={Boolean(linha.phone)}
+            rotulo={linha.phone ? `Marcar ${linha.name}` : `${linha.name} não tem WhatsApp`}
+            aoMudar={() => selecao.alternar(linha.id)}
+          />
+        </span>
+      ) : null}
 
-            Antes a terceira linha juntava temperatura, tag, telefone, etapa e
-            próxima ação numa fileira só, que quebrava onde a largura mandasse. Era
-            o "misturado" da tela em miniatura. Etapa, responsável e próxima ação
-            estão a um toque, na ficha — e no desktop também só aparecem no 2xl. */}
-        <div className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1">
-          {/* O nome quebra em até duas linhas (17/11/2026): com a etapa ao lado, em
-              375 sobravam 137 px e "Carlos Lima — apartamento em Ponta Negra" virava
-              "Carlos Lima — a…". O cartão só cresce quando o nome é comprido. */}
-          <p className="line-clamp-2 font-medium [overflow-wrap:anywhere]">{linha.name}</p>
-          {/* A ETAPA NO LUGAR DA TEMPERATURA (28/09/2026, ADR-16). A cor sumiu do
-              canto: ela achatava as 12 etapas do funil em três matizes, e num
-              traço de 3px não sobrevivia a daltonismo de todo jeito. O que fica é
-              a palavra — que é o que o time lê no sol, com uma mão só. */}
-          <EtiquetaEtapa etapa={linha.stage} className="justify-self-end" />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <p className="truncate text-[15px] font-semibold">{linha.name}</p>
 
-          <p className="truncate text-xs text-muted-foreground">
-            {[linha.primary_category, local || null].filter(Boolean).join(' · ') || '-'}
-          </p>
+        <p className="flex min-w-0 items-center gap-2 text-[13px] whitespace-nowrap text-muted-foreground">
+          {contexto ? <span className="truncate">{contexto}</span> : null}
+          {contexto && linha.phone ? <span aria-hidden="true">·</span> : null}
           {linha.phone ? (
-            <span className="numerico justify-self-end text-xs text-muted-foreground">
-              {formatarTelefone(linha.phone)}
-            </span>
-          ) : (
-            <span aria-hidden="true" />
-          )}
+            <span className="numerico shrink-0">{formatarTelefone(linha.phone)}</span>
+          ) : null}
+          {!contexto && !linha.phone ? <span>-</span> : null}
+        </p>
 
-          {/* A linha do contato ocupa as duas colunas: a tag e o "quando" são uma
-              frase só ("não atendeu, há 2 dias"), e cortá-la ao meio pela grade
-              separaria o que a pessoa lê junto. */}
-          <div className="col-span-2 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-            {contato.contatado ? (
-              <>
-                <TagDoContato resumo={contato} />
-                <span className="truncate" title={contato.descricao}>
-                  {[contato.quando, contato.tentativas].filter(Boolean).join(' · ')}
-                </span>
-              </>
-            ) : (
-              <span>Ainda não contatado</span>
-            )}
-          </div>
+        {/* A etapa e o contato numa linha só, que quebra se precisar: a tag e o
+            "quando" são uma frase ("não atendeu, há 2 dias") e ficam juntos. */}
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+          {acoes && linha.stage ? (
+            <MudarEtapa
+              organizacaoId={linha.id}
+              nome={linha.name}
+              etapa={linha.stage}
+              aoMudar={acoes.aoMudarEtapa}
+              className="relative z-10 h-8 px-2.5 text-foreground"
+            />
+          ) : (
+            <EtiquetaEtapa etapa={linha.stage} />
+          )}
+          {acoes?.consultoria ? (
+            <BotaoConsultoria
+              nome={linha.name}
+              marcado={acoes.consultoria.naConsultoria.has(linha.id)}
+              tag={acoes.consultoria.naConsultoria.get(linha.id) ?? null}
+              aoMudar={(sim) => acoes.consultoria?.marcar(linha.id, sim, linha.name)}
+              className={cn(
+                'relative z-10',
+                acoes.consultoria.naConsultoria.has(linha.id) ? 'h-8' : 'size-8',
+              )}
+            />
+          ) : null}
+          {contato.contatado ? (
+            <>
+              <TagDoContato resumo={contato} />
+              <span className="min-w-0 truncate" title={contato.descricao}>
+                {[contato.quando, contato.tentativas].filter(Boolean).join(' · ')}
+              </span>
+            </>
+          ) : (
+            <span>Ainda não contatado</span>
+          )}
         </div>
-      </Link>
-      {/* Fora do link: botão dentro de link é toque ambíguo (abre a ficha ou
-          manda?), e o leitor de tela anuncia os dois como uma coisa só. */}
+      </div>
+
       {saudacao && linha.phone ? (
         <BotaoSaudacao
           nome={linha.name}
           pedido={saudacao.pedidos.has(linha.id)}
           ocupado={saudacao.ocupado}
           aoPedir={() => saudacao.pedirUm(linha.id)}
-          className="mr-2 size-11"
+          className="relative z-10 -mr-1.5 size-11"
         />
       ) : null}
     </li>

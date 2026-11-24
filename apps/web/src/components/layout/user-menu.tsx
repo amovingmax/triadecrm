@@ -171,14 +171,14 @@ export function UserMenu({ sessao }: { sessao: Sessao }) {
           <Button
             variant="ghost"
             size="lg"
-            className="toque h-11 min-w-11 justify-center gap-2 px-1 sm:min-w-0 sm:pr-1.5 md:h-9"
+            className="toque h-11 min-w-11 justify-center gap-2 px-1 md:h-10 lg:min-w-0 lg:pr-1.5"
             aria-label={`Menu de ${sessao.nome}, ${rotuloPapel}`}
           >
-            <Avatar className="size-7">
+            <Avatar className="size-8">
               {sessao.avatarUrl ? <AvatarImage src={sessao.avatarUrl} alt="" /> : null}
               <AvatarFallback className="text-xs">{sessao.iniciais}</AvatarFallback>
             </Avatar>
-            <span className="hidden max-w-36 flex-col items-start sm:flex">
+            <span className="hidden max-w-36 flex-col items-start lg:flex">
               <span className="w-full truncate text-[13px] leading-5 font-medium">
                 {sessao.nome}
               </span>
@@ -187,7 +187,7 @@ export function UserMenu({ sessao }: { sessao: Sessao }) {
               </span>
             </span>
             <ChevronDown
-              className="hidden size-3.5 text-muted-foreground sm:block"
+              className="hidden size-3.5 text-muted-foreground lg:block"
               aria-hidden="true"
             />
           </Button>

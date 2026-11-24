@@ -1,14 +1,15 @@
 'use client';
 
 import { useId } from 'react';
-import { ChevronDown, Pencil, RotateCw, Target } from 'lucide-react';
+import { ChevronRight, Pencil, RotateCw, Target } from 'lucide-react';
 
 import { EMPRESA } from '@/lib/empresa';
+import { iniciaisDe } from '@/lib/iniciais';
 import { cn } from '@/lib/utils';
-import type { AppRole } from '@/lib/auth/role';
+import { ROTULO_PAPEL, type AppRole } from '@/lib/auth/role';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatarNumero } from '@/components/parceiros/formatos';
 
@@ -78,36 +79,58 @@ export function CartaoPessoa({
   const ficaEmZero = porQueFicaEmZero(papel, pessoa.nome, ehVoce);
 
   return (
-    <Card className="min-w-0">
-      <CardHeader>
-        <div className="flex min-w-0 items-center gap-2">
-          {/* Até duas linhas, quebrando em qualquer ponto (16/11/2026): com o botão
-              "Definir meta" ao lado, em 375 sobravam 120px e o e-mail de quem ainda não
-              tem nome virava "gestor.teste@te…", sem dizer de quem era o cartão. */}
-          <CardTitle className="line-clamp-2 [overflow-wrap:anywhere]">{pessoa.nome}</CardTitle>
-          {ehVoce ? (
-            <Badge variant="pilula" className="shrink-0 font-normal">
-              você
-            </Badge>
-          ) : null}
+    <Card className="min-w-0 gap-3.5 [--card-spacing:--spacing(4)]">
+      {/* Avatar, nome numa linha e o papel embaixo (24/11/2026). O nome corta com
+          reticências e nunca quebra no meio: em duas linhas quebradas em qualquer
+          ponto, o e-mail de quem ainda não tem nome virava "gestor.teste@t / este.local".
+          "Definir meta" desce para baixo do nome quando os dois não cabem lado a
+          lado, em vez de espremê-lo: a base do bloco do nome é a largura do próprio
+          nome (`flex-auto`), então a quebra acontece exatamente quando o nome inteiro
+          não cabe ao lado do botão, e as reticências só aparecem quando ele não cabe
+          nem sozinho na linha. O papel é o que o cartão já sabe da pessoa: o
+          diretório do time não traz e-mail (é sem PII). */}
+      <div
+        data-slot="card-header"
+        className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-(--card-spacing)"
+      >
+        <div className="flex min-w-0 flex-auto items-center gap-2.5">
+          <span
+            aria-hidden="true"
+            className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/12 text-[13px] font-semibold text-primary"
+          >
+            {iniciaisDe(pessoa.nome)}
+          </span>
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <p className="truncate text-[15px] font-semibold" title={pessoa.nome}>
+                {pessoa.nome}
+              </p>
+              {ehVoce ? (
+                <Badge variant="pilula" className="shrink-0 font-normal">
+                  você
+                </Badge>
+              ) : null}
+            </div>
+            {papel ? (
+              <p className="truncate text-[12.5px] text-muted-foreground">{ROTULO_PAPEL[papel]}</p>
+            ) : null}
+          </div>
         </div>
         {podeDefinir ? (
-          <CardAction>
-            <Button
-              variant="outline"
-              disabled={!prontoParaDefinir}
-              aria-describedby={prontoParaDefinir ? undefined : idSituacao}
-              onClick={() => aoDefinirMeta(null)}
-              className="toque h-11 md:h-8"
-            >
-              <Target aria-hidden="true" />
-              Definir meta
-            </Button>
-          </CardAction>
+          <Button
+            variant="outline"
+            disabled={!prontoParaDefinir}
+            aria-describedby={prontoParaDefinir ? undefined : idSituacao}
+            onClick={() => aoDefinirMeta(null)}
+            className="toque h-11 md:h-9"
+          >
+            <Target aria-hidden="true" />
+            Definir meta
+          </Button>
         ) : null}
-      </CardHeader>
+      </div>
 
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-3.5">
         {/* Antes dos números, e não depois: quem lê "0 de 3" e só embaixo descobre
             que aquele zero é do papel, já leu o zero como resultado da pessoa. Sem
             cor e sem ícone de alarme — é um fato de configuração, não um erro dela. */}
@@ -178,14 +201,14 @@ function Conteudo({
           informação junta". O cartão não fica vazio: o número grande de portas
           abertas continua em cima, e a lista está a um toque. */}
       {semMeta.length > 0 ? (
-        <details className="group/detalhes border-t border-hairline pt-2">
-          <summary className="toque flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground md:min-h-8">
-            <ChevronDown
-              className="size-4 transition-transform group-open/detalhes:rotate-180"
+        <details className="group/detalhes border-t border-hairline pt-1">
+          <summary className="toque flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground md:min-h-10">
+            <ChevronRight
+              className="size-4 shrink-0 transition-transform group-open/detalhes:rotate-90"
               aria-hidden="true"
             />
-            <span className="numerico">{formatarNumero(semMeta.length)}</span>
             <span>
+              <span className="numerico">{formatarNumero(semMeta.length)}</span>{' '}
               {semMeta.length === 1 ? 'métrica sem meta definida' : 'métricas sem meta definida'}
             </span>
           </summary>
@@ -211,16 +234,14 @@ function Destaque({ linha }: { linha: LinhaProgresso }) {
   const feito = linha.realizado ?? 0;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <p className="text-xs text-muted-foreground">
-          {linha.metrica_rotulo}
-        </p>
+        <p className="text-[13px] text-muted-foreground">{linha.metrica_rotulo}</p>
         {ehProxy(linha) ? <ChipProxy /> : null}
       </div>
 
       <p className="flex items-baseline gap-2 leading-none">
-        <span className="numerico text-[40px] font-medium tracking-[-0.03em]">
+        <span className="numerico font-heading text-[36px] leading-[1.1] font-bold">
           {formatarNumero(feito)}
         </span>
         {linha.meta !== null ? (

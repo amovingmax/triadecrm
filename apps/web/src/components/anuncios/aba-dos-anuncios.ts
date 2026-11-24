@@ -242,6 +242,8 @@ export type ItemDeAtencao = {
   tom: 'alerta' | 'info';
   icone: 'fotos' | 'editar' | 'copia' | 'publicar' | 'canal_pro';
   titulo: string;
+  /** O nome curto, para o resumo do painel Pendências fechado (24/11/2026). */
+  curto: string;
   texto: string;
   rotulo: string;
   acao: AcaoDeAtencao;
@@ -295,6 +297,7 @@ export function itensDeAtencao(e: {
       tom: 'alerta',
       icone: 'fotos',
       titulo: `${semFotos.length === 1 ? '1 anúncio' : `${semFotos.length} anúncios`} com fotos faltando · ${total} ${total === 1 ? 'está' : 'estão'} no Canal Pro`,
+      curto: `${semFotos.length} com fotos faltando`,
       texto: `${frases.join('; ')}.`,
       rotulo: 'Trazer do Canal Pro',
       acao: { tipo: 'sincronizar' },
@@ -308,6 +311,7 @@ export function itensDeAtencao(e: {
       tom: 'alerta',
       icone: 'editar',
       titulo: `${a.codigo} · no ar, mas fora do arquivo`,
+      curto: `${a.codigo} fora do arquivo`,
       texto: `Falta ${oQueFalta(a.pendencias ?? [])}. Sem isso, o portal o tira do ar na próxima leitura.`,
       rotulo: 'Corrigir',
       acao: { tipo: 'editar', anuncioId: a.id },
@@ -327,6 +331,7 @@ export function itensDeAtencao(e: {
       tom: 'alerta',
       icone: 'editar',
       titulo: `${a.codigo} · falta ${oQueFalta(resto)}`,
+      curto: `${a.codigo} incompleto`,
       texto: 'Rascunho: completando, fica pronto para pôr no ar.',
       rotulo: 'Completar',
       acao: { tipo: 'editar', anuncioId: a.id },
@@ -348,6 +353,7 @@ export function itensDeAtencao(e: {
         ativas.length === 1
           ? '1 cópia antiga ainda ativa no Canal Pro'
           : `${ativas.length} cópias antigas ainda ativas no Canal Pro`,
+      curto: ativas.length === 1 ? '1 cópia antiga' : `${ativas.length} cópias antigas`,
       texto: `${ativas.map((x) => `${x.copia.codigo} (= ${x.anuncio.codigo})`).join(', ')}. Cada uma ocupa uma vaga do plano lá: exclua no Canal Pro.`,
       rotulo: 'Ver',
       acao: { tipo: 'abrir', anuncioId: ativas[0]!.anuncio.id },
@@ -363,6 +369,7 @@ export function itensDeAtencao(e: {
         e.soltas.length === 1
           ? '1 anúncio do Canal Pro ainda sem cartão no CRM'
           : `${e.soltas.length} anúncios do Canal Pro ainda sem cartão no CRM`,
+      curto: `${e.soltas.length} sem cartão no CRM`,
       texto: `${juntarNomes(e.soltas.slice(0, 4).map((l) => l.codigo))}${e.soltas.length > 4 ? ` e mais ${e.soltas.length - 4}` : ''}. A sincronização os traz, com as fotos.`,
       rotulo: 'Sincronizar',
       acao: { tipo: 'sincronizar' },
@@ -383,6 +390,7 @@ export function itensDeAtencao(e: {
       tom: 'info',
       icone: 'publicar',
       titulo: `${prontos.length === 1 ? '1 não publicado já pode' : `${prontos.length} não publicados já podem`} ir ao ar${vagas}`,
+      curto: `${prontos.length} ${prontos.length === 1 ? 'pronto' : 'prontos'} para ir ao ar`,
       texto: `Por visualizações no Canal Pro: ${porVisitas
         .slice(0, 4)
         .map(

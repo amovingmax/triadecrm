@@ -334,7 +334,9 @@ function LinhaWpp({
         aria-current={selecionado ? 'true' : undefined}
         title={dica}
         className={cn(
-          'relative flex w-full items-center gap-3 px-3.5 text-left outline-none',
+          // A margem é a da página (16 px no celular, 20 do tablet para cima),
+          // a mesma do alto da lista, para o retrato alinhar com a busca.
+          'relative flex w-full items-center gap-3 px-4 text-left outline-none md:px-5',
           'hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.06]',
           'pointer-coarse:select-none pointer-coarse:[-webkit-touch-callout:none]',
         )}

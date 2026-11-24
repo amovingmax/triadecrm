@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -10,22 +10,28 @@ import { BotaoRedondo } from './wpp';
 
 /**
  * O MIOLO DA CONVERSA NO JEITO DO WHATSAPP (03/11/2026), igual para as duas telas
- * de conversa (parceiro e cliente): o papel de parede com os desenhos de festa, a
- * pílula da janela de 24 h grudada no alto, as mensagens encostadas embaixo e o
- * botão redondo que desce até a mais recente.
+ * de conversa (parceiro e cliente): o papel de parede com os desenhos de festa, as
+ * mensagens encostadas embaixo e o botão redondo que desce até a mais recente.
  *
- * A pílula do dia também gruda no alto (`linha-do-tempo.tsx`), logo ABAIXO da
- * pílula da janela (04/11/2026): as duas grudavam no mesmo lugar e o "Hoje" ficava
- * escondido atrás da janela. A altura da janela muda (no celular estreito ela
- * quebra em duas linhas), então é medida, e vai para `--topo-do-dia`.
+ * A janela de 24 h saiu daqui (protótipo responsivo, 24/11/2026): era uma pílula
+ * grudada no alto do papel de parede e cobria a primeira mensagem e a data. Agora
+ * é uma faixa própria acima dele (`AvisoDaJanela`), e o alto é só da pílula do dia.
+ *
+ * A DATA GRUDADA SÓ APARECE ENQUANTO SE ROLA (24/11/2026), como no WhatsApp: parada,
+ * ela cobria a mensagem de cima. Quem diz se a data está grudada é a posição dela
+ * (no topo de grude do contêiner, ou acima dele sendo empurrada pela seguinte), e
+ * a marca vai direto no elemento (`data-grudada`), sem redesenhar a conversa a cada
+ * quadro de rolagem. `data-parado` vai no contêiner 1,2 s depois que a rolagem para;
+ * as duas juntas apagam a data (`linha-do-tempo.tsx`). As datas no fluxo, fora do
+ * topo, ficam sempre à vista.
  */
+const DATA_SOME_EM_MS = 1200;
 export function AreaDoFio({
   rolagem,
   conteudo,
   aoRolar,
   longe,
   irAoFim,
-  topo,
   children,
 }: {
   rolagem: React.RefObject<HTMLDivElement | null>;
@@ -34,33 +40,55 @@ export function AreaDoFio({
   /** Subiu o bastante para o botão de descer aparecer (`useRolagemNoFim`). */
   longe: boolean;
   irAoFim: () => void;
-  /** A pílula grudada no alto: a janela de 24 h. */
-  topo?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const toqueEm = useRef<{ x: number; y: number } | null>(null);
-  const area = useRef<HTMLDivElement>(null);
-  const pilula = useRef<HTMLDivElement>(null);
-  const temTopo = Boolean(topo);
+  const relogioDaData = useRef<number | undefined>(undefined);
+
+  const marcarDatas = useCallback(() => {
+    const caixa = rolagem.current;
+    if (!caixa) return;
+    const topo = caixa.getBoundingClientRect().top;
+    for (const dia of caixa.querySelectorAll<HTMLElement>('[data-dia]')) {
+      const grude = Number.parseFloat(getComputedStyle(dia).top) || 0;
+      const r = dia.getBoundingClientRect();
+      dia.toggleAttribute('data-grudada', r.top - (topo + grude) <= 1 && r.bottom > topo);
+    }
+  }, [rolagem]);
+
+  // Parada desde a abertura; a cada mudança de altura (mensagem nova, imagem que
+  // carregou) as marcas são refeitas.
   useEffect(() => {
-    const fora = area.current;
-    const alto = pilula.current;
-    if (!fora || !alto || typeof ResizeObserver === 'undefined') return;
-    // 10 px da margem de cima da pílula e 6 px entre ela e a do dia.
-    const medir = () => fora.style.setProperty('--topo-do-dia', `${alto.offsetHeight + 16}px`);
-    medir();
-    const observador = new ResizeObserver(medir);
-    observador.observe(alto);
-    return () => {
-      observador.disconnect();
-      fora.style.removeProperty('--topo-do-dia');
-    };
-  }, [temTopo]);
+    const caixa = rolagem.current;
+    if (!caixa) return;
+    caixa.setAttribute('data-parado', '');
+    marcarDatas();
+    const dentro = conteudo.current;
+    if (!dentro || typeof ResizeObserver === 'undefined') return;
+    const observador = new ResizeObserver(marcarDatas);
+    observador.observe(dentro);
+    return () => observador.disconnect();
+  }, [rolagem, conteudo, marcarDatas]);
+  useEffect(() => () => window.clearTimeout(relogioDaData.current), []);
+
+  const aoRolarNoFio = () => {
+    aoRolar();
+    const caixa = rolagem.current;
+    if (!caixa) return;
+    caixa.removeAttribute('data-parado');
+    marcarDatas();
+    window.clearTimeout(relogioDaData.current);
+    relogioDaData.current = window.setTimeout(
+      () => caixa.setAttribute('data-parado', ''),
+      DATA_SOME_EM_MS,
+    );
+  };
+
   return (
-    <div ref={area} className="relative flex min-h-0 flex-1 flex-col">
+    <div className="relative flex min-h-0 flex-1 flex-col">
       <div
         ref={rolagem}
-        onScroll={aoRolar}
+        onScroll={aoRolarNoFio}
         // TOCAR NA CONVERSA FECHA O TECLADO, como no WhatsApp (04/11/2026). No
         // navegador do celular o teclado só fecha pelo botão dele: um toque
         // parado (não um arrasto) no papel de parede ou num balão tira o foco da
@@ -77,17 +105,9 @@ export function AreaDoFio({
           const ativo = document.activeElement;
           if (ativo instanceof HTMLTextAreaElement && ativo.id === 'resposta') ativo.blur();
         }}
-        className="papel-de-parede min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]"
+        className="papel-de-parede group/fio min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]"
       >
         <div ref={conteudo} className="flex min-h-full flex-col">
-          {topo ? (
-            <div
-              ref={pilula}
-              className="pointer-events-none sticky top-2.5 z-20 mt-2.5 flex justify-center px-4"
-            >
-              <div className="pointer-events-auto">{topo}</div>
-            </div>
-          ) : null}
           {/* `mt-auto`: com pouca mensagem, elas encostam embaixo, perto da caixa
               de escrever, como no WhatsApp; o vazio fica em cima. */}
           <div className="mt-auto flex flex-col px-3 pt-1.5 pb-4 md:px-[6%] xl:px-[8%]">
@@ -134,7 +154,9 @@ export function useAvisoDeNaoLidas(
 /**
  * A coluna da ficha ao lado da conversa, no computador ("Dados do contato" do
  * WhatsApp). Abre ao tocar no nome ou no ícone do painel, e fica aberta de uma
- * conversa para a outra.
+ * conversa para a outra. Só a partir de 1280 px (protótipo responsivo,
+ * 24/11/2026): abaixo disso a conversa ficava espremida entre a lista e a ficha,
+ * e quem abre a ficha recebe a folha (`conversa.tsx`).
  */
 export function FichaAoLado({
   aoFechar,
@@ -149,7 +171,7 @@ export function FichaAoLado({
     <aside
       aria-label="Dados do contato"
       className={cn(
-        'hidden w-[min(23rem,42%)] shrink-0 flex-col border-l border-wpp-linha bg-wpp-painel md:flex conversa-estreita:hidden',
+        'hidden w-[min(23rem,42%)] shrink-0 flex-col border-l border-wpp-linha bg-wpp-painel xl:flex conversa-estreita:hidden',
         className,
       )}
     >
@@ -165,6 +187,15 @@ export function FichaAoLado({
     </aside>
   );
 }
+
+/**
+ * A faixa "O cliente ligou… e ninguém atendeu" (`FaixaDaLigacao`, do módulo de
+ * ligação) no tamanho e na margem da faixa da janela de 24 h logo abaixo dela
+ * (24/11/2026). Quando o aviso é de ligação perdida (o texto em vermelho), o
+ * fundo também fica vermelho-claro, como no protótipo.
+ */
+export const CLASSE_DA_FAIXA_DA_LIGACAO =
+  'border-b border-wpp-linha px-4 py-2 text-[13px] leading-snug md:px-5 conversa-estreita:px-4 [&.text-destructive-texto]:bg-quente-fundo [&.text-destructive-texto]:text-quente-texto';
 
 /** O título miúdo das seções da ficha e da folha do celular. */
 export const ROTULO_DA_SECAO =

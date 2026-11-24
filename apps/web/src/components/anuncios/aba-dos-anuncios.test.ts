@@ -256,6 +256,7 @@ describe('itensDeAtencao', () => {
     const fotos = itens.find((i) => i.id === 'fotos')!;
     expect(fotos.titulo).toBe('2 anúncios com fotos faltando · 48 estão no Canal Pro');
     expect(fotos.texto).toBe('Edifício Simone sem nenhuma; SA0012_IMOVA com 7 de 8.');
+    expect(fotos.curto).toBe('2 com fotos faltando');
     expect(fotos.acao).toEqual({ tipo: 'sincronizar' });
   });
   it('o rascunho que só espera as fotos do Canal Pro não aparece de novo', () => {

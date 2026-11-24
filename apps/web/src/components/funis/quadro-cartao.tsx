@@ -63,7 +63,7 @@ function AlcaDeArraste({
       {...resto}
       aria-label={`Mover ${nome} de etapa`}
       title="Arraste, ou aperte espaço e use as setas."
-      className="inline-flex size-7 cursor-grab items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-opacity group-hover/cartao:opacity-100 hover:bg-accent hover:text-accent-foreground focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none active:cursor-grabbing md:opacity-0"
+      className="inline-flex size-8 cursor-grab items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-opacity group-hover/cartao:opacity-100 hover:bg-accent hover:text-accent-foreground focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none active:cursor-grabbing md:opacity-0"
     >
       <GripVertical className="size-4" aria-hidden="true" />
     </span>
@@ -76,7 +76,7 @@ function BotaoMover({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="toque inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-hairline text-sm font-medium focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+      className="toque inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-semibold focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
     >
       <ArrowRightLeft className="size-4" aria-hidden="true" />
       Mover de etapa

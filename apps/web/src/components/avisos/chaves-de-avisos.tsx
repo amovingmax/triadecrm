@@ -52,20 +52,26 @@ export function ChavesDeAvisos({ iniciais }: { iniciais: AvisoDaPessoa[] }) {
             aria-label={aviso.nome}
             disabled={salvando === aviso.tipo}
             onClick={() => void trocar(aviso.tipo, !aviso.ligado)}
-            // A chave tem 28 px de altura, mas o dedo acerta 48: o `after` estende
-            // o toque 10 px para cima e para baixo e 8 px para os lados.
-            className={cn(
-              "toque relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors after:absolute after:-inset-x-2 after:-inset-y-2.5 after:content-[''] disabled:opacity-60",
-              aviso.ligado ? 'bg-foreground' : 'bg-foreground/15',
-            )}
+            // O BOTÃO TEM 56 × 44 PX E O DESENHO, OS 48 × 28 DE SEMPRE (24/11/2026).
+            // Antes o botão tinha o tamanho do desenho e um `after` esticava o toque:
+            // o dedo acertava, mas o alvo medido era de 28 px. A margem negativa
+            // devolve ao layout só o espaço do desenho, e a linha não cresce.
+            className="group/chave toque relative -mx-1 -my-2 inline-grid h-11 w-14 shrink-0 place-items-center rounded-full outline-none disabled:opacity-60"
           >
             <span
               aria-hidden="true"
               className={cn(
-                'inline-block size-5 rounded-full bg-background shadow transition-transform',
-                aviso.ligado ? 'translate-x-6' : 'translate-x-1',
+                'inline-flex h-7 w-12 items-center rounded-full transition-colors group-focus-visible/chave:ring-3 group-focus-visible/chave:ring-ring/50',
+                aviso.ligado ? 'bg-foreground' : 'bg-foreground/15',
               )}
-            />
+            >
+              <span
+                className={cn(
+                  'inline-block size-5 rounded-full bg-background shadow transition-transform',
+                  aviso.ligado ? 'translate-x-6' : 'translate-x-1',
+                )}
+              />
+            </span>
           </button>
         </li>
       ))}

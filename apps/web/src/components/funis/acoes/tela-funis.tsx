@@ -158,7 +158,9 @@ export function TelaFunis({ filtrosIniciais }: { filtrosIniciais: FiltrosQuadro 
       <section
         aria-label="Quadro do funil"
         className={cn(
-          'border-t border-hairline pt-4',
+          // Sem o filete de antes (protótipo responsivo, 24/11/2026): no celular a
+          // barrinha de progresso das etapas já separa os filtros do quadro.
+          'pt-1',
           // Enquanto a próxima consulta chega, o quadro anterior fica apagado e sem
           // toque: o que está na tela ainda é o de antes, e a interface não finge.
           quadro.isPlaceholderData && 'pointer-events-none opacity-60',

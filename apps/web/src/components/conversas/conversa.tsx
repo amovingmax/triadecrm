@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { useMidia } from '@/lib/use-midia';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,7 +32,6 @@ import { EmailDaFicha } from '@/components/parceiros/email-da-ficha';
 import { DiasSemContato } from '@/components/temperatura';
 import { definicaoTemperatura } from '@/components/temperatura/escala-termica';
 import { BotaoLigar } from '@/components/ligacao/voz-botao-ligar';
-import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 import { MudarEtapa } from '@/components/funis/mudar-etapa';
 import {
   BotaoDeLigarNaConversa,
@@ -57,12 +57,13 @@ import { contagemDeInteracoes, local } from './formatos';
 import {
   ACAO_DA_FOLHA,
   AreaDoFio,
+  CLASSE_DA_FAIXA_DA_LIGACAO,
   FichaAoLado,
   GRADE_DAS_ACOES,
   ROTULO_DA_SECAO,
   useAvisoDeNaoLidas,
 } from './fio-wpp';
-import { Janela24h, PilulaDaJanela, useJanela } from './janela-24h';
+import { AvisoDaJanela, Janela24h, useJanela } from './janela-24h';
 import { LeituraDaIa } from './leitura-da-ia';
 import { ControleDaIa, SeloDaIa } from '@/components/ia-que-atende/na-conversa';
 import { ClienteDeTeste } from '@/components/ia-que-atende/cliente-de-teste';
@@ -143,12 +144,21 @@ export function Conversa({
   fichaAberta: boolean;
   aoAlternarFicha: () => void;
 }) {
-  const ehCelular = useEhCelular();
-  // A coluna ao lado só cabe no computador e no tablet com o painel largo
-  // (o contrário de `conversa-estreita`); onde não cabe, o nome abre a folha.
+  // O CABEÇALHO PELA LARGURA (protótipo responsivo, 24/11/2026): abaixo de
+  // 1024 px ficam à vista só "Pedir para ligar" (ícone) e o "⋮", que abre a
+  // folha com tudo; de 1024 para cima, a fila inteira (buscar, ligar, concluir,
+  // painel e o menu "⋮").
+  const largo = useMidia('(min-width: 1024px)');
+  // A folha de detalhes desce de baixo no celular e abre do lado do tablet para cima.
+  const folhaDoLado = useMidia('(min-width: 768px)');
+  // A coluna dos dados do contato só aparece a partir de 1280 px (`FichaAoLado`).
+  const fichaCabe = useMidia('(min-width: 1280px)');
+  const fichaVisivel = fichaAberta && fichaCabe;
+  // A coluna ao lado só a partir de 1280 px (e com o painel largo, no toque);
+  // onde não cabe, o nome e o botão do painel abrem a folha.
   const painel = useRef<HTMLDivElement>(null);
   const naoCabeAFicha = () =>
-    window.matchMedia('(max-width: 767px)').matches ||
+    !window.matchMedia('(min-width: 1280px)').matches ||
     (window.matchMedia('(pointer: coarse)').matches && (painel.current?.clientWidth ?? 0) < 672);
   const consulta = useQuery({
     queryKey: chaveDaLinha(item.id),
@@ -239,6 +249,7 @@ export function Conversa({
   // 20/10/2026): etapa, selos, etiquetas, ações e a ficha moram atrás do nome e
   // do "⋯", e a tela fica para a conversa.
   const [folha, setFolha] = useState(false);
+  const abrirFicha = () => (naoCabeAFicha() ? setFolha(true) : aoAlternarFicha());
   const atendendo = fio
     ? fio.responsavelId && fio.responsavelId === eu?.id
       ? 'você'
@@ -461,6 +472,14 @@ export function Conversa({
           {fio && eu?.podeEscrever ? (
             <ControleDaIa fioId={fio.id} className={ACAO_DA_FOLHA} />
           ) : null}
+          {/* Ligar pelo navegador: no cabeçalho só de 1024 px para cima. */}
+          {naFolha && eu?.podeEscrever ? (
+            <BotaoLigar
+              organizationId={item.id}
+              temTelefone={Boolean(item.telefone) || item.telefoneMascarado}
+              className={cn(ACAO_DA_FOLHA, 'flex-none lg:hidden')}
+            />
+          ) : null}
           <Button asChild variant="outline" className={ACAO_DA_FOLHA}>
             <Link href={registrarHref}>
               <MessageSquarePlus aria-hidden="true" />
@@ -541,7 +560,7 @@ export function Conversa({
           </BotaoRedondo>
           <button
             type="button"
-            onClick={() => (naoCabeAFicha() ? setFolha(true) : aoAlternarFicha())}
+            onClick={abrirFicha}
             aria-haspopup="dialog"
             className="toque flex h-[52px] min-w-0 flex-1 items-center gap-3 rounded-[14px] pr-2 pl-1 text-left outline-none hover:bg-foreground/[0.04] focus-visible:ring-3 focus-visible:ring-ring/50"
           >
@@ -566,44 +585,56 @@ export function Conversa({
             <CanalNoTopo
               conversaId={fio.id}
               podeEscrever={Boolean(eu?.podeEscrever)}
-              className="mx-1 max-md:hidden conversa-estreita:hidden @max-4xl:hidden"
+              className="mx-1 py-1.5 max-lg:hidden @max-4xl:hidden"
             />
           ) : null}
-          {/* QUEM CABE NO CABEÇALHO É A LARGURA DO PAINEL QUE DIZ (17/11/2026), e o
-              nome do contato vem primeiro. Em 1280 o cabeçalho pedia 839 px num
-              painel de 798 (com a coluna dos dados do contato aberta, 710 em 463), e
-              o nome ficava com 12 px. Agora: o canal de chegada só com 56rem de
-              painel (ele também está em "Como chegou", nos dados do contato);
-              "Pedir para ligar" e "Assumir conversa" com nome a partir de 48rem, e
-              a IA e o "Concluir" a partir de 64rem; abaixo de 36rem, a lupa e o
-              "Concluir" saem, porque também estão no "⋯". */}
-          {fio ? <BotaoDeBuscarNoFio className="max-md:hidden @max-xl:hidden" /> : null}
+          {/* QUEM CABE NO CABEÇALHO (protótipo responsivo, 24/11/2026). Abaixo de
+              1024 px só "Pedir para ligar", em ícone, e o "⋯": a lupa, o concluir,
+              o ligar pelo navegador, o assumir, a IA e a ficha estão na folha que
+              ele abre (o "Assumir" também vem para cima da caixa de escrever). De
+              1024 para cima, a fila inteira, e o nome do contato continua vindo
+              primeiro: o canal de chegada só com 56rem de painel (ele também está
+              em "Como chegou"), o "Assumir" com nome a partir de 48rem, a IA e o
+              "Concluir" a partir de 64rem, e o "Pedir para ligar" perde o nome
+              quando a coluna dos dados do contato está aberta (17/11/2026: em 1280
+              o nome do contato ficava com 12 px). */}
+          {fio ? <BotaoDeBuscarNoFio className="max-lg:hidden" /> : null}
           {eu?.podeEscrever ? (
             <BotaoLigar
               organizationId={item.id}
               temTelefone={Boolean(item.telefone) || item.telefoneMascarado}
-              className="h-10 flex-none rounded-full border-wpp-linha-forte bg-transparent px-3.5 text-[13.5px] max-md:hidden sm:flex-none md:h-10"
+              className="h-10 flex-none rounded-full border-wpp-linha-forte bg-transparent px-3.5 text-[13.5px] max-lg:hidden sm:flex-none md:h-10"
             />
           ) : null}
           {fio && eu?.podeEscrever ? (
-            <BotaoDeLigarNaConversa
-              conversaId={fio.id}
-              nome={item.nome}
-              compacto={ehCelular}
-              rotuloPelaLargura
-            />
+            // A pílula de 40 px das outras ações do cabeçalho (o botão é de outro
+            // módulo e nasce com 36 px).
+            <span
+              className={cn(
+                'contents',
+                largo &&
+                  '*:h-10 *:rounded-full *:border-wpp-linha-forte *:bg-transparent *:px-3.5 *:text-[13.5px]',
+              )}
+            >
+              <BotaoDeLigarNaConversa
+                conversaId={fio.id}
+                nome={item.nome}
+                compacto={!largo}
+                rotuloPelaLargura={fichaVisivel}
+              />
+            </span>
           ) : null}
           {podeAssumir && fio ? (
             <AssumirConversa
               fioId={fio.id}
               organizacaoId={item.id}
               rotuloPelaLargura
-              className="rounded-full max-md:hidden md:h-10"
+              className="rounded-full max-lg:hidden lg:h-10"
             />
           ) : null}
           {/* A IA que atende (Imova, 06/11/2026): o estado e o "parar" a um toque. */}
           {fio && eu?.podeEscrever ? (
-            <ControleDaIa fioId={fio.id} variante="pilula" className="ml-1" />
+            <ControleDaIa fioId={fio.id} variante="pilula" className="ml-1 max-lg:hidden" />
           ) : null}
           {fio && eu?.podeEscrever ? (
             CONCLUIR_NA_EMPRESA ? (
@@ -611,23 +642,23 @@ export function Conversa({
                 fioId={fio.id}
                 concluidaEm={fio.arquivadaEm}
                 rotuloPelaLargura
-                className="mx-1 conversa-estreita:hidden @max-xl:hidden"
+                className="mx-0.5 border-transparent max-lg:hidden @5xl:border-wpp-linha-forte"
               />
             ) : (
-              <Arquivar fio={fio} className="conversa-estreita:hidden" />
+              <Arquivar fio={fio} className="max-lg:hidden" />
             )
           ) : null}
           <BotaoRedondo
-            onClick={aoAlternarFicha}
-            aria-pressed={fichaAberta}
-            aria-label={fichaAberta ? 'Fechar os dados do contato' : 'Ver os dados do contato'}
-            className="max-md:hidden conversa-estreita:hidden"
+            onClick={abrirFicha}
+            aria-pressed={fichaVisivel}
+            aria-label={fichaVisivel ? 'Fechar os dados do contato' : 'Ver os dados do contato'}
+            className="max-lg:hidden"
           >
             <PanelRight aria-hidden="true" />
           </BotaoRedondo>
-          {/* Computador: o menu "⋯". Celular: o "⋯" abre a folha, que tem tudo. */}
+          {/* De 1024 para cima: o menu "⋯". Abaixo: o "⋯" abre a folha, que tem tudo. */}
           {fio ? (
-            <span className="contents conversa-estreita:hidden">
+            <span className="hidden lg:contents">
               <MenuDaConversa
                 fioId={fio.id}
                 bloqueada={fio.bloqueadaEm !== null}
@@ -643,7 +674,7 @@ export function Conversa({
           <BotaoRedondo
             onClick={() => setFolha(true)}
             aria-label="Mais: etapa, etiquetas, ações e ficha"
-            className={cn('hidden conversa-estreita:inline-flex', !fio && 'md:inline-flex')}
+            className={cn(fio && 'lg:hidden')}
           >
             <EllipsisVertical aria-hidden="true" />
           </BotaoRedondo>
@@ -659,7 +690,15 @@ export function Conversa({
             podeReabrir={Boolean(eu?.podeEscrever)}
           />
         ) : null}
-        {fio ? <FaixaDaLigacao conversaId={fio.id} className="border-b border-wpp-linha" /> : null}
+        {/* OS AVISOS NUMA FAIXA PRÓPRIA (protótipo responsivo, 24/11/2026): a
+            ligação perdida e a janela de 24 h, de largura toda, acima das
+            mensagens. A janela era uma pílula por cima da primeira mensagem. */}
+        {fio ? (
+          <div className="flex shrink-0 flex-col">
+            <FaixaDaLigacao conversaId={fio.id} className={CLASSE_DA_FAIXA_DA_LIGACAO} />
+            <AvisoDaJanela estado={janela} />
+          </div>
+        ) : null}
         {/* Clientes e Parceiros (Imova, 23/11/2026): o perfil e a troca dele. */}
         {item.parceiro !== undefined ? (
           <FaixaDoPerfil
@@ -677,8 +716,11 @@ export function Conversa({
 
         <Sheet open={folha} onOpenChange={setFolha}>
           <SheetContent
-            side="bottom"
-            className="@container max-h-[88svh] gap-5 overflow-y-auto rounded-t-2xl px-4 pt-4 pb-[calc(var(--area-segura-inferior)+1.25rem)]"
+            side={folhaDoLado ? 'right' : 'bottom'}
+            className={cn(
+              '@container gap-5 overflow-y-auto px-4 pt-4 pb-[calc(var(--area-segura-inferior)+1.25rem)]',
+              folhaDoLado ? 'w-full sm:max-w-[400px]' : 'max-h-[88svh] rounded-t-2xl',
+            )}
           >
             <SheetHeader className="flex-row items-center gap-3 p-0 pr-12 text-left">
               <AvatarDaConversa
@@ -709,7 +751,6 @@ export function Conversa({
           aoRolar={aoRolar}
           longe={longe}
           irAoFim={irAoFim}
-          topo={fio ? <PilulaDaJanela estado={janela} /> : null}
         >
           <AvisoWhatsapp meta={meta} compacto className="mx-auto my-3 w-full max-w-xl" />
 
@@ -742,7 +783,7 @@ export function Conversa({
           ) : null}
           {/* Quem atende, logo acima da caixa: quem vai responder precisa saber
               se está respondendo no lugar de alguém. */}
-          {/* No celular o "Assumir" sai do cabeçalho (não cabe na linha) e vem
+          {/* Abaixo de 1024 px o "Assumir" sai do cabeçalho (não cabe na linha) e vem
               para cá, onde a pessoa já está com o dedo: no fim da frase do aviso,
               e não num bloco de largura inteira embaixo dele (16/11/2026), que
               comia 52 px da conversa num celular de 667. Quem pode assumir é
@@ -758,7 +799,7 @@ export function Conversa({
                   <AssumirConversa
                     fioId={fio.id}
                     organizacaoId={item.id}
-                    className="my-0.5 ml-1.5 h-8 px-3 align-middle text-[13px] md:hidden"
+                    className="my-0.5 ml-1.5 h-9 px-3 align-middle text-[13px] lg:hidden"
                   />
                 ) : null
               }

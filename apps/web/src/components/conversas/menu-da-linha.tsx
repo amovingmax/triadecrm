@@ -154,7 +154,7 @@ export function MenuDaLinha({
           type="button"
           aria-label={`Opções da conversa com ${linha.nome}`}
           className={cn(
-            'flex size-[30px] items-center justify-center rounded-full bg-inherit text-wpp-suave outline-none',
+            'flex size-8 items-center justify-center rounded-full bg-inherit text-wpp-suave outline-none',
             'opacity-0 transition-opacity group-hover/linha:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100',
             'focus-visible:ring-3 focus-visible:ring-ring/50 pointer-coarse:hidden',
             className,

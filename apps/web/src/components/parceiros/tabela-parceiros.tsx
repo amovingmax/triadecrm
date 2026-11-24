@@ -67,16 +67,11 @@ const ContextoDasAcoes = createContext<AcoesNaTabela | null>(null);
  * está parado.
  *
  * A tabela cabe na tela em vez de sangrar para fora dela: `table-fixed` faz as
- * larguras declaradas valerem (sem isso o layout automático segue o max-content e o
- * conteúdo estoura), e as colunas secundárias entram por degrau de largura. Como o
- * contêiner é 256px mais estreito que o viewport (a lateral), cada breakpoint do
- * Tailwind sobe um nível: categoria no `lg`, bairro e cidade no `xl`, o resto no `2xl`.
- * Nome e dias sem contato nunca somem: são o par que carrega a leitura de relance.
- *
- * A coluna do nome continua fixa na rolagem horizontal, para o `2xl` e para o zoom:
- * é o nome que responde "de quem é esta linha?" quando o resto some para a esquerda.
- * A sombra nas bordas do contêiner avisa que ainda há coluna fora da tela, e é 100%
- * CSS (`background-attachment`), sem ouvinte de scroll, que o plano de design proíbe.
+ * larguras declaradas valerem, o nome fica com a sobra e as colunas secundárias
+ * entram por degrau de largura (responsável no `xl`, próxima ação no `2xl`). Desde o
+ * protótipo responsivo (24/11/2026) ela só aparece a partir de 1024px; abaixo disso
+ * a lista é de cartões. Sem rolagem lateral, o cabeçalho fica preso ao rolar a página
+ * e a coluna fixa do nome, que servia à rolagem lateral, saiu.
  *
  * Sem ordenação por coluna: a ordem vem do servidor (relevância da busca, depois nome)
  * e vale para as 5.000 linhas. Ordenar só as 50 da página mentiria sobre o resto.
@@ -88,57 +83,26 @@ const coluna = createColumnHelper<typeof recursos, LinhaParceiro>();
 
 /**
  * Largura e visibilidade por coluna, compartilhadas pelo cabeçalho e pela célula.
- * As larguras só valem porque a tabela é `table-fixed`; os breakpoints sobem um
- * degrau porque medem o viewport, e o contêiner tem 256px a menos que ele.
- *
- * O peso horizontal foi medido em 1440 e reequilibrado: `categoria` tinha 206px de
- * caixa útil para um conteúdo que pede até 383px (20 das 25 linhas visíveis cortadas),
- * enquanto sobrava folga nas colunas de largura fixa. Como a tabela é `table-fixed` e
- * `w-full`, o navegador distribui a sobra PROPORCIONALMENTE às larguras declaradas, e
- * era daí que vinha o ar: 1072px declarados em 1184px de contêiner inflavam tudo em
- * 10%. Subindo `categoria` de w-52 para w-72 a sobra cai para 16px, a caixa útil da
- * categoria vai de 206px para ~268px e o corte quase desaparece; o que encolhe são as
- * colunas que estavam sobrando, não as que cortavam.
+ * As larguras só valem porque a tabela é `table-fixed`. Em 1024px o contêiner tem
+ * ~890px: 224 + 224 + 208 deixam ~230px para o nome, que trunca com `title`.
  */
 const CLASSES: Record<string, string> = {
-  // O nome passou a carregar DUAS linhas: o nome e, embaixo, categoria · bairro,
-  // cidade — que antes eram duas colunas próprias somando ~450px de largura
-  // declarada. Juntar as três num lugar só é o que devolveu espaço ao WhatsApp,
-  // que ficava cortado na borda direita a 1425px: justamente o dado que o time usa
-  // para FAZER o contato, e a última coisa da linha.
-  nome: 'w-[clamp(15rem,24vw,22rem)]',
+  // O nome carrega DUAS linhas: o nome e, embaixo, categoria · bairro, cidade. Sem
+  // largura declarada desde 24/11/2026: é a coluna que fica com a sobra, e as outras
+  // têm a medida do que mostram.
+  nome: '',
   // A tag do desfecho mais longa do catálogo ("Pediu contato no WhatsApp") e a
-  // linha de baixo (canal · quando · tentativa · quem) cabem em 240px sem cortar.
-  dias: 'w-60',
-  // w-52 desde 07/10/2026: o botão da saudação mora ao lado do número.
+  // linha de baixo (canal · quando · tentativa · quem); o que passar trunca, com a
+  // frase inteira no `title`.
+  dias: 'w-56',
+  // A etapa (botão que abre a folha de mover) e, ao lado, a marca de Parceiro.
+  etapa: 'w-56',
+  // O responsável entra a partir do `xl` (protótipo responsivo, 24/11/2026; antes
+  // só no `2xl`): em 1280 a tabela já tem folga para ele.
+  responsavel: 'hidden w-32 xl:table-cell',
+  // O número e o botão da saudação ao lado.
   telefone: 'w-52',
-  // A etapa é SEMPRE visível desde 28/09/2026: ela herdou o lugar da coluna
-  // "Temperatura" (ADR-16). w-44 e não w-40 porque o nome mais longo do catálogo
-  // — "Apresentação realizada" — não pode nascer truncado. w-60 desde 14/10/2026:
-  // o botão da Consultoria mora ao lado da etapa.
-  etapa: 'w-60',
-  responsavel: 'hidden w-36 2xl:table-cell',
   proxima: 'hidden w-32 2xl:table-cell',
-};
-
-/**
- * Aviso de que ainda há coluna fora da tela, sem ouvinte de scroll (proibido pelo
- * plano de design): quatro camadas de fundo, duas presas ao conteúdo (`local`, que
- * some no início e no fim da rolagem) e duas presas ao contêiner (`scroll`), que só
- * aparecem quando as primeiras saem de baixo delas. Cores em tokens, para valer nos
- * dois temas.
- */
-const SOMBRA_DE_ROLAGEM: React.CSSProperties = {
-  backgroundImage: [
-    'linear-gradient(to right, var(--background), transparent)',
-    'linear-gradient(to left, var(--background), transparent)',
-    'linear-gradient(to right, color-mix(in oklab, var(--foreground) 10%, transparent), transparent)',
-    'linear-gradient(to left, color-mix(in oklab, var(--foreground) 10%, transparent), transparent)',
-  ].join(', '),
-  backgroundPosition: 'left center, right center, left center, right center',
-  backgroundRepeat: 'no-repeat',
-  backgroundSize: '2rem 100%, 2rem 100%, 0.75rem 100%, 0.75rem 100%',
-  backgroundAttachment: 'local, local, scroll, scroll',
 };
 
 const colunas = coluna.columns([
@@ -153,18 +117,10 @@ const colunas = coluna.columns([
     header: 'Último contato',
     cell: ({ row }) => <UltimoContato linha={row.original} />,
   }),
-  // Terceira, e não última: é por onde o contato acontece. Antes vinha depois de
-  // categoria e bairro, e a 1425px já nascia cortado pela borda do contêiner.
-  coluna.accessor('phone', {
-    id: 'telefone',
-    header: 'WhatsApp',
-    cell: ({ row }) => <CelulaWhatsapp linha={row.original} />,
-  }),
-  // A ETAPA NO LUGAR DA TEMPERATURA (28/09/2026, ADR-16). Até hoje esta posição
-  // — a única que a tabela mostra em toda largura — era a coluna "Temperatura",
-  // e a etapa só aparecia a partir do `xl`. Rafael: "o fato de só o lead
-  // responder e ele já virar morno não faz sentido e tá errado". As 12 etapas do
-  // funil apareciam aqui como três cores; agora aparecem como as 12 que são.
+  // A ETAPA NO LUGAR DA TEMPERATURA (28/09/2026, ADR-16): as 12 etapas do funil
+  // aparecem como as 12 que são, e não como três cores. Logo depois do contato desde
+  // o protótipo responsivo (24/11/2026): o que o contato deu e onde o negócio está
+  // são lidos juntos.
   coluna.accessor('stage', {
     id: 'etapa',
     header: 'Etapa',
@@ -174,6 +130,13 @@ const colunas = coluna.columns([
     id: 'responsavel',
     header: 'Responsável',
     cell: ({ getValue }) => <Texto valor={getValue()} />,
+  }),
+  // Por onde o contato acontece, com o botão da saudação ao lado. A tabela cabe na
+  // largura desde 24/11/2026, então a última coluna não nasce mais cortada.
+  coluna.accessor('phone', {
+    id: 'telefone',
+    header: 'WhatsApp',
+    cell: ({ row }) => <CelulaWhatsapp linha={row.original} />,
   }),
   coluna.accessor('next_action_at', {
     id: 'proxima',
@@ -199,31 +162,33 @@ export function TabelaParceiros({
         <RevelarLista>
           <ColunasEscondidas />
 
-          {/* O contêiner rola na horizontal; a página nunca rola.
-          E ele é um CARTÃO (29/09/2026, Design System): a tabela ficava direto
-          sobre a página, com as linhas encostando na borda da tela. No desenho
-          novo a página é cinza e a tabela é conteúdo, logo mora no branco.
-          `px-1` em vez de padding cheio porque as células já têm o seu, e um
-          padding duplo empurraria a primeira coluna para o meio do cartão. */}
-          <div
-            className="sombra-base relative w-full overflow-x-auto rounded-xl bg-card px-1 py-1"
-            style={SOMBRA_DE_ROLAGEM}
-          >
-            <table className="w-full table-fixed border-collapse text-sm">
+          {/* Um CARTÃO (29/09/2026, Design System): a página é cinza e a tabela é
+          conteúdo, logo mora no branco.
+
+          `overflow-x-clip`, e não `auto` (protótipo responsivo, 24/11/2026): um
+          contêiner que rola vira o dono do `sticky`, e o cabeçalho deixava de ficar
+          preso ao rolar a página. A tabela só aparece a partir de 1024px e as
+          colunas secundárias entram por degrau de largura, então ela cabe sem rolar
+          de lado. */}
+          <div className="sombra-base relative w-full overflow-x-clip rounded-xl bg-card px-3 py-1">
+            <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
               <thead>
                 {tabela.getHeaderGroups().map((grupo) => (
-                  <tr key={grupo.id} className="border-b border-hairline">
+                  <tr key={grupo.id}>
                     {grupo.headers.map((cabecalho) => (
                       <th
                         key={cabecalho.id}
                         scope="col"
                         className={cn(
-                          // `truncate` é rede de segurança da troca de fonte: Poppins é
-                          // mais larga que a Geist anterior, e com `table-fixed` um
-                          // rótulo que crescesse sangraria por cima da coluna vizinha.
-                          'h-9 truncate px-3 text-left align-middle text-xs font-medium text-muted-foreground',
-                          cabecalho.column.id === 'nome' &&
-                            'sticky left-0 z-20 border-r border-hairline bg-card pl-4',
+                          // `truncate` é rede de segurança da troca de fonte: com
+                          // `table-fixed` um rótulo que crescesse sangraria por cima
+                          // da coluna vizinha.
+                          'h-12 truncate border-b border-border bg-card px-3 text-left align-middle text-xs font-semibold text-muted-foreground',
+                          // CABEÇALHO PRESO: para logo abaixo do cabeçalho do app (72px)
+                          // e da barra de busca, que também é presa e cresce quando há
+                          // etiquetas de filtro (a tela mede e passa a altura).
+                          'sticky top-[calc(4.5rem+var(--barra-da-lista,4rem))] z-10',
+                          cabecalho.column.id === 'nome' && 'pl-1',
                           CLASSES[cabecalho.column.id],
                         )}
                       >
@@ -240,16 +205,11 @@ export function TabelaParceiros({
                       <td
                         key={celula.id}
                         className={cn(
-                          // 56px e não 36px. A tabela nasceu para uma linha por célula, e
-                          // a tag do contato com a linha de baixo ficava espremida rente ao
-                          // topo. Agora TODA linha tem a mesma anatomia — em cima o que
-                          // importa, embaixo o contexto —, e as células de uma linha só
-                          // (WhatsApp, temperatura) centralizam nessa mesma altura.
-                          'h-14 px-3 align-middle whitespace-nowrap',
-                          celula.column.id === 'nome' &&
-                            // Fundo opaco para o conteúdo passar por baixo, e o mesmo
-                            // resultado do hover da linha (muted a 50% sobre o fundo).
-                            'sticky left-0 z-10 border-r border-hairline bg-card p-0 group-hover/linha:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]',
+                          // 60px: em cima o que importa, embaixo o contexto, e as
+                          // células de uma linha só (WhatsApp, etapa) centralizam na
+                          // mesma altura.
+                          'h-[60px] border-b border-hairline px-3 align-middle whitespace-nowrap group-last/linha:border-b-0',
+                          celula.column.id === 'nome' && 'p-0',
                           CLASSES[celula.column.id],
                         )}
                       >
@@ -270,22 +230,16 @@ export function TabelaParceiros({
 /**
  * Nenhuma coluna some em silêncio.
  *
- * As colunas secundárias entram por degrau de largura, e numa tela de 1280px (o
- * notebook do time) responsável, etapa e próxima ação simplesmente não estão lá.
- * Sem este aviso a pessoa conclui que o dado não existe, e não que ele está a um
- * clique de distância. O texto é escolhido por CSS, no mesmo degrau em que a coluna
- * desaparece, então não há medição de largura nem ouvinte de resize.
- *
- * Fica ACIMA da tabela, e não abaixo: embaixo ele nascia em y=2163 num documento de
- * 2283px, ou seja, para descobrir que existe uma coluna "Próxima ação" era preciso
- * passar pelas 50 linhas. E não manda mais "rolar a tabela para o lado": abaixo do
- * `2xl` as colunas escondidas estão em `display:none`, o contêiner não rola (medido:
- * scrollWidth 1184 = clientWidth 1184 em 1440px) e rolar nunca as traria de volta.
+ * As colunas secundárias entram por degrau de largura, e numa tela de 1024px (o
+ * tablet deitado) responsável e próxima ação simplesmente não estão lá. Sem este
+ * aviso a pessoa conclui que o dado não existe, e não que ele está a um clique de
+ * distância. O texto é escolhido por CSS, no mesmo degrau em que a coluna some.
  */
 function ColunasEscondidas() {
   return (
     <p className="pb-2 text-xs text-muted-foreground 2xl:hidden">
-      Responsável e próxima ação estão na ficha de cada parceiro.
+      <span className="xl:hidden">Responsável e próxima ação estão na ficha de cada parceiro.</span>
+      <span className="hidden xl:inline">A próxima ação está na ficha de cada parceiro.</span>
     </p>
   );
 }
@@ -301,10 +255,7 @@ function Linha({ indice, children }: { indice: number; children: React.ReactNode
   return (
     <tr
       {...revelar}
-      className={cn(
-        'group/linha border-b border-hairline transition-colors last:border-b-0 hover:bg-muted/50',
-        revelar.className,
-      )}
+      className={cn('group/linha transition-colors hover:bg-muted/50', revelar.className)}
     >
       {children}
     </tr>
@@ -324,7 +275,7 @@ function CelulaNome({ linha }: { linha: LinhaParceiro }) {
   const saudacao = useContext(ContextoDaSaudacao);
 
   return (
-    <div className="relative flex h-14 items-center">
+    <div className="relative flex h-[60px] items-center">
       {saudacao ? (
         <CaixaDeMarcar
           marcada={saudacao.escolhidos.has(linha.id)}
@@ -337,10 +288,10 @@ function CelulaNome({ linha }: { linha: LinhaParceiro }) {
         href={`/parceiros/${linha.id}`}
         className={cn(
           'flex min-w-0 flex-1 flex-col justify-center gap-0.5 rounded-lg py-1.5 pr-3 outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-          saudacao ? 'pl-2' : 'pl-4',
+          saudacao ? 'pl-1' : 'pl-3',
         )}
       >
-        <span className="truncate font-medium" title={linha.name}>
+        <span className="truncate font-semibold" title={linha.name}>
           {linha.name}
         </span>
         {contexto ? (
@@ -367,35 +318,34 @@ function CabecalhoNome() {
         habilitada={saudacao.marcaveis.length > 0}
         rotulo="Marcar todos desta página que têm WhatsApp"
         aoMudar={() => saudacao.marcarVarios(saudacao.marcaveis, !todas)}
-        noCabecalho
       />
-      <span className="pl-2">Parceiro</span>
+      <span className="pl-1">Parceiro</span>
     </span>
   );
 }
 
-function CaixaDeMarcar({
+/**
+ * A caixa de marcar com 40px de área de toque (o rótulo inteiro), e não só a caixa
+ * de 18px. Também serve aos cartões do tablet (`lista-cartoes.tsx`).
+ */
+export function CaixaDeMarcar({
   marcada,
   meia = false,
   habilitada,
   rotulo,
   aoMudar,
-  noCabecalho = false,
 }: {
   marcada: boolean;
   meia?: boolean;
   habilitada: boolean;
   rotulo: string;
   aoMudar: () => void;
-  noCabecalho?: boolean;
 }) {
   return (
-    // O alvo é o rótulo inteiro (44px de altura), não só a caixa de 16px.
     <label
       className={cn(
-        'flex shrink-0 items-center justify-center',
-        noCabecalho ? 'h-9 w-6' : 'h-14 w-8 pl-3',
-        habilitada ? 'cursor-pointer' : 'cursor-not-allowed opacity-40',
+        'flex size-10 shrink-0 items-center justify-center rounded-lg',
+        habilitada ? 'cursor-pointer hover:bg-muted/60' : 'cursor-not-allowed opacity-40',
       )}
       title={rotulo}
     >
@@ -408,7 +358,7 @@ function CaixaDeMarcar({
         disabled={!habilitada}
         onChange={aoMudar}
         aria-label={rotulo}
-        className="size-4 accent-[var(--foreground)]"
+        className="size-[18px] accent-[var(--primary)]"
       />
     </label>
   );
@@ -427,6 +377,7 @@ function CelulaWhatsapp({ linha }: { linha: LinhaParceiro }) {
           pedido={saudacao.pedidos.has(linha.id)}
           ocupado={saudacao.ocupado}
           aoPedir={() => saudacao.pedirUm(linha.id)}
+          className="size-9"
         />
       ) : null}
     </span>
@@ -448,7 +399,7 @@ function CelulaEtapa({ linha }: { linha: LinhaParceiro }) {
           nome={linha.name}
           etapa={linha.stage}
           aoMudar={acoes.aoMudarEtapa}
-          className="min-w-0 shrink"
+          className="h-8 min-w-0 shrink px-2.5"
         />
       ) : (
         <EtiquetaEtapa etapa={null} className="min-w-0 shrink" />
@@ -459,6 +410,7 @@ function CelulaEtapa({ linha }: { linha: LinhaParceiro }) {
           marcado={acoes.consultoria.naConsultoria.has(linha.id)}
           tag={acoes.consultoria.naConsultoria.get(linha.id) ?? null}
           aoMudar={(sim) => acoes.consultoria?.marcar(linha.id, sim, linha.name)}
+          className={acoes.consultoria.naConsultoria.has(linha.id) ? 'h-8' : 'size-8'}
         />
       ) : null}
     </span>

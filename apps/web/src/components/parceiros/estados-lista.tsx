@@ -25,8 +25,8 @@ export function EsqueletoLista() {
     <div aria-busy="true" aria-live="polite">
       <span className="sr-only">Carregando parceiros.</span>
 
-      {/* Celular: cartões */}
-      <ul className="md:hidden">
+      {/* Celular e tablet: cartões (a tabela só entra em 1024px) */}
+      <ul className="lg:hidden">
         {Array.from({ length: 8 }, (_, i) => (
           <li
             key={i}
@@ -42,8 +42,8 @@ export function EsqueletoLista() {
         ))}
       </ul>
 
-      {/* Desktop: a forma da tabela */}
-      <div className="hidden md:block">
+      {/* Computador: a forma da tabela */}
+      <div className="hidden lg:block">
         <div className="flex h-9 items-center gap-3 border-b border-hairline px-3">
           {['w-20', 'w-16', 'w-24', 'w-16', 'w-20', 'w-20', 'w-14', 'w-20'].map((l, i) => (
             <Skeleton key={i} className={`h-3 ${l}`} />

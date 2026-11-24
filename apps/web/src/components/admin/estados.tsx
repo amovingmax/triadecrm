@@ -152,12 +152,19 @@ export function ListaAdmin<T>({
   acoes,
   larguraDasAcoes = 'w-44',
   rotuloDaLista,
+  cartaoNoCelular,
 }: {
   colunas: ColunaAdmin<T>[];
   linhas: T[];
   chave: (linha: T) => string | number;
   /** Botões da linha. Recebe a linha e devolve os controles, ou nada. */
   acoes?: (linha: T) => React.ReactNode;
+  /**
+   * O bloco de cada linha no celular, quando a lista pede um desenho próprio em vez
+   * de "rótulo e valor" (Pessoas, 24/11/2026: avatar, nome e acesso numa linha, papel
+   * e setor embaixo). Quem passa este bloco põe nele também as ações da linha.
+   */
+  cartaoNoCelular?: (linha: T) => React.ReactNode;
   /**
    * Largura da coluna de ação, no cabeçalho e na célula, como em `largura`. Duas ações
    * na mesma linha pedem mais que o padrão.
@@ -173,8 +180,11 @@ export function ListaAdmin<T>({
     // cinza da tela, a tabela da Admin era a única lista do CRM sem superfície,
     // e as linhas pareciam continuar pela página afora.
     <div className="sombra-base rounded-xl bg-card px-4 py-1 md:px-5 md:py-2">
-      {/* Desktop: tabela densa, separada por hairline (nunca borda cheia). */}
-      <div className="hidden overflow-x-auto md:block">
+      {/* Desktop: tabela densa, separada por hairline (nunca borda cheia). O `relative`
+          prende aqui dentro o "Ações" só para leitor de tela (`sr-only` é absoluto):
+          sem ele, numa tabela mais larga que o cartão, esse texto escapava da rolagem
+          e esticava a página para o lado (Catálogos em 1024 px, 24/11/2026). */}
+      <div className="relative hidden overflow-x-auto md:block">
         <table className="corpo-tabela w-full table-fixed text-sm">
           <caption className="sr-only">{rotuloDaLista}</caption>
           <thead>
@@ -224,24 +234,30 @@ export function ListaAdmin<T>({
 
       {/* Celular: um bloco por linha, sem tabela e sem rolagem lateral. */}
       <ul className="md:hidden" aria-label={rotuloDaLista}>
-        {linhas.map((linha) => (
-          <li key={chave(linha)} className="border-b border-hairline py-3 last:border-0">
-            <div className="font-medium">{principal ? principal.celula(linha) : null}</div>
-            <dl className="mt-2 grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1.5 text-sm">
-              {secundarias
-                .filter((coluna) => !coluna.soNoDesktop)
-                .map((coluna) => (
-                  <div key={coluna.id} className="contents">
-                    <dt className="text-xs text-muted-foreground">{coluna.rotulo}</dt>
-                    {/* `overflow-wrap:anywhere`: e-mail e código sem espaço quebram
-                        dentro da coluna em vez de vazar do cartão. */}
-                    <dd className="min-w-0 [overflow-wrap:anywhere]">{coluna.celula(linha)}</dd>
-                  </div>
-                ))}
-            </dl>
-            {acoes ? <div className="mt-3 flex flex-wrap gap-2">{acoes(linha)}</div> : null}
-          </li>
-        ))}
+        {linhas.map((linha) =>
+          cartaoNoCelular ? (
+            <li key={chave(linha)} className="border-b border-hairline py-3.5 last:border-0">
+              {cartaoNoCelular(linha)}
+            </li>
+          ) : (
+            <li key={chave(linha)} className="border-b border-hairline py-3 last:border-0">
+              <div className="font-medium">{principal ? principal.celula(linha) : null}</div>
+              <dl className="mt-2 grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1.5 text-sm">
+                {secundarias
+                  .filter((coluna) => !coluna.soNoDesktop)
+                  .map((coluna) => (
+                    <div key={coluna.id} className="contents">
+                      <dt className="text-xs text-muted-foreground">{coluna.rotulo}</dt>
+                      {/* `overflow-wrap:anywhere`: e-mail e código sem espaço quebram
+                          dentro da coluna em vez de vazar do cartão. */}
+                      <dd className="min-w-0 [overflow-wrap:anywhere]">{coluna.celula(linha)}</dd>
+                    </div>
+                  ))}
+              </dl>
+              {acoes ? <div className="mt-3 flex flex-wrap gap-2">{acoes(linha)}</div> : null}
+            </li>
+          ),
+        )}
       </ul>
     </div>
   );

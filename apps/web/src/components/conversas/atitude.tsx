@@ -262,54 +262,6 @@ export function AtitudeDaConversaNoTopo({
   );
 }
 
-/**
- * "Recentes · Mais interessados", no alto da lista. Desligada a atitude, não
- * existe: a lista da KOMUNE fica como era.
- */
-export function OrdemDaLista({
-  ligada,
-  ordem,
-  aoMudar,
-  className,
-}: {
-  ligada: boolean;
-  ordem: 'recentes' | 'interesse';
-  aoMudar: (ordem: 'recentes' | 'interesse') => void;
-  className?: string;
-}) {
-  if (!ligada) return null;
-  const opcoes = [
-    { id: 'recentes', rotulo: 'Recentes' },
-    { id: 'interesse', rotulo: 'Mais interessados' },
-  ] as const;
-  return (
-    <div role="group" aria-label="Ordem da lista" className={cn('flex items-center gap-1.5', className)}>
-      <span className="text-[11px] text-muted-foreground">Ordem:</span>
-      {opcoes.map((o) => {
-        const ativa = o.id === ordem;
-        return (
-          <button
-            key={o.id}
-            type="button"
-            aria-pressed={ativa}
-            onClick={() => aoMudar(o.id)}
-            className={cn(
-              'toque inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-medium transition-colors md:h-6',
-              'focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
-              ativa
-                ? 'bg-foreground text-background'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-            )}
-          >
-            {o.id === 'interesse' ? <Flame className="size-3" aria-hidden="true" /> : null}
-            {o.rotulo}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function quando(iso: string): string {
   const dia = rotuloDoDia(iso);
   return `${dia.palavra}${dia.numero ?? ''}`;

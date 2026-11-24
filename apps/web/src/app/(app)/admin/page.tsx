@@ -5,10 +5,11 @@ import { AreaRestrita } from '@/components/admin/area-restrita';
 import { TelaAdmin } from '@/components/admin/tela-admin';
 import { abaDaUrl, catalogoDaUrl, lgpdDaUrl } from '@/components/admin/tipos';
 
-export const metadata: Metadata = { title: 'Admin' };
+// O nome da aba do navegador é o do menu (era "Admin").
+export const metadata: Metadata = { title: 'Ajustes' };
 
 /**
- * Administração (PRD §7.9): pessoas, catálogos e ferramentas de LGPD.
+ * Ajustes, a administração (PRD §7.9): pessoas, catálogos e ferramentas de LGPD.
  *
  * A rota exige sessão, mas NÃO redireciona quem não é admin nem gestor: quem chega
  * aqui sem o papel vê uma tela que explica o que existe nesta parte e a quem pedir

@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 
 import { EMPRESA, TIPOS_EM_USO, TIPOS_POR_EXTENSO } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
+import { useMidia } from '@/lib/use-midia';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -61,17 +62,17 @@ import { SEM_PERDIDAS, type Perdidas } from '@/components/ligacao-whatsapp/logic
 import {
   ACAO_DA_FOLHA,
   AreaDoFio,
+  CLASSE_DA_FAIXA_DA_LIGACAO,
   FichaAoLado,
   GRADE_DAS_ACOES,
   ROTULO_DA_SECAO,
   useAvisoDeNaoLidas,
 } from './fio-wpp';
-import { Janela24h, PilulaDaJanela } from './janela-24h';
+import { AvisoDaJanela, Janela24h } from './janela-24h';
 import { LinhaDoTempo } from './linha-do-tempo';
 import { agruparPorDia, montarLinhaDoTempo } from './montagem';
 import type { Preferencias } from './preferencias';
 import { AvatarDaConversa, BotaoRedondo } from './wpp';
-import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 import { useLeituraDoFio } from './leitura-do-fio';
 import {
   estadoDaJanela,
@@ -250,11 +251,18 @@ export function ConversaForaDaBase({
     [mensagens.data, catalogos],
   );
   const avisoDeNaoLidas = useAvisoDeNaoLidas(dias, fio.unread_count);
+  // O cabeçalho e a ficha pela largura, como em `conversa.tsx` (protótipo
+  // responsivo, 24/11/2026): abaixo de 1024 px, só "Pedir para ligar" e o "⋯";
+  // a coluna dos dados do contato a partir de 1280 px, e a folha abaixo disso.
+  const largo = useMidia('(min-width: 1024px)');
+  const folhaDoLado = useMidia('(min-width: 768px)');
+  const fichaCabe = useMidia('(min-width: 1280px)');
+  const fichaVisivel = fichaAberta && fichaCabe;
   const painel = useRef<HTMLDivElement>(null);
   const naoCabeAFicha = () =>
-    window.matchMedia('(max-width: 767px)').matches ||
+    !window.matchMedia('(min-width: 1280px)').matches ||
     (window.matchMedia('(pointer: coarse)').matches && (painel.current?.clientWidth ?? 0) < 672);
-  const ehCelular = useEhCelular();
+  const abrirFicha = () => (naoCabeAFicha() ? setFolha(true) : aoAlternarFicha());
   const rotulo = nomeDoCliente(fio);
   // O lead dos portais (05/11/2026, só na Imova; na KOMUNE não há consulta): a
   // pessoa mandou mensagem aqui depois de tocar num anúncio, e a ficha automática
@@ -360,7 +368,7 @@ export function ConversaForaDaBase({
             </BotaoRedondo>
             <button
               type="button"
-              onClick={() => (naoCabeAFicha() ? setFolha(true) : aoAlternarFicha())}
+              onClick={abrirFicha}
               aria-haspopup="dialog"
               className="toque flex h-[52px] min-w-0 flex-1 items-center gap-3 rounded-[14px] pr-2 pl-1 text-left outline-none hover:bg-foreground/[0.04] focus-visible:ring-3 focus-visible:ring-ring/50"
             >
@@ -378,23 +386,33 @@ export function ConversaForaDaBase({
             <CanalNoTopo
               conversaId={fio.id}
               podeEscrever={Boolean(eu?.podeEscrever)}
-              className="mx-1 max-md:hidden conversa-estreita:hidden @max-4xl:hidden"
+              className="mx-1 py-1.5 max-lg:hidden @max-4xl:hidden"
             />
-            {/* As mesmas regras do cabeçalho de `conversa.tsx` (17/11/2026). */}
-            <BotaoDeBuscarNoFio className="max-md:hidden @max-xl:hidden" />
+            {/* As mesmas regras do cabeçalho de `conversa.tsx` (24/11/2026): abaixo
+                de 1024 px a lupa, o virar parceiro, o concluir e a ficha moram na
+                folha do "⋯". */}
+            <BotaoDeBuscarNoFio className="max-lg:hidden" />
             {eu?.podeEscrever ? (
-              <BotaoDeLigarNaConversa
-                conversaId={fio.id}
-                nome={rotulo}
-                compacto={ehCelular}
-                rotuloPelaLargura
-              />
+              <span
+                className={cn(
+                  'contents',
+                  largo &&
+                    '*:h-10 *:rounded-full *:border-wpp-linha-forte *:bg-transparent *:px-3.5 *:text-[13.5px]',
+                )}
+              >
+                <BotaoDeLigarNaConversa
+                  conversaId={fio.id}
+                  nome={rotulo}
+                  compacto={!largo}
+                  rotuloPelaLargura={fichaVisivel}
+                />
+              </span>
             ) : null}
             {virando ? null : (
               <Button
                 type="button"
                 variant="outline"
-                className="toque mx-0.5 h-10 shrink-0 rounded-full border-wpp-linha-forte bg-transparent px-3.5 text-[13.5px] font-medium conversa-estreita:hidden"
+                className="toque mx-0.5 h-10 shrink-0 rounded-full border-wpp-linha-forte bg-transparent px-3.5 text-[13.5px] font-medium max-lg:hidden"
                 onClick={() => setVirando(true)}
                 title={`É ${TIPOS_POR_EXTENSO}? Leve para a base.`}
               >
@@ -409,21 +427,21 @@ export function ConversaForaDaBase({
                   fioId={fio.id}
                   concluidaEm={fio.arquivada_em}
                   rotuloPelaLargura
-                  className="mx-1 conversa-estreita:hidden @max-xl:hidden"
+                  className="mx-0.5 border-transparent max-lg:hidden @5xl:border-wpp-linha-forte"
                 />
               ) : (
-                <ArquivarCliente fio={fio} className="conversa-estreita:hidden" />
+                <ArquivarCliente fio={fio} className="max-lg:hidden" />
               )
             ) : null}
             <BotaoRedondo
-              onClick={aoAlternarFicha}
-              aria-pressed={fichaAberta}
-              aria-label={fichaAberta ? 'Fechar os dados do contato' : 'Ver os dados do contato'}
-              className="max-md:hidden conversa-estreita:hidden"
+              onClick={abrirFicha}
+              aria-pressed={fichaVisivel}
+              aria-label={fichaVisivel ? 'Fechar os dados do contato' : 'Ver os dados do contato'}
+              className="max-lg:hidden"
             >
               <PanelRight aria-hidden="true" />
             </BotaoRedondo>
-            <span className="contents conversa-estreita:hidden">
+            <span className="hidden lg:contents">
               <MenuDaConversa
                 fioId={fio.id}
                 bloqueada={bloqueada}
@@ -436,7 +454,7 @@ export function ConversaForaDaBase({
             <BotaoRedondo
               onClick={() => setFolha(true)}
               aria-label="Mais: telefone e ações"
-              className="hidden conversa-estreita:inline-flex"
+              className="lg:hidden"
             >
               <EllipsisVertical aria-hidden="true" />
             </BotaoRedondo>
@@ -449,7 +467,11 @@ export function ConversaForaDaBase({
             concluidaPor={fio.arquivada_por ? (nomeDaPessoa.get(fio.arquivada_por) ?? null) : null}
             podeReabrir={Boolean(eu?.podeEscrever)}
           />
-          <FaixaDaLigacao conversaId={fio.id} className="border-b border-wpp-linha" />
+          {/* Os avisos numa faixa própria acima das mensagens (24/11/2026). */}
+          <div className="flex shrink-0 flex-col">
+            <FaixaDaLigacao conversaId={fio.id} className={CLASSE_DA_FAIXA_DA_LIGACAO} />
+            <AvisoDaJanela estado={janela} />
+          </div>
           {/* PARECE FORNECEDOR (13/11/2026): o número não está em Prospectados,
               mas no robô de entrada a pessoa disse que é fornecedor. Com as caixas
               de Conversas ela está em Clientes; o botão leva para Fornecedores. */}
@@ -482,8 +504,11 @@ export function ConversaForaDaBase({
 
           <Sheet open={folha} onOpenChange={setFolha}>
             <SheetContent
-              side="bottom"
-              className="max-h-[88svh] gap-5 overflow-y-auto rounded-t-2xl px-4 pt-4 pb-[calc(var(--area-segura-inferior)+1.25rem)]"
+              side={folhaDoLado ? 'right' : 'bottom'}
+              className={cn(
+                '@container gap-5 overflow-y-auto px-4 pt-4 pb-[calc(var(--area-segura-inferior)+1.25rem)]',
+                folhaDoLado ? 'w-full sm:max-w-[400px]' : 'max-h-[88svh] rounded-t-2xl',
+              )}
             >
               <SheetHeader className="flex-row items-center gap-3 p-0 pr-12 text-left">
                 <AvatarDaConversa nome={nome || '?'} tamanho={48} anel="var(--background)" />
@@ -550,7 +575,6 @@ export function ConversaForaDaBase({
             aoRolar={aoRolar}
             longe={longe}
             irAoFim={irAoFim}
-            topo={<PilulaDaJanela estado={janela} />}
           >
             {mensagens.isPending ? (
               <p className="mx-auto my-6 text-sm text-wpp-suave">Carregando as mensagens...</p>

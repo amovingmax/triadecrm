@@ -47,7 +47,7 @@ export function AlternadorTema() {
         <Button
           variant="ghost"
           size="icon-sm"
-          className="toque size-11 text-muted-foreground hover:text-foreground md:size-7"
+          className="toque size-11 text-muted-foreground hover:text-foreground md:size-10"
           disabled={!montado}
           aria-label={montado ? `Tema: ${atual.rotulo}. Trocar tema` : 'Trocar tema'}
         >

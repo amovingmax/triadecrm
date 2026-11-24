@@ -1,11 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowRight,
   Layers,
+  LayoutGrid,
+  List,
   Plus,
   RefreshCw,
   RotateCw,
@@ -16,8 +18,11 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { ChipsDeSecao } from '@/components/ui/abas';
+import { Chip } from '@/components/ui/chip';
+import { FaixaDeNumeros, NumeroCompacto } from '@/components/ui/faixa-de-numeros';
+import { FaixaDeslizante } from '@/components/ui/faixa-deslizante';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useMidia } from '@/lib/use-midia';
 import { cn } from '@/lib/utils';
 
 import {
@@ -28,7 +33,7 @@ import {
   naoPublicadoPronto,
 } from './aba-dos-anuncios';
 import { LinhaDoCanalPro } from './anuncios-no-canal-pro';
-import { CartaoDoAnuncio } from './cartao-do-anuncio';
+import { CartaoDoAnuncio, type ModoDaLista } from './cartao-do-anuncio';
 import {
   carregarAnuncios,
   carregarCaminhoDoLead,
@@ -48,7 +53,7 @@ import { resumoDosTipos } from './leads/leads-rotulos';
 import { NovoAnuncioConferido } from './novo-anuncio-conferido';
 import { PainelCanalPro } from './painel-canal-pro';
 import { diasDeCalendario, haQuanto } from './passos-do-caminho';
-import { PrecisaDeVoce } from './precisa-de-voce';
+import { Pendencias } from './pendencias';
 import {
   crmPublica,
   estadoNoPortal,
@@ -58,7 +63,6 @@ import {
 } from './regras-do-cartao';
 import { ativoNoCanalPro } from './relatorio-canal-pro';
 import { SecoesDosAnuncios } from './secoes';
-import { TrocaDaArbo } from './troca-da-arbo';
 
 /** As abas com as palavras do Canal Pro (05/11/2026). */
 type Recorte = 'todos' | 'publicados' | 'nao_publicados' | 'rascunhos' | 'excluidos';
@@ -77,25 +81,34 @@ const ROTULO_DO_FILTRO: Record<Filtro, string> = {
 /** Mais que isso sem a lista do Canal Pro, o número fica em alerta. */
 const DIAS_DA_LISTA = 7;
 
+/** Grade ou lista: a escolha fica neste navegador (24/11/2026). */
+const GUARDADO_DO_MODO = 'anuncios:modo';
+const semInscricao = () => () => {};
+const lerModo = (): ModoDaLista | null => {
+  try {
+    const v = localStorage.getItem(GUARDADO_DO_MODO);
+    return v === 'grade' || v === 'lista' ? v : null;
+  } catch {
+    return null;
+  }
+};
+
 /**
- * A aba Anúncios (04/11/2026; redesenhada em 18/11/2026), só na Imova.
+ * A aba Anúncios (04/11/2026; redesenhada em 18/11/2026 e de novo em 24/11/2026,
+ * pelo protótipo responsivo aprovado), só na Imova. De cima para baixo:
  *
- * O pedido de 18/11: "tem muita informação repetida entrando no CRM ... a ideia é
- * deixar a aba de anúncios cada vez menos repetitiva, mais objetiva, mais clara e
- * mais funcional". Aprovado pelo protótipo no mesmo dia. De cima para baixo:
+ *   1. Três números numa faixa compacta: as vagas do plano, os leads dos portais
+ *      (leva aos Leads) e a última lista do Canal Pro (com o "Sincronizar").
+ *   2. O painel Pendências: a troca da Arbo pelo CRM (`troca-da-arbo.tsx`) e o
+ *      "Precisa de você", num cartão que abre e fecha (`pendencias.tsx`).
+ *   3. A busca, o Grade/Lista e os filtros com as palavras do Canal Pro, presos
+ *      no topo ao rolar; e a lista: UM CARTÃO POR IMÓVEL, com o que o Canal Pro
+ *      diz dele e as cópias antigas juntadas (`aba-dos-anuncios.ts`). O clique
+ *      abre a ficha por cima.
  *
- *   1. Três números: as vagas do plano, os leads dos portais e a última lista do
- *      Canal Pro (com o "Sincronizar"). Cada número aparece uma vez só na tela.
- *   2. A troca da Arbo pelo CRM, só com o passo atual (`troca-da-arbo.tsx`).
- *   3. "Precisa de você": uma linha por pendência, com a ação.
- *   4. A busca, as abas com as palavras do Canal Pro e a lista: UM CARTÃO POR
- *      IMÓVEL, com o que o Canal Pro diz dele e as cópias antigas juntadas
- *      (`aba-dos-anuncios.ts`). O clique abre a ficha por cima.
- *
- * Saíram do cabeçalho "Atualizar do sistema atual" e "Atualizar do Canal Pro":
- * viraram "Sincronizar Canal Pro", e os dois jeitos de antes moram dentro dele.
- * A lista "No Canal Pro, sem anúncio no CRM" ficou só para o que não tem cartão
- * nem é cópia de um.
+ * No celular a lista abre em linhas com foto pequena (cabem uns 5 anúncios por
+ * tela) e "Novo anúncio" vira o botão + flutuante; do tablet para cima, grade
+ * com a largura toda da página.
  */
 export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
   const [recorte, setRecorte] = useState<Recorte>('todos');
@@ -108,11 +121,26 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
   const [novoAberto, setNovoAberto] = useState(false);
   const excluidos = recorte === 'excluidos';
 
+  // Grade ou lista: a escolha de quem usa (guardada) vale sobre o padrão do
+  // tamanho, que é lista abaixo de 640px e grade do tablet para cima.
+  const guardado = useSyncExternalStore(semInscricao, lerModo, () => null);
+  const [escolhido, setEscolhido] = useState<ModoDaLista | null>(null);
+  const largo = useMidia('(min-width: 640px)');
+  const modo: ModoDaLista = escolhido ?? guardado ?? (largo ? 'grade' : 'lista');
+  function escolherModo(m: ModoDaLista) {
+    setEscolhido(m);
+    try {
+      localStorage.setItem(GUARDADO_DO_MODO, m);
+    } catch {
+      // Sem armazenamento (janela privada): só não lembra.
+    }
+  }
+
   const consulta = useQuery({
     queryKey: [...CHAVE_DOS_ANUNCIOS, 'lista', excluidos],
     queryFn: () => carregarAnuncios(excluidos),
   });
-  // Os do CRM, sempre: os números, o "Precisa de você" e a troca contam com eles.
+  // Os do CRM, sempre: os números, as pendências e a troca contam com eles.
   const doCrm = useQuery({
     queryKey: [...CHAVE_DOS_ANUNCIOS, 'lista', false],
     queryFn: () => carregarAnuncios(false),
@@ -206,25 +234,33 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
     );
   }
 
+  const recortes: { id: Recorte; rotulo: string; contagem?: number }[] = [
+    { id: 'todos', rotulo: 'Todos' },
+    { id: 'publicados', rotulo: 'Publicados', contagem: porEstado.publicado },
+    { id: 'nao_publicados', rotulo: 'Não publicados', contagem: porEstado.nao_publicado },
+    { id: 'rascunhos', rotulo: 'Rascunhos', contagem: porEstado.rascunho },
+    { id: 'excluidos', rotulo: 'Excluídos' },
+  ];
+
   return (
-    <div className="flex w-full max-w-5xl flex-col gap-5">
+    // O fim da página ganha espaço no celular para o botão + não cobrir o último cartão.
+    <div className="flex w-full flex-col gap-4 pb-[4.5rem] md:gap-5 md:pb-0">
       <header className="flex flex-col gap-4">
         <SecoesDosAnuncios ativa="anuncios" />
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1 basis-80">
             <h1 className="font-heading text-[32px] leading-tight font-normal tracking-[-0.02em]">
               Anúncios
             </h1>
             <p className="max-w-2xl text-sm text-muted-foreground">
-              Os imóveis da Imova no ZAP, Viva Real e OLX. Um cartão por imóvel, com o que vem da
-              Arbo e do Canal Pro junto.
+              Os imóveis da Imova no ZAP, Viva Real e OLX, com o que vem da Arbo e do Canal Pro.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             {podePublicar ? (
               <Button
                 variant="outline"
-                className="toque h-11 md:h-9"
+                className="toque h-11 md:h-10"
                 onClick={() => setSincronizarAberto(true)}
               >
                 <RefreshCw aria-hidden="true" />
@@ -233,14 +269,18 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
             ) : null}
             <Button
               variant="outline"
-              className="toque size-11 p-0 md:size-9"
+              className="toque size-11 p-0 md:size-10"
               aria-label="Ajustes do Canal Pro"
               title="Ajustes do Canal Pro"
               onClick={() => setPainelAberto(true)}
             >
               <Settings2 aria-hidden="true" />
             </Button>
-            <Button className="toque h-11 md:h-9" onClick={() => setNovoAberto(true)}>
+            {/* No celular ele é o botão + flutuante, no fim desta tela. */}
+            <Button
+              className="toque hidden h-10 md:inline-flex"
+              onClick={() => setNovoAberto(true)}
+            >
               <Plus aria-hidden="true" />
               Novo anúncio
             </Button>
@@ -258,7 +298,9 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
       />
 
       {podePublicar ? (
-        <TrocaDaArbo
+        <Pendencias
+          itens={itens}
+          itensProntos={!consulta.isPending && !listaDoCanalPro.isPending}
           chave={canalPro.data?.chave ?? null}
           noPortalSoPeloSistemaAtual={aAssumir.length}
           pino={{ faltam: semPino.length, temEndereco: temEnderecoDoSistemaAtual }}
@@ -268,12 +310,6 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
             setBusca('');
             irParaALista();
           }}
-        />
-      ) : null}
-
-      {podePublicar && !consulta.isPending && !listaDoCanalPro.isPending ? (
-        <PrecisaDeVoce
-          itens={itens}
           aoSincronizar={() => setSincronizarAberto(true)}
           aoAbrir={setFichaDe}
           aoFiltrarProntos={() => {
@@ -288,57 +324,93 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
       <section
         id="lista-de-anuncios"
         aria-label="Lista de anúncios"
-        className="flex scroll-mt-20 flex-col gap-3"
+        className="flex scroll-mt-14 flex-col gap-3 md:scroll-mt-[72px]"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <label className="flex h-11 min-w-0 flex-1 basis-60 items-center gap-2 rounded-full border border-input bg-card px-4 md:h-9 md:max-w-sm">
-            <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <input
-              type="search"
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Código, título ou bairro"
-              aria-label="Buscar anúncio"
-              className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
-            />
-          </label>
-          <ChipsDeSecao<Recorte>
-            rotulo="Que anúncios mostrar"
-            ativo={recorte}
-            aoTrocar={(r) => {
-              setRecorte(r);
-              setFiltro(null);
-            }}
-            itens={[
-              { id: 'todos', rotulo: 'Todos' },
-              { id: 'publicados', rotulo: 'Publicados', contagem: porEstado.publicado },
-              { id: 'nao_publicados', rotulo: 'Não publicados', contagem: porEstado.nao_publicado },
-              { id: 'rascunhos', rotulo: 'Rascunhos', contagem: porEstado.rascunho },
-              { id: 'excluidos', rotulo: 'Excluídos' },
-            ]}
-          />
-        </div>
-        {filtro ? (
-          <p className="flex items-center gap-2 text-sm">
-            <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary/12 pr-1 pl-3 font-medium text-primary">
-              {ROTULO_DO_FILTRO[filtro]}
-              <button
-                type="button"
-                onClick={() => setFiltro(null)}
-                aria-label="Tirar o filtro"
-                className="toque grid size-7 place-items-center rounded-full outline-none hover:bg-primary/15 focus-visible:ring-3 focus-visible:ring-ring/50"
+        {/* Presa abaixo do cabeçalho (56px no celular, 72px no computador): a busca
+            e os filtros continuam à mão depois de rolar a lista. */}
+        <div className="sticky top-14 z-20 -mx-4 flex flex-col gap-2.5 bg-background/90 px-4 py-2.5 backdrop-blur-md md:top-[72px] md:-mx-5 md:px-5">
+          <div className="flex items-center gap-2">
+            <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-lg border border-input bg-card pr-3 pl-3.5 focus-within:ring-3 focus-within:ring-ring/40 md:h-10">
+              <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <input
+                type="search"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Código, título ou bairro"
+                aria-label="Buscar anúncio"
+                className="h-full min-w-0 flex-1 bg-transparent text-sm text-ellipsis outline-none"
+              />
+            </label>
+            <div
+              role="group"
+              aria-label="Mostrar como"
+              className="sombra-base flex h-11 shrink-0 items-center gap-0.5 rounded-full bg-card p-1 md:h-10"
+            >
+              {(
+                [
+                  ['grade', 'Grade', LayoutGrid],
+                  ['lista', 'Lista', List],
+                ] as const
+              ).map(([id, rotulo, Icone]) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={modo === id}
+                  aria-label={rotulo}
+                  title={rotulo}
+                  onClick={() => escolherModo(id)}
+                  className={cn(
+                    'toque grid h-9 w-10 place-items-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:h-8',
+                    modo === id
+                      ? 'bg-menta text-menta-tinta'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <Icone className="size-4" aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          </div>
+          <FaixaDeslizante rotulo="Que anúncios mostrar" ativo={recorte} sangria>
+            {recortes.map((r) => (
+              <Chip
+                key={r.id}
+                ativo={recorte === r.id}
+                contagem={r.contagem}
+                onClick={() => {
+                  setRecorte(r.id);
+                  setFiltro(null);
+                }}
               >
-                <X className="size-4" aria-hidden="true" />
-              </button>
-            </span>
-          </p>
-        ) : null}
+                {r.rotulo}
+              </Chip>
+            ))}
+          </FaixaDeslizante>
+          {filtro ? (
+            <p className="flex items-center gap-2 text-sm">
+              <span className="inline-flex h-10 max-w-full items-center gap-1 rounded-full bg-primary/12 pr-1 pl-3.5 font-medium text-primary md:h-9">
+                <span className="truncate">{ROTULO_DO_FILTRO[filtro]}</span>
+                <button
+                  type="button"
+                  onClick={() => setFiltro(null)}
+                  aria-label="Tirar o filtro"
+                  className="toque grid size-8 shrink-0 place-items-center rounded-full outline-none hover:bg-primary/15 focus-visible:ring-3 focus-visible:ring-ring/50 md:size-7"
+                >
+                  <X className="size-4" aria-hidden="true" />
+                </button>
+              </span>
+            </p>
+          ) : null}
+        </div>
 
         {consulta.isPending ? (
-          <div aria-busy="true" className="flex flex-col gap-3">
+          <div aria-busy="true" className={modo === 'grade' ? GRADE : LISTA}>
             <span className="sr-only">Carregando os anúncios.</span>
-            {Array.from({ length: 3 }, (_, i) => (
-              <Skeleton key={i} className="h-[380px] w-full rounded-xl md:h-[180px]" />
+            {Array.from({ length: modo === 'grade' ? 4 : 3 }, (_, i) => (
+              <Skeleton
+                key={i}
+                className={cn('w-full rounded-xl', modo === 'grade' ? 'h-[400px]' : 'h-[108px]')}
+              />
             ))}
           </div>
         ) : consulta.isError ? (
@@ -379,7 +451,7 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
         ) : (
           <>
             {linhas.length ? (
-              <ul className="flex flex-col gap-3">
+              <ul className={modo === 'grade' ? GRADE : LISTA}>
                 {linhas.map((a) => (
                   <CartaoDoAnuncio
                     key={a.id}
@@ -387,6 +459,7 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
                     doCanalPro={porAnuncio.get(a.id)}
                     podePublicar={podePublicar}
                     plano={plano}
+                    modo={modo}
                     aoAbrir={() => setFichaDe(a.id)}
                     aoSincronizar={() => setSincronizarAberto(true)}
                   />
@@ -419,6 +492,16 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
           </>
         )}
       </section>
+
+      {/* "Novo anúncio" no celular: acima da barra de baixo e da área segura do iPhone. */}
+      <Button
+        className="toque sombra-base-forte fixed right-4 bottom-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] z-30 size-14 rounded-xl p-0 md:hidden"
+        aria-label="Novo anúncio"
+        title="Novo anúncio"
+        onClick={() => setNovoAberto(true)}
+      >
+        <Plus className="size-6" aria-hidden="true" />
+      </Button>
 
       <FichaDoAnuncio
         anuncio={ficha}
@@ -465,8 +548,21 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
 }
 
 /**
- * Os três números do alto. Cada um aparece uma vez só na tela: as vagas não se
- * repetem na troca, a lista do Canal Pro não se repete no "Precisa de você".
+ * A grade usa a largura toda da página: cabe quantos cartões couberem. O mínimo é
+ * 270px, e não os 250px do protótipo: a margem do CRM é menor (20px contra 32px) e,
+ * com 250px, o monitor de 1440px ganhava uma 5ª coluna estreita, com o rodapé do
+ * cartão quebrando em duas linhas. Com 270px ficam as 4 colunas do protótipo; nas
+ * outras larguras dá o mesmo número de colunas.
+ */
+const GRADE = 'grid grid-cols-[repeat(auto-fill,minmax(min(270px,100%),1fr))] gap-3.5';
+/** Na lista, duas colunas do computador para cima, para a linha não ficar comprida. */
+const LISTA = 'grid gap-2.5 lg:grid-cols-2';
+
+/**
+ * Os três números do alto, numa faixa compacta (24/11/2026): desliza de lado no
+ * celular e divide a largura do tablet para cima. Cada um aparece uma vez só na
+ * tela e continua levando ao mesmo lugar: os leads abrem a seção Leads, a lista
+ * do Canal Pro abre o "Sincronizar".
  */
 function Numeros({
   carregando,
@@ -495,11 +591,11 @@ function Numeros({
   });
   if (carregando) {
     return (
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <FaixaDeNumeros rotulo="Situação">
         {Array.from({ length: 3 }, (_, i) => (
-          <Skeleton key={i} className="h-[104px] rounded-xl" />
+          <Skeleton key={i} className="h-[92px] rounded-xl" />
         ))}
-      </div>
+      </FaixaDeNumeros>
     );
   }
   const agora = new Date();
@@ -509,88 +605,99 @@ function Numeros({
   const total = leads?.total ?? leadsDosAnuncios;
   const ultimo = leads?.ultimo ?? null;
   const cheio = plano?.anuncios != null && plano.anunciosEmUso >= plano.anuncios;
+  // A frase inteira do último lead (anúncio e tipo) fica na dica do número.
+  const sobreOUltimo = ultimo
+    ? `Último ${haQuanto(ultimo.em, agora)}${ultimo.anuncio ? ` · ${ultimo.anuncio}` : ''} · ${resumoDosTipos(ultimo.tipos).toLowerCase()}`
+    : 'Nenhum lead dos portais ainda.';
+  const sobreALista = 'Situação, visualizações, contatos e fotos de tudo o que está lá.';
 
   return (
-    <section aria-label="Situação" className="grid grid-cols-1 gap-3 md:grid-cols-3">
-      <div className="sombra-base flex flex-col gap-1.5 rounded-xl bg-card px-4 py-3.5">
-        <p className="text-[13px] text-muted-foreground">Vagas do plano no portal</p>
+    <FaixaDeNumeros rotulo="Situação">
+      <NumeroCompacto
+        rotulo="Vagas do plano"
+        icone={<Layers aria-hidden="true" />}
+        tom={cheio ? 'text-destructive-texto' : undefined}
+        valor={
+          plano?.anuncios != null ? (
+            <>
+              {plano.anunciosEmUso}{' '}
+              <small className="font-sans text-[13px] font-medium text-muted-foreground">
+                de {plano.anuncios}
+              </small>
+            </>
+          ) : (
+            '–'
+          )
+        }
+        detalhe={
+          plano?.anuncios == null
+            ? 'O plano não está no CRM (Ajustes).'
+            : plano.destaques != null
+              ? `${plano.destaquesEmUso} de ${plano.destaques} destaques`
+              : null
+        }
+      >
         {plano?.anuncios != null ? (
-          <>
-            <p
-              className={cn(
-                'font-heading text-2xl leading-tight font-semibold',
-                cheio && 'text-destructive-texto',
-              )}
-            >
-              <span className="numerico">{plano.anunciosEmUso}</span>{' '}
-              <span className="text-sm font-medium text-muted-foreground">de {plano.anuncios}</span>
-            </p>
-            <span className="h-1.5 overflow-hidden rounded-full bg-muted">
-              <span
-                className="block h-full rounded-full bg-primary"
-                style={{
-                  width: `${Math.min(100, (plano.anunciosEmUso / Math.max(1, plano.anuncios)) * 100)}%`,
-                }}
-              />
-            </span>
-            {plano.destaques != null ? (
-              <p className="text-[13px] text-muted-foreground numerico">
-                {plano.destaquesEmUso} de {plano.destaques} destaques
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">O plano não está no CRM (Ajustes).</p>
-        )}
-      </div>
+          <span className="my-1 h-1.5 overflow-hidden rounded-full bg-muted">
+            <span
+              className="block h-full rounded-full bg-primary"
+              style={{
+                width: `${Math.min(100, (plano.anunciosEmUso / Math.max(1, plano.anuncios)) * 100)}%`,
+              }}
+            />
+          </span>
+        ) : null}
+      </NumeroCompacto>
 
       <Link
         href="/anuncios/leads"
-        className="sombra-base flex flex-col gap-1.5 rounded-xl bg-card px-4 py-3.5 outline-none hover:ring-1 hover:ring-border focus-visible:ring-3 focus-visible:ring-ring/50"
+        title={sobreOUltimo}
+        className="group rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       >
-        <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-          <UserRound className="size-3.5" aria-hidden="true" />
-          Leads dos portais
-        </p>
-        <p className="font-heading text-2xl leading-tight font-semibold numerico">{total}</p>
-        <p className="text-[13px] text-muted-foreground">
-          {ultimo
-            ? `Último ${haQuanto(ultimo.em, agora)}${ultimo.anuncio ? ` · ${ultimo.anuncio}` : ''} · ${resumoDosTipos(ultimo.tipos).toLowerCase()}`
-            : 'Nenhum lead dos portais ainda.'}
-        </p>
-        <span className="mt-auto inline-flex items-center gap-1 text-[13px] font-medium text-primary">
-          Ver os leads <ArrowRight className="size-3.5" aria-hidden="true" />
-        </span>
+        <NumeroCompacto
+          rotulo="Leads dos portais"
+          icone={<UserRound aria-hidden="true" />}
+          valor={total}
+          className="h-full group-hover:ring-1 group-hover:ring-border"
+          detalhe={
+            <>
+              {ultimo ? `último ${haQuanto(ultimo.em, agora)} · ` : 'nenhum ainda · '}
+              <span className="font-medium text-primary">
+                Ver os leads <ArrowRight className="inline size-3" aria-hidden="true" />
+              </span>
+            </>
+          }
+        />
+        <span className="sr-only">. {sobreOUltimo}</span>
       </Link>
 
-      <div className="sombra-base flex flex-col gap-1.5 rounded-xl bg-card px-4 py-3.5">
-        <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-          <RefreshCw className="size-3.5" aria-hidden="true" />
-          Última lista do Canal Pro
-        </p>
-        <p
-          className={cn(
-            'font-heading text-2xl leading-tight font-semibold',
-            velha && 'text-morno-texto',
-          )}
-        >
-          {dias === null ? 'nunca' : dias === 0 ? 'hoje' : dias === 1 ? 'ontem' : `há ${dias} dias`}
-        </p>
-        <p className="text-[13px] text-muted-foreground">
-          Situação, visualizações, contatos e fotos de tudo o que está lá.
-        </p>
-        {podePublicar ? (
-          <button
-            type="button"
-            onClick={aoSincronizar}
-            className="mt-auto inline-flex w-fit items-center gap-1 rounded-sm text-[13px] font-medium text-primary outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            {velha ? 'Sincronizar agora' : 'Sincronizar'}{' '}
-            <ArrowRight className="size-3.5" aria-hidden="true" />
-          </button>
-        ) : null}
-      </div>
-    </section>
+      <NumeroCompacto
+        rotulo="Última lista do Canal Pro"
+        icone={<RefreshCw aria-hidden="true" />}
+        tom={velha ? 'text-morno-texto' : undefined}
+        valor={
+          dias === null ? 'nunca' : dias === 0 ? 'hoje' : dias === 1 ? 'ontem' : `há ${dias} dias`
+        }
+        className={cn('relative', podePublicar && 'hover:ring-1 hover:ring-border')}
+        detalhe={
+          podePublicar ? (
+            // O botão estica um `::after` sobre o número inteiro: o toque em qualquer
+            // ponto sincroniza, e a caixa de 40px conta como alvo do dedo.
+            <button
+              type="button"
+              onClick={aoSincronizar}
+              title={sobreALista}
+              className="-my-3 inline-flex h-10 items-center gap-1 font-medium text-primary outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-3 focus-visible:after:ring-ring/50"
+            >
+              {velha ? 'Sincronizar agora' : 'Sincronizar'}
+              <ArrowRight className="size-3" aria-hidden="true" />
+            </button>
+          ) : (
+            sobreALista
+          )
+        }
+      />
+    </FaixaDeNumeros>
   );
 }
 

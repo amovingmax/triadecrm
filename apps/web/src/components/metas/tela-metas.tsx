@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { keepPreviousData, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, Info, RotateCw } from 'lucide-react';
+import { ChevronRight, Info, RotateCw } from 'lucide-react';
 
 import { EMPRESA } from '@/lib/empresa';
 import { cn } from '@/lib/utils';
@@ -211,11 +211,12 @@ export function TelaMetas({
         />
       </header>
 
-      {/* Uma LINHA, e não uma faixa com borda (29/09/2026): é um lembrete sobre
-          os cartões logo abaixo, e na faixa ele tinha o peso de um cartão. */}
+      {/* Uma faixa macia, sem borda (24/11/2026, protótipo aprovado): como linha
+          solta de 12px ela sumia entre o período e os cartões, e é ela que diz que
+          os números abaixo não têm alvo. */}
       {aviso ? (
-        <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-          <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+        <p className="flex items-start gap-2.5 rounded-lg bg-muted px-3.5 py-3 text-[13.5px] leading-snug">
+          <Info className="mt-px size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span>{aviso}</span>
         </p>
       ) : null}
@@ -248,7 +249,7 @@ export function TelaMetas({
         <section
           aria-label="Metas por pessoa"
           className={cn(
-            'grid grid-cols-1 items-start gap-4',
+            'grid grid-cols-1 items-start gap-3.5',
             // Sem `mx-auto`: a borda esquerda do conteúdo não se mexe entre telas.
             // Ver o porquê em @/lib/larguras.
             pessoas.length > 1 ? 'lg:grid-cols-2' : 'w-full max-w-2xl',
@@ -310,7 +311,7 @@ function ComoContamos({ linhas }: { linhas: LinhaProgresso[] }) {
   const proxies = EMPRESA.modulos.plataformaKomune ? linhas.filter(ehProxy) : [];
 
   return (
-    <section className="flex flex-col gap-3 border-t border-hairline pt-4">
+    <section className="flex flex-col gap-3">
       {pendentes.length > 0 || proxies.length > 0 ? (
         <div className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -343,14 +344,14 @@ function ComoContamos({ linhas }: { linhas: LinhaProgresso[] }) {
       ) : null}
 
       <details className="group/como">
-        <summary className="toque flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground md:min-h-8">
-          <ChevronDown
-            className="size-4 transition-transform group-open/como:rotate-180"
+        <summary className="toque flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground md:min-h-10">
+          <ChevronRight
+            className="size-4 shrink-0 transition-transform group-open/como:rotate-90"
             aria-hidden="true"
           />
           Como cada número é contado
         </summary>
-        <dl className="flex flex-col gap-2 pt-2 pl-5.5">
+        <dl className="flex flex-col gap-2 pt-2 pl-6">
           {linhas.map((linha) => (
             <div key={linha.metrica} className="text-xs leading-relaxed">
               <dt className="inline font-medium">{linha.metrica_rotulo}: </dt>

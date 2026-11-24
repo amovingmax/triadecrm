@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Chip } from '@/components/ui/chip';
+import { FaixaDeslizante } from '@/components/ui/faixa-deslizante';
 import {
   Dialog,
   DialogContent,
@@ -35,7 +37,6 @@ import {
   type RecorteDosParceiros,
 } from './perfil-regra';
 import type { PerfilDoParceiro, TipoDeParceria } from './tipos';
-import { ChipDeAba } from './wpp';
 
 /**
  * CLIENTES E PARCEIROS NA TELA (Imova, 23/11/2026). As regras estão em
@@ -461,9 +462,10 @@ export function GanhoNaLista() {
 }
 
 /**
- * As pílulas da caixa Parceiros: todos ou uma tag só. As três tags aparecem
+ * As fichas da caixa Parceiros: todos ou uma tag só. As três tags aparecem
  * sempre, mesmo com zero (é a categoria, não só um filtro); "Sem tag" só
- * quando há Parceiro de antes das tags esperando uma.
+ * quando há Parceiro de antes das tags esperando uma. Numa linha que desliza,
+ * no lugar da linha das abas da caixa Clientes (protótipo responsivo, 24/11/2026).
  */
 export function FiltroDaParceria({
   tipo,
@@ -478,25 +480,37 @@ export function FiltroDaParceria({
 }) {
   const semTag = porTipo.get(SEM_TAG) ?? 0;
   return (
-    <div role="group" aria-label="Que tag mostrar" className="flex flex-wrap gap-1.5 pb-0.5">
-      <ChipDeAba ativo={tipo === 'todos'} contagem={total} onClick={() => aoTrocar('todos')}>
+    <FaixaDeslizante rotulo="Que tag mostrar" ativo={tipo} sangria>
+      {/* Zero não leva número, como antes. */}
+      <Chip
+        ativo={tipo === 'todos'}
+        contagem={total || null}
+        onClick={() => aoTrocar('todos')}
+        className="md:h-10"
+      >
         Todos
-      </ChipDeAba>
+      </Chip>
       {TIPOS_DE_PARCERIA.map((t) => (
-        <ChipDeAba
+        <Chip
           key={t.id}
           ativo={tipo === t.id}
-          contagem={porTipo.get(t.id) ?? 0}
+          contagem={porTipo.get(t.id) || null}
           onClick={() => aoTrocar(t.id)}
+          className="md:h-10"
         >
           {t.plural}
-        </ChipDeAba>
+        </Chip>
       ))}
       {semTag > 0 || tipo === SEM_TAG ? (
-        <ChipDeAba ativo={tipo === SEM_TAG} contagem={semTag} onClick={() => aoTrocar(SEM_TAG)}>
+        <Chip
+          ativo={tipo === SEM_TAG}
+          contagem={semTag || null}
+          onClick={() => aoTrocar(SEM_TAG)}
+          className="md:h-10"
+        >
           Sem tag
-        </ChipDeAba>
+        </Chip>
       ) : null}
-    </div>
+    </FaixaDeslizante>
   );
 }

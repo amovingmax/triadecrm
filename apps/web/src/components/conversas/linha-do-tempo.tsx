@@ -3,6 +3,7 @@
 import { Fragment } from 'react';
 import { DoorOpen } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
 import { dataHoraCompleta, duracao, hora, rotuloDoDia } from './formatos';
@@ -89,9 +90,16 @@ function SeparadorDeDia({ iso }: { iso: string }) {
     // GRUDADO NO TOPO. Numa conversa de três meses, rolar para o meio deixava a
     // pessoa sem saber de que dia era aquilo — o separador tinha passado
     // trezentos pixels acima. `z-10` porque os balões rolam por baixo dele.
-    // Com a pílula da janela de 24 h no alto, gruda logo abaixo dela
-    // (`--topo-do-dia`, medido em `fio-wpp.tsx`).
-    <div className="sticky top-[var(--topo-do-dia,0.375rem)] z-10 mt-4 mb-1.5 flex justify-center">
+    // A janela de 24 h saiu do alto do papel de parede (24/11/2026): o alto é dele.
+    // Grudada, ela só aparece enquanto a pessoa rola e some 1,2 s depois, para não
+    // cobrir a mensagem de cima (`data-dia`, marcada em `fio-wpp.tsx`).
+    <div
+      data-dia=""
+      className={cn(
+        'sticky top-1.5 z-10 mt-4 mb-1.5 flex justify-center transition-opacity duration-200 motion-reduce:transition-none',
+        'group-data-[parado]/fio:data-[grudada]:pointer-events-none group-data-[parado]/fio:data-[grudada]:opacity-0',
+      )}
+    >
       <PilulaDoFio tom="dia" title={completo}>
         {/* "Hoje", "Ontem", "Segunda-feira, ": com maiúscula, como no WhatsApp. */}
         {palavra.charAt(0).toUpperCase() + palavra.slice(1)}

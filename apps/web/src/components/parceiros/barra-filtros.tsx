@@ -1,21 +1,15 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 
-import { cn } from '@/lib/utils';
+import { BotaoFiltros } from '@/components/ui/botao-filtros';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Chip } from '@/components/ui/chip';
+import { FolhaFiltros, GrupoDeFiltro } from '@/components/ui/folha-filtros';
 
+import { CampoDeBusca } from './campo-de-busca';
+import { EtiquetasDeFiltro, type EtiquetaDeFiltro } from './etiquetas-de-filtro';
+import { formatarNumero } from './formatos';
 import {
   contarFiltros,
   FILTRO_DE_PERFIL,
@@ -25,268 +19,235 @@ import {
   type FiltrosParceiros,
 } from './tipos';
 
-/** Valor do "sem filtro" no Radix Select, que não aceita item com valor vazio. */
-const TODOS = 'todos';
-
 /**
  * Busca e filtros da lista.
  *
- * A busca é uma caixa só: nome, telefone em qualquer formato, @instagram, CNPJ ou
- * bairro caem no mesmo campo, porque em campo ninguém escolhe o tipo do que copiou
- * do WhatsApp antes de colar (RF-BAS-12). O texto é enviado com atraso de 300ms para
- * não disparar uma consulta por tecla.
+ * Protótipo responsivo da Imova (24/11/2026): a busca ocupa a largura toda e os seis
+ * filtros (Perfil, Contato, Categoria, Cidade, Etapa, Responsável) moram numa folha,
+ * atrás do botão Filtros, que mostra quantos estão ligados. Antes eles eram seis
+ * caixas ao lado da busca: no tablet quebravam em três linhas, e no celular a fila
+ * era cortada à direita. Os ligados aparecem abaixo da busca como etiquetas que se
+ * tiram com um toque, e a barra inteira fica presa no topo ao rolar a lista.
  *
- * Os quatro filtros de lista saem dos catálogos do banco (nada é escrito à mão aqui).
+ * Os filtros saem dos catálogos do banco (nada é escrito à mão aqui) e valem na hora
+ * em que são tocados: a folha não tem "aplicar", o botão do rodapé só fecha e diz
+ * quantos parceiros sobraram.
  */
 export function BarraFiltros({
   filtros,
   catalogos,
+  total,
+  carregando,
   aoMudar,
   aoLimpar,
+  aoMedir,
 }: {
   filtros: FiltrosParceiros;
   catalogos: Catalogos;
+  /** Quantos parceiros o recorte atual devolveu (para o botão da folha). */
+  total: number;
+  carregando: boolean;
   aoMudar: (parcial: Partial<FiltrosParceiros>) => void;
   aoLimpar: () => void;
+  /** A altura da barra presa, para o cabeçalho da tabela parar logo abaixo dela. */
+  aoMedir?: (altura: number) => void;
 }) {
-  const idBusca = useId();
+  const [folhaAberta, setFolhaAberta] = useState(false);
+  const barra = useRef<HTMLDivElement>(null);
   const ativos = contarFiltros(filtros);
 
-  const limpavel = ativos > 0 || filtros.q.trim() !== '';
+  useEffect(() => {
+    const el = barra.current;
+    if (!el || !aoMedir) return;
+    const observador = new ResizeObserver(() => aoMedir(el.offsetHeight));
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, [aoMedir]);
+
+  const etiquetas = etiquetasDosFiltros(filtros, catalogos, aoMudar);
 
   return (
-    // Uma linha só a partir do `md`: busca à esquerda, filtros ocupando a faixa que
-    // antes ficava vazia à direita. `items-center` alinha a fila de gatilhos com a
-    // CAIXA da busca (o rótulo em cima e a dica embaixo somam altura igual dos dois
-    // lados do campo, então o centro do bloco é o centro do input).
-    <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
-      <CampoBusca id={idBusca} valor={filtros.q} aoMudar={(q) => aoMudar({ q })} />
-
-      <div className="flex min-w-0 flex-col gap-2 md:flex-1 md:flex-row md:items-center md:gap-2">
-        {/* No celular a fila de filtros rola na horizontal; nada quebra a largura da
-            tela. A máscara à direita diz que ainda há gatilho fora dela: sem ela a
-            quarta pílula aparece guilhotinada rente à borda e lê como layout quebrado.
-            Some no `md`, onde os quatro cabem e a fila passa a quebrar em linha. */}
-        <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 [mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)] md:mx-0 md:flex-wrap md:px-0 md:pb-0 md:[mask-image:none]">
-          {/* PRIMEIRO da fila, e não o último: o time faz a captação a partir desta
-              lista, e a pergunta da manhã é "para quem eu ligo?" — quem ainda não
-              foi contatado, ou quem não atendeu e está esperando a próxima tentativa.
-              Categoria e cidade recortam o QUE; este recorta o PRÓXIMO PASSO. */}
-          {/* Clientes e Parceiros (Imova, 23/11/2026): quem é quem na base, com as
-              três tags dos Parceiros. Na KOMUNE não aparece. */}
-          {FILTRO_DE_PERFIL ? (
-            <FiltroLista
-              rotulo="Perfil"
-              valor={filtros.perfil}
-              aoMudar={(v) => aoMudar({ perfil: v, pagina: 1 })}
-              opcoes={PERFIS_DA_LISTA.map((p) => ({ ...p }))}
-            />
-          ) : null}
-          <FiltroLista
-            rotulo="Contato"
-            valor={filtros.contato}
-            aoMudar={(v) => aoMudar({ contato: v, pagina: 1 })}
-            opcoes={SITUACOES_DO_CONTATO.map((c) => ({ valor: c.valor, rotulo: c.rotulo }))}
+    <>
+      {/* Presa logo abaixo do cabeçalho do app (56px no celular, 72px do tablet para
+          cima), com o fundo da página translúcido por trás: quem rolou até o
+          quadragésimo parceiro continua a um toque da busca. A margem negativa leva
+          o fundo até a borda da tela. */}
+      <div
+        ref={barra}
+        className="sticky top-14 z-20 -mx-4 flex flex-col gap-2.5 bg-background/90 px-4 py-2.5 backdrop-blur-md md:top-[72px] md:-mx-5 md:px-5"
+      >
+        <div className="flex items-center gap-2">
+          <CampoDeBusca
+            valor={filtros.q}
+            aoMudar={(q) => aoMudar({ q })}
+            rotulo="Buscar parceiro"
+            placeholder="Nome, telefone, @instagram, CNPJ ou bairro"
+            dica="Nome, telefone, @instagram, CNPJ ou bairro."
           />
-          <FiltroLista
-            rotulo="Categoria"
-            valor={filtros.categoriaId}
-            aoMudar={(v) => aoMudar({ categoriaId: v, pagina: 1 })}
-            opcoes={catalogos.categorias.map((c) => ({ valor: c.id, rotulo: c.nome }))}
-          />
-          <FiltroLista
-            rotulo="Cidade"
-            valor={filtros.cidadeId}
-            aoMudar={(v) => aoMudar({ cidadeId: v, pagina: 1 })}
-            opcoes={catalogos.cidades.map((c) => ({
-              valor: c.id,
-              rotulo: c.nome,
-              grupo: c.grandeNatal ? 'Grande Natal' : 'Interior',
-            }))}
-          />
-          <FiltroLista
-            rotulo="Etapa"
-            valor={filtros.etapaId}
-            aoMudar={(v) => aoMudar({ etapaId: v, pagina: 1 })}
-            opcoes={catalogos.etapas.map((e) => ({ valor: e.id, rotulo: e.nome, grupo: e.funil }))}
-          />
-          <FiltroLista
-            rotulo="Responsável"
-            valor={filtros.responsavelId}
-            aoMudar={(v) => aoMudar({ responsavelId: v, pagina: 1 })}
-            opcoes={catalogos.pessoas.map((p) => ({ valor: p.id, rotulo: p.nome }))}
-          />
+          <BotaoFiltros ligados={ativos} onClick={() => setFolhaAberta(true)} />
         </div>
-
-        {/* Fora do rolador, de propósito: dentro dele o "Limpar" era o último item da
-            fila e nascia depois de x=470 numa tela de 390px, ou seja, o contador de
-            filtros ativos e o botão que os desfaz ficavam fora da tela justamente
-            quando havia filtro. Aqui ele é uma linha própria no celular e volta para
-            o fim da fila no `md`. */}
-        {limpavel ? (
-          <Button
-            variant="ghost"
-            onClick={aoLimpar}
-            className="toque h-11 w-fit shrink-0 text-muted-foreground md:h-8"
-          >
-            <X aria-hidden="true" />
-            Limpar
-            {ativos > 0 ? <span className="numerico">({ativos})</span> : null}
-          </Button>
-        ) : null}
+        <EtiquetasDeFiltro etiquetas={etiquetas} aoLimpar={aoLimpar} />
       </div>
-    </div>
+
+      <FolhaFiltros
+        aberta={folhaAberta}
+        aoMudar={setFolhaAberta}
+        rodape={
+          <>
+            {ativos > 0 ? (
+              <Button variant="outline" className="toque h-11" onClick={aoLimpar}>
+                Limpar
+              </Button>
+            ) : null}
+            <Button className="toque h-11" onClick={() => setFolhaAberta(false)}>
+              {carregando
+                ? 'Ver parceiros'
+                : `Ver ${formatarNumero(total)} ${total === 1 ? 'parceiro' : 'parceiros'}`}
+            </Button>
+          </>
+        }
+      >
+        {/* PRIMEIRO, e não o último: o time faz a captação a partir desta lista, e a
+            pergunta da manhã é "para quem eu ligo?". Categoria e cidade recortam o
+            QUE; o contato recorta o PRÓXIMO PASSO. O perfil vem antes dele só na
+            Imova (Clientes e Parceiros, 23/11/2026); na KOMUNE não aparece. */}
+        {FILTRO_DE_PERFIL ? (
+          <GrupoOpcoes
+            titulo="Perfil"
+            valor={filtros.perfil}
+            aoMudar={(perfil) => aoMudar({ perfil })}
+            opcoes={PERFIS_DA_LISTA.map((p) => ({ ...p }))}
+          />
+        ) : null}
+        <GrupoOpcoes
+          titulo="Contato"
+          valor={filtros.contato}
+          aoMudar={(contato) => aoMudar({ contato })}
+          opcoes={SITUACOES_DO_CONTATO.map((c) => ({ valor: c.valor, rotulo: c.rotulo }))}
+        />
+        <GrupoOpcoes
+          titulo="Categoria"
+          valor={filtros.categoriaId}
+          aoMudar={(categoriaId) => aoMudar({ categoriaId })}
+          opcoes={catalogos.categorias.map((c) => ({ valor: c.id, rotulo: c.nome }))}
+        />
+        <GrupoOpcoes
+          titulo="Cidade"
+          valor={filtros.cidadeId}
+          aoMudar={(cidadeId) => aoMudar({ cidadeId })}
+          opcoes={catalogos.cidades.map((c) => ({
+            valor: c.id,
+            rotulo: c.nome,
+            grupo: c.grandeNatal ? 'Grande Natal' : 'Interior',
+          }))}
+        />
+        <GrupoOpcoes
+          titulo="Etapa"
+          valor={filtros.etapaId}
+          aoMudar={(etapaId) => aoMudar({ etapaId })}
+          opcoes={catalogos.etapas.map((e) => ({ valor: e.id, rotulo: e.nome, grupo: e.funil }))}
+        />
+        <GrupoOpcoes
+          titulo="Responsável"
+          valor={filtros.responsavelId}
+          aoMudar={(responsavelId) => aoMudar({ responsavelId })}
+          opcoes={catalogos.pessoas.map((p) => ({ valor: p.id, rotulo: p.nome }))}
+        />
+      </FolhaFiltros>
+    </>
   );
 }
 
-function CampoBusca({
-  id,
-  valor,
-  aoMudar,
-}: {
-  id: string;
-  valor: string;
-  aoMudar: (v: string) => void;
-}) {
-  const [texto, setTexto] = useState(valor);
-  const ultimoEnviado = useRef(valor);
-
-  // Espelha uma mudança vinda de fora (o botão "Limpar", por exemplo) sem
-  // atropelar o que a pessoa está digitando.
-  useEffect(() => {
-    if (valor !== ultimoEnviado.current) {
-      ultimoEnviado.current = valor;
-      setTexto(valor);
-    }
-  }, [valor]);
-
-  // 300ms: rápido o bastante para parecer instantâneo, lento o bastante para não
-  // mandar uma consulta por tecla no 4G da rua.
-  useEffect(() => {
-    if (texto === ultimoEnviado.current) return;
-    const relogio = window.setTimeout(() => {
-      ultimoEnviado.current = texto;
-      aoMudar(texto);
-    }, 300);
-    return () => window.clearTimeout(relogio);
-  }, [texto, aoMudar]);
-
-  // O campo ocupava três linhas — rótulo, caixa e lista de formatos aceitos — para
-  // fazer uma pergunta só, e as duas linhas de cinza em volta eram metade da poluição
-  // do topo desta tela. Agora a lista de formatos é o próprio placeholder e o rótulo
-  // é de leitor de tela. O que se perdeu com isso: o placeholder some na primeira
-  // tecla. O que não se perdeu: `aria-describedby` continua apontando para a lista,
-  // que segue no documento, e quem volta da ficha com a busca preenchida lê o nome
-  // que digitou dentro de um campo com lupa — não precisa de rótulo para saber que
-  // aquilo é uma busca.
-  return (
-    // Largura máxima no desktop: um campo de 1.500px de largura para digitar um nome
-    // não ajuda ninguém a mirar. `max-w-sm` (e não `xl`) porque a busca agora divide a
-    // linha com os filtros: o campo pede a largura de um nome, não a da tela.
-    <div className="md:w-full md:max-w-sm md:shrink-0">
-      <label htmlFor={id} className="sr-only">
-        Buscar parceiro
-      </label>
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-          aria-hidden="true"
-        />
-        <Input
-          id={id}
-          type="search"
-          inputMode="search"
-          autoComplete="off"
-          enterKeyHint="search"
-          placeholder="Nome, telefone, @instagram, CNPJ ou bairro"
-          aria-describedby={`${id}-dica`}
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          // `pr-12` e o X nativo do `type="search"` escondido (16/11/2026): o texto
-          // corria por baixo do nosso "limpar", e o X azul do navegador aparecia
-          // encavalado nele, dois "limpar" um em cima do outro.
-          className="h-11 pr-12 pl-9 md:h-9 md:pr-9 [&::-webkit-search-cancel-button]:appearance-none"
-        />
-        {texto ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => setTexto('')}
-            className="absolute top-1/2 right-1.5 size-11 -translate-y-1/2 md:size-7"
-          >
-            <X aria-hidden="true" />
-            <span className="sr-only">Limpar a busca</span>
-          </Button>
-        ) : null}
-      </div>
-      <p id={`${id}-dica`} className="sr-only">
-        Nome, telefone, @instagram, CNPJ ou bairro.
-      </p>
-    </div>
-  );
+/** As etiquetas dos filtros ligados, na ordem da folha. */
+function etiquetasDosFiltros(
+  f: FiltrosParceiros,
+  catalogos: Catalogos,
+  aoMudar: (parcial: Partial<FiltrosParceiros>) => void,
+): EtiquetaDeFiltro[] {
+  const lista: EtiquetaDeFiltro[] = [];
+  const incluir = (
+    chave: string,
+    titulo: string,
+    nome: string | undefined,
+    tirar: Partial<FiltrosParceiros>,
+  ) => {
+    if (nome) lista.push({ chave, rotulo: `${titulo}: ${nome}`, aoTirar: () => aoMudar(tirar) });
+  };
+  if (FILTRO_DE_PERFIL && f.perfil)
+    incluir('perfil', 'Perfil', PERFIS_DA_LISTA.find((p) => p.valor === f.perfil)?.rotulo, {
+      perfil: null,
+    });
+  if (f.contato)
+    incluir('contato', 'Contato', SITUACOES_DO_CONTATO.find((c) => c.valor === f.contato)?.rotulo, {
+      contato: null,
+    });
+  if (f.categoriaId !== null)
+    incluir(
+      'categoria',
+      'Categoria',
+      catalogos.categorias.find((c) => c.id === f.categoriaId)?.nome,
+      {
+        categoriaId: null,
+      },
+    );
+  if (f.cidadeId !== null)
+    incluir('cidade', 'Cidade', catalogos.cidades.find((c) => c.id === f.cidadeId)?.nome, {
+      cidadeId: null,
+    });
+  if (f.etapaId !== null)
+    incluir('etapa', 'Etapa', catalogos.etapas.find((e) => e.id === f.etapaId)?.nome, {
+      etapaId: null,
+    });
+  if (f.responsavelId !== null)
+    incluir(
+      'responsavel',
+      'Responsável',
+      catalogos.pessoas.find((p) => p.id === f.responsavelId)?.nome,
+      {
+        responsavelId: null,
+      },
+    );
+  return lista;
 }
 
 type Opcao<T> = { valor: T; rotulo: string; grupo?: string };
 
 /**
- * Um filtro de lista. Genérico em `T` para servir tanto aos catálogos com id
- * numérico (categoria, cidade, etapa) quanto ao responsável, que é um uuid.
+ * Um filtro na folha: as opções como fichas, uma escolhida por vez. Tocar na ficha
+ * ligada a desliga (volta a "tudo"). Os catálogos agrupados (cidades por região,
+ * etapas por funil, perfis por tag) ganham o nome do grupo antes das fichas dele, na
+ * ordem em que o banco os mandou.
  */
-function FiltroLista<T extends string | number>({
-  rotulo,
+function GrupoOpcoes<T extends string | number>({
+  titulo,
   valor,
   opcoes,
   aoMudar,
 }: {
-  rotulo: string;
+  titulo: string;
   valor: T | null;
   opcoes: Opcao<T>[];
   aoMudar: (v: T | null) => void;
 }) {
-  const numerico = typeof opcoes[0]?.valor === 'number';
-  const selecionado = valor === null ? TODOS : String(valor);
-
-  // Agrupa mantendo a ordem em que o catálogo veio do banco.
-  const grupos = new Map<string, Opcao<T>[]>();
-  for (const o of opcoes) {
-    const chave = o.grupo ?? '';
-    const lista = grupos.get(chave);
-    if (lista) lista.push(o);
-    else grupos.set(chave, [o]);
-  }
-
+  if (opcoes.length === 0) return null;
   return (
-    <Select
-      value={selecionado}
-      onValueChange={(v) => aoMudar(v === TODOS ? null : ((numerico ? Number(v) : v) as T))}
-    >
-      <SelectTrigger
-        aria-label={rotulo}
-        className={cn(
-          'toque h-11 shrink-0 md:h-8',
-          valor !== null && 'border-foreground/40 font-medium',
-        )}
-      >
-        <SelectValue placeholder={rotulo}>
-          {valor === null ? rotulo : opcoes.find((o) => o.valor === valor)?.rotulo}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent className="max-h-80">
-        <SelectGroup>
-          <SelectItem value={TODOS}>{rotulo}: tudo</SelectItem>
-        </SelectGroup>
-        {[...grupos.entries()].map(([nomeDoGrupo, itens]) => (
-          <SelectGroup key={nomeDoGrupo || rotulo}>
-            {nomeDoGrupo ? <SelectLabel>{nomeDoGrupo}</SelectLabel> : null}
-            {itens.map((o) => (
-              <SelectItem key={String(o.valor)} value={String(o.valor)}>
-                {o.rotulo}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        ))}
-      </SelectContent>
-    </Select>
+    <GrupoDeFiltro titulo={titulo}>
+      {opcoes.map((o, i) => {
+        const novoGrupo = o.grupo !== undefined && o.grupo !== opcoes[i - 1]?.grupo;
+        return (
+          <Fragment key={String(o.valor)}>
+            {novoGrupo ? (
+              <p className="basis-full pt-1 text-xs font-medium text-muted-foreground">{o.grupo}</p>
+            ) : null}
+            <Chip
+              ativo={valor === o.valor}
+              onClick={() => aoMudar(valor === o.valor ? null : o.valor)}
+            >
+              {o.rotulo}
+            </Chip>
+          </Fragment>
+        );
+      })}
+    </GrupoDeFiltro>
   );
 }

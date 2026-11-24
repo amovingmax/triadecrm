@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 
+import { Chave } from './chave';
 import { buscarFreios, buscarSaudeDaEsteira } from './dados';
 import { rotuloDaRecusaDoAtendimento } from './formatos';
 
@@ -337,34 +338,17 @@ export function Interruptor({
         </label>
         <p className="text-xs leading-relaxed text-muted-foreground">{descricao}</p>
       </div>
-      <button
+      {/* A caixa da chave tem 44px de altura (24/11/2026) e o desenho, 24, no meio: a
+          margem negativa põe o desenho onde ele sempre esteve (4px abaixo do topo da
+          linha) e devolve ao layout só os 24px dele. O título ao lado também liga e
+          desliga: é `<label htmlFor>`. */}
+      <Chave
         id={id}
-        type="button"
-        role="switch"
-        aria-checked={ligado}
-        disabled={!podeEditar}
-        onClick={() => aoMudar(!ligado)}
-        className={cn(
-          'relative mt-1 h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50',
-          // A chave desenhada tem 24px de altura; o dedo precisa de 44 (16/11/2026).
-          // O `after` invisível estende a área de toque 10px para cada lado sem mudar
-          // o desenho. O título ao lado também liga e desliga: é `<label htmlFor>`.
-          "after:absolute after:-inset-2.5 after:content-['']",
-          // Ligado é MENTA (29/09/2026): o interruptor ligado era tinta, e um
-          // painel de cinco interruptores pretos lia como cinco "desligados"
-          // de relance. Menta é o "sim" da interface.
-          ligado ? 'bg-menta' : 'bg-muted-foreground/30',
-        )}
-      >
-        <span className="sr-only">{ligado ? 'Ligado' : 'Desligado'}</span>
-        <span
-          aria-hidden="true"
-          className={cn(
-            'absolute top-0.5 left-0.5 size-5 rounded-full bg-background shadow transition-transform',
-            ligado && 'translate-x-5',
-          )}
-        />
-      </button>
+        ligada={ligado}
+        desabilitada={!podeEditar}
+        aoMudar={aoMudar}
+        className="-mt-1.5 -mr-1 -mb-2.5"
+      />
     </div>
   );
 }
