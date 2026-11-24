@@ -618,7 +618,7 @@ describe('a busca no mapa (v7, 23/11/2026): só com o mapa no worker', () => {
 describe('a foto para confirmar o imóvel (v8, 24/11/2026)', () => {
   const uso = { entrada: 100, saida: 20, escritaDeCache: 0, leituraDeCache: 0 };
   const CAPA = 'te0004/capa.jpg';
-  const TEXTO = 'Acho que já sei qual é! Temos um terreno de frente para o mar em Tabatinga, perto de Camurupim.';
+  const TEXTO = 'É o nosso terreno de frente para o mar em Tabatinga, perto de Camurupim.';
   const saidaComFoto = (legenda = 'É este aqui que você viu?') => ({
     ...saidaDoModelo({ acao: 'responder', mensagem: TEXTO, agenda: null }),
     fotoParaConfirmar: { imovelCodigo: 'TE0004', legenda },

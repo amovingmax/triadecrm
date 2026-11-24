@@ -172,8 +172,7 @@ describe('bateria do atendente: a régua', () => {
 
   it('a foto para confirmar (v8): a do imóvel certo, a frase sem preço nem pergunta, e só quando o caso pede', () => {
     const comFoto = { temMapa: true, temFoto: true };
-    const frase =
-      'Acho que já sei qual é! Temos um terreno de frente para o mar em Tabatinga, perto de Camurupim.';
+    const frase = 'É o nosso terreno de frente para o mar em Tabatinga, perto de Camurupim.';
     const fotoTabatinga = { imovelCodigo: 'TE0004_IMOVA', legenda: 'É este aqui que você viu?' };
     const resp = (mensagem: string, foto: typeof fotoTabatinga | null) => ({
       acao: 'responder' as const,
@@ -208,6 +207,27 @@ describe('bateria do atendente: a régua', () => {
         'pergunta no texto, além da legenda da foto',
       ]),
     );
+    // Dúvida na frase antes da foto.
+    expect(
+      conferirCasoDaBateria(
+        caso('I01'),
+        resp(
+          'Acho que já sei qual é! Temos um terreno de frente para o mar em Tabatinga.',
+          fotoTabatinga,
+        ),
+        comFoto,
+      ),
+    ).toContain('mostra dúvida ao dizer qual é o imóvel');
+    expect(
+      conferirCasoDaBateria(
+        caso('I01'),
+        resp(
+          'Pelo que você descreve, deve ser o terreno de frente para o mar em Tabatinga.',
+          fotoTabatinga,
+        ),
+        comFoto,
+      ),
+    ).toContain('mostra dúvida ao dizer qual é o imóvel');
     // Legenda que não pergunta.
     expect(
       conferirCasoDaBateria(
@@ -229,10 +249,7 @@ describe('bateria do atendente: a régua', () => {
     expect(
       conferirCasoDaBateria(
         caso('I04'),
-        resp(
-          'Acho que já sei qual é! Temos um terreno na Rua Professor Etelvino Cunha, em Capim Macio.',
-          fotoDe900,
-        ),
+        resp('É o nosso terreno na Rua Professor Etelvino Cunha, em Capim Macio.', fotoDe900),
         comFoto,
       ),
     ).toEqual([]);
@@ -247,13 +264,10 @@ describe('bateria do atendente: a régua', () => {
     expect(
       conferirCasoDaBateria(
         caso('I03'),
-        resp(
-          'Acho que já sei qual é! Temos um terreno na Rua Professor Etelvino Cunha, em Capim Macio.',
-          {
-            imovelCodigo: 'TE0006',
-            legenda: 'É este o terreno que você viu?',
-          },
-        ),
+        resp('É o nosso terreno na Rua Professor Etelvino Cunha, em Capim Macio.', {
+          imovelCodigo: 'TE0006',
+          legenda: 'É este o terreno que você viu?',
+        }),
         comFoto,
       ),
     ).toEqual([]);

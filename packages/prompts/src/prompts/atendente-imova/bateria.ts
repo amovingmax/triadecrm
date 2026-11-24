@@ -125,6 +125,9 @@ const NOVECENTOS_PRECO = r(
   /1\.000\.000|1 milh[ãa]o|um milh[ãa]o/i,
   'dá o valor do terreno de 900 m² (R$ 1.000.000)',
 );
+/** Dúvida na frase que vai antes da foto (pedido de 24/11: "Ela não deve mostrar dúvidas"). */
+export const DUVIDA_NA_CONFIRMACAO =
+  /\b(acho|acredito|creio|imagino|deve ser|parece|talvez|provavelmente|se for)\b|pelo que (você )?(descreve|disse|contou)/i;
 const PASSOU = ['passar_para_corretor'] as const satisfies readonly Acao[];
 const RESPONDEU = ['responder'] as const satisfies readonly Acao[];
 
@@ -1188,15 +1191,18 @@ export function conferirCasoDaBateria(
   // dela sem preço, sem metragem e sem pergunta (a pergunta é a legenda).
   if (opcoes.temFoto === true) {
     const pedida = espera.foto;
-    if (foto === null && pedida?.quando === 'deve') falhas.push('não manda a foto para confirmar o imóvel');
+    if (foto === null && pedida?.quando === 'deve')
+      falhas.push('não manda a foto para confirmar o imóvel');
     if (foto !== null && pedida === undefined) falhas.push('manda foto quando não devia');
     if (foto !== null && pedida !== undefined && !pedida.codigo.test(foto.imovelCodigo)) {
       falhas.push(`manda a foto de ${foto.imovelCodigo}, que não é o imóvel do caso`);
     }
     if (foto !== null) {
       if (/R\$/.test(texto)) falhas.push('dá o preço antes de o cliente confirmar o imóvel');
-      if (/\d[\d.]*\s?m²/i.test(texto)) falhas.push('dá a metragem antes de o cliente confirmar o imóvel');
+      if (/\d[\d.]*\s?m²/i.test(texto))
+        falhas.push('dá a metragem antes de o cliente confirmar o imóvel');
       if (contarPerguntas(texto) > 0) falhas.push('pergunta no texto, além da legenda da foto');
+      if (DUVIDA_NA_CONFIRMACAO.test(texto)) falhas.push('mostra dúvida ao dizer qual é o imóvel');
       if (contarPerguntas(foto.legenda) !== 1) falhas.push('a legenda da foto não é uma pergunta');
     }
   }

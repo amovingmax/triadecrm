@@ -17,7 +17,7 @@
  *   (migração 20261124170000), que põe a foto na fila logo depois do texto. Sem foto no
  *   anúncio, ou se a foto falhar, a legenda sai como texto.
  * - Um bloco no fim do sistema: QUANDO a confirmação vai com foto, como é a mensagem
- *   antes dela (curta, calorosa, sem preço, sem metragem, sem pergunta) e como seguir
+ *   antes dela (curta, calorosa, segura, sem preço, sem metragem, sem pergunta) e como seguir
  *   depois do "é esse sim". O exemplo é o modelo que o usuário pediu, sem a metragem (a
  *   nota 13 do caderno proíbe confirmar pela área).
  * - A linha da saída ganha o campo novo.
@@ -74,12 +74,13 @@ export const BLOCO_DA_FOTO = `A FOTO PARA CONFIRMAR O IMÓVEL (acao = responder)
 Quando você reconhecer de qual imóvel o cliente fala por uma referência que ele deu (rua,
 avenida, bairro, praia, condomínio, ponto conhecido, ou o que a busca no mapa mostrou) e
 ainda precisar que ele confirme, a confirmação vai em duas mensagens:
-1. \`mensagem\`: uma frase curta e calorosa dizendo qual imóvel você acha que é, pelo tipo e
-   pelo lugar, com a referência que ele deu. Sem preço (mesmo que ele tenha perguntado: o
-   valor vem na resposta ao "é esse"), sem documentação, sem metragem, sem outros detalhes e
-   sem pergunta: a pergunta vai na foto. Ex.: "Acho que já sei qual é!
-   Temos um terreno bem perto da Gustavo Neves, na Rua Professor Etelvino Cunha, em Capim
-   Macio."
+1. \`mensagem\`: uma frase curta, calorosa e segura dizendo qual é o imóvel, pelo tipo e pelo
+   lugar, com a referência que ele deu. Sem mostrar dúvida: nunca "acho", "acredito",
+   "deve ser", "parece", "talvez", "provavelmente", "pelo que você descreve" nem "se for".
+   Sem preço (mesmo que ele tenha perguntado: o valor vem na resposta ao "é esse"), sem
+   documentação, sem metragem, sem outros detalhes e sem pergunta: a pergunta vai na foto.
+   Ex.: "É o nosso terreno bem perto da Gustavo Neves, na Rua Professor Etelvino Cunha, em
+   Capim Macio."
 2. \`fotoParaConfirmar\`: o código do imóvel, exatamente como está na lista, e a legenda, uma
    pergunta curta: "${LEGENDA_PADRAO_DA_FOTO}" ou "É este o terreno que você viu?". O sistema
    manda a foto principal do anúncio logo depois da sua mensagem.
@@ -183,7 +184,7 @@ const exemplos = [
     saida: {
       acao: 'responder' as const,
       mensagem:
-        'Acho que já sei qual é! Temos um terreno bem perto da Gustavo Neves, na Rua Professor Etelvino Cunha, em Capim Macio.',
+        'É o nosso terreno bem perto da Gustavo Neves, na Rua Professor Etelvino Cunha, em Capim Macio.',
       agenda: null,
       motivo:
         'Mapa: o terreno de Capim Macio fica bem perto da Gustavo Neves; mando a foto para ele confirmar antes de falar de preço.',

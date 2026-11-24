@@ -63,9 +63,12 @@ describe('atendente-imova@v8', () => {
   it('o bloco ensina as duas mensagens: a frase sem preço, sem metragem e sem pergunta, e a foto com a pergunta', () => {
     expect(BLOCO_DA_FOTO).toMatch(/^A FOTO PARA CONFIRMAR O IMÓVEL \(acao = responder\):/);
     expect(BLOCO_DA_FOTO).toMatch(
-      /Sem preço \(mesmo que ele tenha perguntado[^)]*\), sem documentação, sem metragem/,
+      /Sem preço \(mesmo que ele tenha perguntado[^)]*\), sem\s+documentação, sem metragem/,
     );
-    expect(BLOCO_DA_FOTO).toMatch(/Acho que já sei qual é!/);
+    expect(BLOCO_DA_FOTO).toMatch(/É o nosso terreno bem perto da Gustavo Neves/);
+    // Sem dúvida na confirmação (pedido de 24/11: "Ela não deve mostrar dúvidas").
+    expect(BLOCO_DA_FOTO).toMatch(/Sem mostrar dúvida: nunca "acho"/);
+    expect(BLOCO_DA_FOTO).not.toMatch(/Acho que já sei/);
     expect(BLOCO_DA_FOTO).not.toMatch(/\d+ ?m²/);
     expect(BLOCO_DA_FOTO).not.toMatch(/R\$/);
     expect(BLOCO_DA_FOTO).toContain(LEGENDA_PADRAO_DA_FOTO);
@@ -119,7 +122,7 @@ describe('atendente-imova@v8', () => {
     expect(comFoto).toHaveLength(1);
     const exemplo = comFoto[0];
     if (exemplo === undefined) throw new Error('falta o exemplo da foto');
-    expect(exemplo.saida.mensagem).not.toMatch(/R\$|m²|\?/);
+    expect(exemplo.saida.mensagem).not.toMatch(/R\$|m²|\?|\bacho\b|deve ser|parece/i);
     expect(exemplo.saida.fotoParaConfirmar?.legenda).toBe(LEGENDA_PADRAO_DA_FOTO);
   });
 
