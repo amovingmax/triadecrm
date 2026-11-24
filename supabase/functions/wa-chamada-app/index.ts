@@ -14,6 +14,7 @@
 //   soltar       a rede caiu antes de atender: a ligação volta a tocar para o CRM aberto
 //   recusar      Recusar neste iPhone: só ele para de tocar (não recebe o "parar")
 //   estado       o app pergunta, tocando e durante a ligação, se a ligação continua
+//   diario       o app manda as linhas do diário (passos, áudio, conexão), 24/11/2026
 //
 // A `wa-chamada` do navegador não muda. Guia: docs/operacao/ligacao-whatsapp.md.
 // =============================================================================
@@ -27,7 +28,7 @@ const TAMANHO_MAXIMO = 64 * 1024;
 const TEMPO_DA_META_MS = 10_000;
 const URL_DA_GRAPH = (Deno.env.get('META_WA_GRAPH_URL') ?? 'https://graph.facebook.com').replace(/\/+$/, '');
 const VERSAO_DA_GRAPH = Deno.env.get('META_WA_API_VERSION') ?? 'v26.0';
-const ACOES = ['atender', 'pre_aceitar', 'aceitar', 'encerrar', 'soltar', 'recusar', 'estado'] as const;
+const ACOES = ['atender', 'pre_aceitar', 'aceitar', 'encerrar', 'soltar', 'recusar', 'estado', 'diario'] as const;
 type Acao = (typeof ACOES)[number];
 
 type DoBanco = {
@@ -94,7 +95,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const metodo = exigirMetodo(req, ['POST']);
   if (metodo) return metodo;
 
-  let pedido: { convite?: unknown; acao?: unknown; sdp?: unknown };
+  let pedido: { convite?: unknown; acao?: unknown; sdp?: unknown; linhas?: unknown };
   try {
     const cru = await req.text();
     if (cru.length > TAMANHO_MAXIMO) return erro(413, 'corpo_grande_demais', 'O pedido é grande demais.');
@@ -111,6 +112,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   const noBanco = (a: string) => rpcServico<DoBanco>('wa_chamada_app', { p_convite: convite, p_acao: a });
+
+  if (acao === 'diario') {
+    if (!Array.isArray(pedido.linhas)) return erro(400, 'pedido_invalido', 'O diário veio sem linhas.');
+    try {
+      const r = await rpcServico<{ ok: boolean; motivo?: string; linhas?: number }>('voip_diario', {
+        p_convite: convite,
+        p_linhas: pedido.linhas,
+      });
+      return r.ok ? json({ ok: true, linhas: r.linhas ?? 0 }) : recusa(r.motivo);
+    } catch (e) {
+      return erro(502, 'falha_no_banco', 'Não consegui guardar o diário.', e);
+    }
+  }
 
   try {
     if (acao === 'atender' || acao === 'soltar' || acao === 'recusar' || acao === 'estado') {

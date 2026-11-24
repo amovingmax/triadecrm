@@ -18,6 +18,46 @@ const ouvintes = new Set<() => void>();
 function mudar(nova: LinhaNoApp | null) {
   linha = nova;
   for (const o of ouvintes) o();
+  conferirLigacao();
+}
+
+/**
+ * Há ligação tocando ou em curso neste iPhone? Enquanto houver, a página do CRM fica
+ * calada (`audio-da-pagina.ts`): o som dela tiraria o áudio da ligação (24/11/2026).
+ * Tocando conta pelos eventos do nativo; um toque sem fim conhecido sai em 90 s.
+ */
+const tocando = new Map<string, number>();
+const TOQUE_ESQUECIDO_MS = 90_000;
+let emLigacaoAgora = false;
+const aoMudarLigacao = new Set<(emLigacao: boolean) => void>();
+
+function conferirLigacao() {
+  const agora = Date.now();
+  for (const [chamada, desde] of tocando) if (agora - desde > TOQUE_ESQUECIDO_MS) tocando.delete(chamada);
+  const em = tocando.size > 0 || (linha !== null && (linha.estado === 'conectando' || linha.estado === 'em_curso'));
+  if (em === emLigacaoAgora) return;
+  emLigacaoAgora = em;
+  for (const f of aoMudarLigacao) f(em);
+}
+
+export function emLigacao(): boolean {
+  return emLigacaoAgora;
+}
+
+export function quandoMudarLigacao(f: (emLigacao: boolean) => void): () => void {
+  aoMudarLigacao.add(f);
+  return () => aoMudarLigacao.delete(f);
+}
+
+function tocou(chamada: string) {
+  tocando.set(chamada, Date.now());
+  conferirLigacao();
+  // O toque esquecido (sem fim nem atender) sai sozinho.
+  setTimeout(conferirLigacao, TOQUE_ESQUECIDO_MS + 1000);
+}
+
+function parouDeTocar(chamada: string) {
+  if (tocando.delete(chamada)) conferirLigacao();
 }
 
 /**
@@ -28,6 +68,7 @@ function mudar(nova: LinhaNoApp | null) {
 const EVENTO_VELHO_MS = 10_000;
 
 function receber(l: LigacaoDoNativo) {
+  parouDeTocar(l.chamada);
   if (linha?.chamada !== l.chamada && Date.now() - l.em > EVENTO_VELHO_MS) return;
   // Ligação nova: o som volta para o fone.
   if (linha?.chamada !== l.chamada) altoFalante = false;
@@ -53,6 +94,9 @@ export function iniciarChamadas(): void {
   ligado = true;
   void chamadaNativa.iniciar();
   chamadaNativa.addListener('onEstado', receber);
+  chamadaNativa.addListener('onTocando', (e) => tocou(e.chamada));
+  chamadaNativa.addListener('onFim', (e) => parouDeTocar(e.chamada));
+  chamadaNativa.addListener('onRecusar', (e) => parouDeTocar(e.chamada));
   // O app abriu no meio de uma ligação atendida com o iPhone bloqueado.
   void chamadaNativa
     .ligacaoAtual()

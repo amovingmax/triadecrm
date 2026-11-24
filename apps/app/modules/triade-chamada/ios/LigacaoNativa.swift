@@ -105,6 +105,7 @@ final class LigacaoNativa: NSObject, RTCPeerConnectionDelegate {
     // Sem microfone, nem reserva: a ligação segue tocando para o resto da equipe (com o
     // iPhone bloqueado não há como perguntar; o app pede ao entrar na Imova).
     guard LigacaoNativa.microfoneLiberado() else {
+      Diario.anotar("sem permissão do microfone")
       falhar("microfone")
       return
     }
@@ -113,6 +114,7 @@ final class LigacaoNativa: NSObject, RTCPeerConnectionDelegate {
 
   private func reservar(tentativa: Int) {
     pedir("atender") { resultado in
+      if case .failure(let r) = resultado { Diario.anotar("reservar: \(r.motivo) (tentativa \(tentativa))") }
       switch resultado {
       case .failure(let r) where r.motivo == "sem_internet":
         // A reserva pode ter sido gravada e a resposta se perdido: o servidor aceita o
@@ -133,9 +135,11 @@ final class LigacaoNativa: NSObject, RTCPeerConnectionDelegate {
           return
         }
         guard let oferta = corpo["oferta_sdp"] as? String, !oferta.isEmpty else {
+          Diario.anotar("reservou, mas sem oferta da Meta")
           self.falhar("ja_atendida")
           return
         }
+        Diario.anotar("reservou; oferta da Meta com \(oferta.count) caracteres")
         self.responder(oferta)
       }
     }
@@ -165,6 +169,48 @@ final class LigacaoNativa: NSObject, RTCPeerConnectionDelegate {
     let rtc = RTCAudioSession.sharedInstance()
     rtc.audioSessionDidDeactivate(sessao)
     rtc.isAudioEnabled = false
+    ligadoPeloApp = false
+  }
+
+  /// Na abertura do app: o WebRTC não liga o áudio sozinho (quem liga é o iPhone, ao
+  /// atender) e começa desligado.
+  static func audioNoInicio() {
+    let rtc = RTCAudioSession.sharedInstance()
+    rtc.useManualAudio = true
+    rtc.isAudioEnabled = false
+  }
+
+  /// O áudio ligado pelo app, quando o iPhone não liga sozinho depois do Atender (24/11:
+  /// a página do CRM aberta no app segura o áudio, e o CallKit não consegue ativá-lo).
+  /// A Apple prefere o caminho do CallKit; este é o reserva, para a ligação não sair muda.
+  private(set) static var ligadoPeloApp = false
+
+  static func audioPeloApp() {
+    let sessao = AVAudioSession.sharedInstance()
+    let rtc = RTCAudioSession.sharedInstance()
+    rtc.lockForConfiguration()
+    do {
+      try rtc.setConfiguration(RTCAudioSessionConfiguration.webRTC(), active: true)
+      Diario.anotar("áudio ligado pelo app (\(sessao.category.rawValue), \(sessao.mode.rawValue))")
+    } catch {
+      Diario.anotar("o app não conseguiu ligar o áudio: \((error as NSError).code)")
+    }
+    rtc.unlockForConfiguration()
+    rtc.audioSessionDidActivate(sessao)
+    rtc.isAudioEnabled = true
+    ligadoPeloApp = true
+  }
+
+  /// Fim da ligação com o áudio ligado pelo app: desliga, devolvendo o som aos outros apps.
+  static func desligarAudioDoApp() {
+    guard ligadoPeloApp else { return }
+    ligadoPeloApp = false
+    let rtc = RTCAudioSession.sharedInstance()
+    rtc.isAudioEnabled = false
+    rtc.lockForConfiguration()
+    try? rtc.setActive(false)
+    rtc.unlockForConfiguration()
+    rtc.audioSessionDidDeactivate(AVAudioSession.sharedInstance())
   }
 
   /// Antes de o CallKit ativar o áudio: o WebRTC não abre a sessão por conta própria
@@ -202,16 +248,22 @@ final class LigacaoNativa: NSObject, RTCPeerConnectionDelegate {
     pc.setRemoteDescription(RTCSessionDescription(type: .offer, sdp: oferta)) { erro in
       DispatchQueue.main.async {
         if self.acabou { return }
-        if erro != nil { self.falhar("conexao"); return }
+        if let erro { Diario.anotar("oferta recusada pelo WebRTC: \(erro.localizedDescription)"); self.falhar("conexao"); return }
         pc.answer(for: restricoes) { resposta, erro in
           DispatchQueue.main.async {
             if self.acabou { return }
-            guard let resposta, erro == nil else { self.falhar("conexao"); return }
+            guard let resposta, erro == nil else { Diario.anotar("WebRTC não criou a resposta"); self.falhar("conexao"); return }
             pc.setLocalDescription(resposta) { erro in
               DispatchQueue.main.async {
                 if self.acabou { return }
-                if erro != nil { self.falhar("conexao"); return }
-                self.esperarColeta { self.aceitar() }
+                if erro != nil { Diario.anotar("WebRTC não aceitou a própria resposta"); self.falhar("conexao"); return }
+                let direcoes = pc.transceivers.map { "\($0.mediaType == .audio ? "áudio" : "outro") \($0.direction.rawValue)" }
+                Diario.anotar("resposta pronta; transceptores: \(direcoes.joined(separator: ", "))")
+                let inicio = Date()
+                self.esperarColeta {
+                  Diario.anotar("coleta \(self.nomeDaColeta) em \(Int(Date().timeIntervalSince(inicio) * 1000)) ms")
+                  self.aceitar()
+                }
               }
             }
           }
@@ -226,17 +278,25 @@ final class LigacaoNativa: NSObject, RTCPeerConnectionDelegate {
       return
     }
     // `pre_accept` sobe a conexão antes de atender; se falhar, o `accept` ainda tenta.
-    pedir("pre_aceitar", sdp: sdp) { _ in
-      self.esperarConectar { _ in
+    pedir("pre_aceitar", sdp: sdp) { resultado in
+      switch resultado {
+      case .success: Diario.anotar("pre_aceitar ok")
+      case .failure(let r): Diario.anotar("pre_aceitar: \(r.motivo)")
+      }
+      let inicio = Date()
+      self.esperarConectar { conectou in
         if self.acabou { return }
+        Diario.anotar("conexão \(conectou ? "subiu" : "não subiu") em \(Int(Date().timeIntervalSince(inicio) * 1000)) ms (\(self.nomeDaConexao))")
         self.pedir("aceitar", sdp: sdp) { resultado in
           if self.acabou { return }
           switch resultado {
           case .failure(let r):
+            Diario.anotar("aceitar: \(r.motivo)")
             self.falhar(r.motivo)
           case .success:
             // A conexão caiu antes do aceite: o navegador desliga nesse caso, e aqui também.
             if self.caiu || self.pc?.connectionState == .failed {
+              Diario.anotar("aceitar ok, mas a conexão caiu")
               self.falhar("conexao")
               return
             }
@@ -244,8 +304,11 @@ final class LigacaoNativa: NSObject, RTCPeerConnectionDelegate {
             self.trilha?.isEnabled = !self.mudo
             self.estado = .emCurso
             self.atendidaEm = Date()
+            Diario.anotar("aceitar ok; microfone \(self.mudo ? "mudo" : "liberado")")
             self.avisar()
             self.acompanhar()
+            self.medir(depois: 3)
+            self.medir(depois: 10)
           }
         }
       }
@@ -299,6 +362,7 @@ final class LigacaoNativa: NSObject, RTCPeerConnectionDelegate {
 
   private func fechar(_ final: Estado, motivo: String?) {
     if acabou { return }
+    Diario.anotar("fim: \(final.rawValue)\(motivo.map { " (\($0))" } ?? "")")
     acabou = true
     leitura?.invalidate()
     leitura = nil
@@ -312,7 +376,76 @@ final class LigacaoNativa: NSObject, RTCPeerConnectionDelegate {
     for f in aoConectar { f(false) }
     aoColetar.removeAll()
     aoConectar.removeAll()
+    LigacaoNativa.desligarAudioDoApp()
     avisar()
+    // O diário desta ligação vai ao servidor (o convite ainda vale por 2 dias).
+    let funcao = self.funcao, convite = self.convite
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1) { Diario.enviar(funcao: funcao, convite: convite) }
+  }
+
+  // MARK: - O diário
+
+  private var nomeDaColeta: String {
+    switch pc?.iceGatheringState {
+    case .new: return "nova"
+    case .gathering: return "em andamento"
+    case .complete: return "completa"
+    default: return "?"
+    }
+  }
+
+  private var nomeDaConexao: String {
+    pc.map { LigacaoNativa.nome($0.connectionState) } ?? "sem conexão"
+  }
+
+  private static func nome(_ estado: RTCPeerConnectionState) -> String {
+    switch estado {
+    case .new: return "nova"
+    case .connecting: return "conectando"
+    case .connected: return "conectada"
+    case .disconnected: return "desconectada"
+    case .failed: return "falhou"
+    case .closed: return "fechada"
+    default: return "?"
+    }
+  }
+
+  /// Quanto áudio foi e veio, o nível do microfone e o estado do áudio do iPhone.
+  private func medir(depois segundos: TimeInterval) {
+    DispatchQueue.main.asyncAfter(deadline: .now() + segundos) {
+      guard let pc = self.pc, !self.acabou else { return }
+      pc.statistics { relatorio in
+        var enviados = 0, recebidos = 0, perdidos = 0
+        var nivelDoMicrofone = -1.0, nivelRecebido = -1.0
+        var par = "?"
+        for estatistica in relatorio.statistics.values {
+          let v = estatistica.values
+          switch estatistica.type {
+          case "outbound-rtp":
+            enviados += (v["bytesSent"] as? NSNumber)?.intValue ?? 0
+          case "inbound-rtp":
+            recebidos += (v["bytesReceived"] as? NSNumber)?.intValue ?? 0
+            perdidos += (v["packetsLost"] as? NSNumber)?.intValue ?? 0
+            if let n = v["audioLevel"] as? NSNumber { nivelRecebido = n.doubleValue }
+          case "media-source":
+            if let n = v["audioLevel"] as? NSNumber { nivelDoMicrofone = n.doubleValue }
+          case "candidate-pair":
+            if (v["nominated"] as? NSNumber)?.boolValue == true { par = (v["state"] as? String) ?? "?" }
+          default:
+            break
+          }
+        }
+        let sessao = AVAudioSession.sharedInstance()
+        let saida = sessao.currentRoute.outputs.map { $0.portType.rawValue }.joined(separator: "+")
+        let rtc = RTCAudioSession.sharedInstance()
+        let linha = String(
+          format: "+%ds: enviou %d B, recebeu %d B (perdidos %d), mic %.3f, ouvido %.3f, par %@, áudio %@%@, %@/%@, saída %@",
+          Int(segundos), enviados, recebidos, perdidos, nivelDoMicrofone, nivelRecebido, par,
+          rtc.isAudioEnabled ? "ligado" : "DESLIGADO", LigacaoNativa.ligadoPeloApp ? " pelo app" : "",
+          sessao.category.rawValue, sessao.mode.rawValue, saida)
+        Diario.anotar(linha)
+      }
+    }
   }
 
   private func avisar() {
@@ -365,7 +498,7 @@ final class LigacaoNativa: NSObject, RTCPeerConnectionDelegate {
     sdp: String? = nil,
     _ depois: @escaping (Result<[String: Any], Recusa>) -> Void
   ) {
-    LigacaoNativa.pedirAoServidor(funcao: funcao, convite: convite, acao: acao, sdp: sdp, depois)
+    LigacaoNativa.pedirAoServidor(funcao: funcao, convite: convite, acao: acao, sdp: sdp, linhas: nil, depois)
   }
 
   /// Um pedido à `wa-chamada-app` com o convite. A resposta volta na fila principal.
@@ -374,6 +507,7 @@ final class LigacaoNativa: NSObject, RTCPeerConnectionDelegate {
     convite: String,
     acao: String,
     sdp: String? = nil,
+    linhas: [String]? = nil,
     _ depois: @escaping (Result<[String: Any], Recusa>) -> Void
   ) {
     var pedido = URLRequest(url: funcao, timeoutInterval: 12)
@@ -381,6 +515,7 @@ final class LigacaoNativa: NSObject, RTCPeerConnectionDelegate {
     pedido.setValue("application/json", forHTTPHeaderField: "Content-Type")
     var corpo: [String: Any] = ["acao": acao, "convite": convite]
     if let sdp { corpo["sdp"] = sdp }
+    if let linhas { corpo["linhas"] = linhas }
     pedido.httpBody = try? JSONSerialization.data(withJSONObject: corpo)
     URLSession.shared.dataTask(with: pedido) { dados, resposta, erro in
       let status = (resposta as? HTTPURLResponse)?.statusCode ?? 0
@@ -403,7 +538,20 @@ final class LigacaoNativa: NSObject, RTCPeerConnectionDelegate {
   func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {}
   func peerConnection(_ peerConnection: RTCPeerConnection, didRemove stream: RTCMediaStream) {}
   func peerConnectionShouldNegotiate(_ peerConnection: RTCPeerConnection) {}
-  func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceConnectionState) {}
+  func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceConnectionState) {
+    let nome: String
+    switch newState {
+    case .new: nome = "nova"
+    case .checking: nome = "verificando"
+    case .connected: nome = "conectada"
+    case .completed: nome = "completa"
+    case .failed: nome = "falhou"
+    case .disconnected: nome = "desconectada"
+    case .closed: nome = "fechada"
+    default: nome = "?"
+    }
+    Diario.anotar("ICE \(nome)")
+  }
   func peerConnection(_ peerConnection: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) {}
   func peerConnection(_ peerConnection: RTCPeerConnection, didRemove candidates: [RTCIceCandidate]) {}
   func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) {}
@@ -419,6 +567,7 @@ final class LigacaoNativa: NSObject, RTCPeerConnectionDelegate {
 
   func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCPeerConnectionState) {
     DispatchQueue.main.async {
+      Diario.anotar("conexão \(LigacaoNativa.nome(newState))")
       if newState == .connected {
         let fila = self.aoConectar
         self.aoConectar.removeAll()

@@ -30,10 +30,13 @@ import {
 } from './ambiente';
 import { arquivoDaMensagem, type ArquivoRecebido } from './arquivo';
 import { enderecoDoAviso, origemDe, scriptDoAparelho } from './aviso';
+import { avisarLigacaoAPagina, guardaDoAudio } from './audio-da-pagina';
 import {
+  emLigacao,
   enderecoDeChamada,
   iniciarChamadas,
   pedirMicrofone,
+  quandoMudarLigacao,
   temTelaDeChamada,
 } from './chamada-nativa';
 import { AVISAR_COR_DA_BARRA, corDaMensagem, estiloDaBarra } from './cor-da-barra';
@@ -207,6 +210,17 @@ function Tela() {
   // Trocar a chave monta uma WebView nova: é o que o Android pede quando o processo
   // da página morre.
   const [chave, setChave] = useState(0);
+  // Com ligação tocando ou em curso, a página do CRM fica calada (`audio-da-pagina.ts`).
+  const [ligacaoAgora, setLigacaoAgora] = useState(emLigacao);
+
+  useEffect(
+    () =>
+      quandoMudarLigacao((em) => {
+        setLigacaoAgora(em);
+        webview.current?.injectJavaScript(avisarLigacaoAPagina(em));
+      }),
+    [],
+  );
 
   // Com a tela "Sem internet" aberta, a volta da conexão recarrega o site. Só a
   // VOLTA conta: o NetInfo avisa o estado atual ao assinar, e isso não é volta.
@@ -364,6 +378,7 @@ function Tela() {
         onOpenWindow={aoAbrirJanela}
         javaScriptCanOpenWindowsAutomatically
         injectedJavaScript={AVISAR_COR_DA_BARRA}
+        injectedJavaScriptBeforeContentLoaded={guardaDoAudio(ligacaoAgora)}
         onMessage={({ nativeEvent }) => {
           const nova = corDaMensagem(nativeEvent.data);
           if (nova) {
@@ -386,6 +401,7 @@ function Tela() {
         onLoad={() => {
           setSemInternet(false);
           carregou.current = true;
+          webview.current?.injectJavaScript(avisarLigacaoAPagina(emLigacao()));
           if (avisoPendente.current) {
             irPara(avisoPendente.current);
             avisoPendente.current = null;

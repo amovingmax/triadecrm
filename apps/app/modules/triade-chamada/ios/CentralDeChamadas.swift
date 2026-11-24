@@ -26,6 +26,9 @@ final class CentralDeChamadas: NSObject, PKPushRegistryDelegate, CXProviderDeleg
   private static let toqueMaximo: TimeInterval = 60
   /// Tocando, o app pergunta se a ligação continua: um "parar" perdido não deixa tocar.
   private static let leituraTocando: TimeInterval = 3
+  /// Depois do Atender, o prazo para o iPhone ligar o áudio da ligação (`didActivate`).
+  /// Passou, o app liga sozinho (24/11/2026: no primeiro teste o cliente não ouviu nada).
+  private static let esperaDoAudio: TimeInterval = 2
 
   private var registro: PKPushRegistry?
   private let provedor: CXProvider
@@ -41,6 +44,8 @@ final class CentralDeChamadas: NSObject, PKPushRegistryDelegate, CXProviderDeleg
   private var vigias: [UUID: Timer] = [:]
   /// A ligação atendida neste iPhone (uma por vez, como no navegador).
   private var ligacao: LigacaoNativa?
+  /// O iPhone ligou o áudio da ligação (`didActivate`) e ainda não desligou.
+  private var audioDoIPhone = false
 
   /// Os eventos para o JS. Guardados até alguém ouvir: o app pode abrir no meio da ligação.
   private var fila: [(String, [String: Any?])] = []
@@ -66,10 +71,22 @@ final class CentralDeChamadas: NSObject, PKPushRegistryDelegate, CXProviderDeleg
   /// voz que acordou o app só é entregue depois que o registro existe.
   func iniciar() {
     if registro != nil { return }
+    // O WebRTC nunca liga o áudio por conta própria: quem liga é o iPhone, ao atender.
+    LigacaoNativa.audioNoInicio()
     let r = PKPushRegistry(queue: .main)
     r.delegate = self
     r.desiredPushTypes = [.voIP]
     registro = r
+    Diario.anotar("aviso de voz registrado")
+  }
+
+  private var estadoDoApp: String {
+    switch UIApplication.shared.applicationState {
+    case .active: return "app na tela"
+    case .inactive: return "app inativo"
+    case .background: return "app em segundo plano"
+    @unknown default: return "app ?"
+    }
   }
 
   // MARK: - O JS
@@ -140,11 +157,13 @@ final class CentralDeChamadas: NSObject, PKPushRegistryDelegate, CXProviderDeleg
 
   func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
     let token = pushCredentials.token.map { String(format: "%02x", $0) }.joined()
+    if tokenDeVoz != token { Diario.anotar("endereço de voz \(token.prefix(8))…") }
     tokenDeVoz = token
     emitir("onTokenDeVoz", ["token": token])
   }
 
   func pushRegistry(_ registry: PKPushRegistry, didInvalidatePushTokenFor type: PKPushType) {
+    Diario.anotar("a Apple invalidou o endereço de voz")
     tokenDeVoz = nil
   }
 
@@ -158,6 +177,7 @@ final class CentralDeChamadas: NSObject, PKPushRegistryDelegate, CXProviderDeleg
     let evento = dados["evento"] as? String
     // Sem id válido, um id qualquer: a tela de chamada tem de aparecer de todo jeito.
     let uuid = (dados["chamada"] as? String).flatMap { UUID(uuidString: $0) } ?? UUID()
+    Diario.anotar("aviso \(evento ?? "?") \(uuid.uuidString.prefix(8)) (\(estadoDoApp))")
 
     if evento == "tocar" {
       let quem = (dados["quem"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Cliente"
@@ -172,14 +192,24 @@ final class CentralDeChamadas: NSObject, PKPushRegistryDelegate, CXProviderDeleg
       atualizacao.supportsDTMF = false
       let jaTocava = chamadas[uuid] != nil
       chamadas[uuid] = dados
+      // O áudio de ligação configurado ANTES de mostrar a chamada (recomendação da Apple
+      // para o CallKit conseguir ligá-lo ao atender). Configurar não liga nada.
+      LigacaoNativa.prepararAudio()
       provedor.reportNewIncomingCall(with: uuid, update: atualizacao) { erro in
         DispatchQueue.main.async {
-          if erro != nil {
+          if let erro {
             // "Não perturbe", bloqueio do iPhone ou a mesma chamada de novo: não toca.
+            Diario.anotar("tela de chamada recusada pelo iPhone: \((erro as NSError).code)")
             if !jaTocava { self.chamadas[uuid] = nil }
           } else {
+            Diario.anotar("tela de chamada mostrada")
             self.vigiar(uuid, dados)
             self.emitir("onTocando", self.corpoDaChamada(uuid, dados))
+            // O diário de antes (uma abertura pelo aviso, a ligação anterior) vai já.
+            if let convite = dados["convite"] as? String,
+               let funcao = (dados["funcao"] as? String).flatMap(LigacaoNativa.funcaoConfiavel) {
+              Diario.enviar(funcao: funcao, convite: convite)
+            }
           }
           completion()
         }
@@ -259,6 +289,7 @@ final class CentralDeChamadas: NSObject, PKPushRegistryDelegate, CXProviderDeleg
   // MARK: - CallKit
 
   func providerDidReset(_ provider: CXProvider) {
+    Diario.anotar("o iPhone reiniciou as chamadas do app")
     // O sistema derrubou as chamadas: a da Meta também acaba (ela cobra a ligação aberta).
     ligacao?.desligar()
     for uuid in chamadas.keys {
@@ -273,8 +304,10 @@ final class CentralDeChamadas: NSObject, PKPushRegistryDelegate, CXProviderDeleg
   func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
     let uuid = action.callUUID
     let livre = ligacao == nil || ligacao?.estado == .encerrada || ligacao?.estado == .falhou
+    Diario.anotar("Atender tocado (\(estadoDoApp))")
     guard livre, let dados = chamadas[uuid], let nova = LigacaoNativa(uuid: uuid, dados: dados) else {
       // Outra ligação em curso, a chamada já esquecida ou um aviso sem convite válido.
+      Diario.anotar("Atender sem ligação válida (livre=\(livre))")
       action.fail()
       provedor.reportCall(with: uuid, endedAt: Date(), reason: .failed)
       esquecer(uuid)
@@ -297,16 +330,27 @@ final class CentralDeChamadas: NSObject, PKPushRegistryDelegate, CXProviderDeleg
     }
     ligacao = nova
     // O áudio de ligação, antes de o CallKit ativá-lo (voz, com o eco cancelado).
+    audioDoIPhone = false
     LigacaoNativa.prepararAudio()
     action.fulfill()
     emitir("onEstado", corpoDaLigacao(nova))
     nova.atender()
+    // O iPhone liga o áudio logo depois do Atender. Se não ligar (outro áudio do app
+    // ativo, como a página do CRM, impede o CallKit), o app liga sozinho: ligação
+    // muda é o pior dos mundos (teste de 24/11/2026).
+    DispatchQueue.main.asyncAfter(deadline: .now() + CentralDeChamadas.esperaDoAudio) {
+      guard self.ligacao === nova, nova.estado == .conectando || nova.estado == .emCurso,
+            !self.audioDoIPhone else { return }
+      Diario.anotar("o iPhone não ligou o áudio em \(Int(CentralDeChamadas.esperaDoAudio)) s: o app liga")
+      LigacaoNativa.audioPeloApp()
+    }
   }
 
   func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
     let uuid = action.callUUID
     let atendida = atendidas.contains(uuid)
     let dados = chamadas[uuid] ?? [:]
+    Diario.anotar(atendida ? "Desligar tocado" : "Recusar tocado")
     esquecer(uuid)
     // Recusar só para de tocar NESTE iPhone: a ligação segue tocando para o resto da
     // equipe, e o servidor fica sabendo para não mandar "parar" a este aparelho.
@@ -330,10 +374,14 @@ final class CentralDeChamadas: NSObject, PKPushRegistryDelegate, CXProviderDeleg
 
   func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
     // O WebRTC só grava e toca depois disto: quem abre o áudio da ligação é o CallKit.
+    audioDoIPhone = true
+    Diario.anotar("o iPhone ligou o áudio (\(audioSession.category.rawValue), \(audioSession.mode.rawValue))")
     LigacaoNativa.audioAtivo(audioSession)
   }
 
   func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
+    audioDoIPhone = false
+    Diario.anotar("o iPhone desligou o áudio")
     LigacaoNativa.audioInativo(audioSession)
   }
 
