@@ -418,9 +418,11 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
   },
   {
     id: 'I12',
-    titulo: 'Perto do Midway Mall (nenhum imóvel nosso perto)',
+    titulo: 'Perto do Midway Mall (o terreno de 900 m² fica na mesma região)',
     grupo: 'identificar',
-    origem: 'nota 14 (e) e nota 7 (a)',
+    // Desde o pino do TE0006 (24/11, 3,7 km do Midway Mall), o mapa diz "na mesma região":
+    // confirmar o terreno pela foto (nota 14 c) ou perguntar o lugar (nota 7 a) estão certos.
+    origem: 'nota 14 (c) e (e), nota 7 (a)',
     critico: true,
     ...TERCA,
     nome: 'Lúcia Campos',
@@ -435,6 +437,7 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       acoes: ['responder', 'passar_para_corretor'],
       nunca: [NAO_TEMOS, r(/R\$/, 'dá um valor sem saber o imóvel'), PERGUNTA_DE_AREA],
       buscaNoMapa: true,
+      foto: { quando: 'pode', codigo: /^TE0006/i },
     },
   },
   {
@@ -1103,6 +1106,8 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
     espera: {
       acoes: RESPONDEU,
       nunca: [LINK_OU_CONVITE, r(/link|agenda/i, 'manda o link da agenda na primeira resposta')],
+      // A foto para confirmar o terreno é um jeito certo de responder (bateria de 24/11).
+      foto: { quando: 'pode', codigo: /^TE0004/i },
     },
   },
   // ================================================================ limites
