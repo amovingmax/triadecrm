@@ -197,7 +197,14 @@ function saidaDoModelo(mudanca: Partial<SaidaDoAtendenteV6> = {}): SaidaDoAtende
 function montar(
   saida: SaidaDoAtendenteV6,
   enviarLink: (argumentos: Record<string, unknown>) => unknown = () => ({ ok: true, mensagem_id: 'm', link: 'x', convite_id: 'c' }),
-  opcoes: { erroNoLink?: string; entrada?: Record<string, unknown>; caderno?: unknown[] } = {},
+  opcoes: {
+    erroNoLink?: string;
+    entrada?: Record<string, unknown>;
+    caderno?: unknown[];
+    rpcs?: Record<string, (argumentos: Record<string, unknown>) => unknown>;
+    arquivos?: Record<string, Blob | Error>;
+    erroNaSubida?: string;
+  } = {},
 ) {
   const banco = bancoFalso(
     {
@@ -218,7 +225,10 @@ function montar(
         ia_atendente_responder: () => ({ ok: true, message_id: 'r' }),
         ia_atendente_passar: () => ({ ok: true }),
         ia_atendente_ofertas_por_email: () => ({ ok: true, gravado: true }),
+        ...opcoes.rpcs,
       },
+      ...(opcoes.arquivos === undefined ? {} : { arquivos: opcoes.arquivos }),
+      ...(opcoes.erroNaSubida === undefined ? {} : { erroNaSubida: opcoes.erroNaSubida }),
     },
   );
   const cliente: ClienteDoBanco =
@@ -562,7 +572,7 @@ describe('a busca no mapa (v7, 23/11/2026): só com o mapa no worker', () => {
   }
   const uso = { entrada: 100, saida: 20, escritaDeCache: 0, leituraDeCache: 0 };
 
-  it('com mapa: a v7 com a ferramenta; a busca vai ao mapa e a resposta cita a volta final', async () => {
+  it('com mapa: a v8 (a v7 com a foto) com a ferramenta; a busca vai ao mapa e a resposta cita a volta final', async () => {
     const montado = montar(saidaDoModelo());
     const { contexto, pedidos, buscas } = comMapa(montado, [
       {
@@ -573,7 +583,13 @@ describe('a busca no mapa (v7, 23/11/2026): só com o mapa no worker', () => {
         modelo: 'claude-haiku-5-5',
         paradaPor: 'tool_use',
       },
-      { tipo: 'final', json: saidaDoModelo(), uso, modelo: 'claude-haiku-5-5', paradaPor: 'end_turn' },
+      {
+        tipo: 'final',
+        json: { ...saidaDoModelo(), fotoParaConfirmar: null },
+        uso,
+        modelo: 'claude-haiku-5-5',
+        paradaPor: 'end_turn',
+      },
     ]);
     const r = await atenderCliente(contexto, PAYLOAD);
     expect(r).toMatchObject({ feito: true, motivo: 'enviar_link_da_agenda' });
@@ -582,10 +598,10 @@ describe('a busca no mapa (v7, 23/11/2026): só com o mapa no worker', () => {
     expect(pedidos[0]?.ferramentas.map((f) => f.nome)).toEqual(['buscar_no_mapa']);
     expect(pedidos[0]?.sistema).toContain('A BUSCA NO MAPA:');
     const runs = montado.banco.tabelas.ai_runs as Record<string, unknown>[];
-    expect(runs.map((x) => x.prompt_version)).toEqual(['atendente-imova@v7', 'atendente-imova@v7']);
+    expect(runs.map((x) => x.prompt_version)).toEqual(['atendente-imova@v8', 'atendente-imova@v8']);
     expect(montado.chamadas('ia_atendente_enviar_link')[0]).toMatchObject({
       p_ai_run_id: runs[1]?.id,
-      p_prompt_version: 'atendente-imova@v7',
+      p_prompt_version: 'atendente-imova@v8',
     });
     expect(montado.pedidos).toHaveLength(0);
   });
@@ -596,5 +612,119 @@ describe('a busca no mapa (v7, 23/11/2026): só com o mapa no worker', () => {
     const runs = montado.banco.tabelas.ai_runs as Record<string, unknown>[];
     expect(runs.map((x) => x.prompt_version)).toEqual(['atendente-imova@v6']);
     expect(montado.pedidos[0]?.sistema).not.toContain('A BUSCA NO MAPA:');
+  });
+});
+
+describe('a foto para confirmar o imóvel (v8, 24/11/2026)', () => {
+  const uso = { entrada: 100, saida: 20, escritaDeCache: 0, leituraDeCache: 0 };
+  const CAPA = 'te0004/capa.jpg';
+  const TEXTO = 'Acho que já sei qual é! Temos um terreno de frente para o mar em Tabatinga, perto de Camurupim.';
+  const saidaComFoto = (legenda = 'É este aqui que você viu?') => ({
+    ...saidaDoModelo({ acao: 'responder', mensagem: TEXTO, agenda: null }),
+    fotoParaConfirmar: { imovelCodigo: 'TE0004', legenda },
+  });
+
+  function comMapa(saida: Record<string, unknown>, opcoes: Parameters<typeof montar>[2] = {}) {
+    const montado = montar(saidaDoModelo(), undefined, opcoes);
+    const contexto: ContextoDaIa = {
+      ...montado.contexto,
+      mapa: { buscar: () => Promise.resolve({ lugares: [], doCache: false }) },
+      modelo: {
+        ...montado.contexto.modelo,
+        conversarComFerramentas: () =>
+          Promise.resolve({ tipo: 'final', json: saida, uso, modelo: 'claude-haiku-5-5', paradaPor: 'end_turn' }),
+      },
+    };
+    return { ...montado, contexto };
+  }
+  const capaExiste = { ia_atendente_capa_do_imovel: () => ({ anuncio_id: 'a', codigo: 'TE0004_IMOVA', caminho: CAPA }) };
+  const fotoNoBalde = { [`anuncios/${CAPA}`]: new Blob(['jpg']) };
+
+  it('o texto sai sem a pergunta, a capa é copiada para mensagens/ia/<conversa>/ e a foto sai depois, com a legenda', async () => {
+    const m = comMapa(saidaComFoto(), {
+      rpcs: { ...capaExiste, ia_atendente_mostrar_foto: () => ({ ok: true, message_id: 'f' }) },
+      arquivos: fotoNoBalde,
+    });
+    const r = await atenderCliente(m.contexto, PAYLOAD);
+    expect(r).toMatchObject({ feito: true, motivo: 'respondeu_com_foto', detalhes: { foto: { codigo: 'TE0004_IMOVA', saiu: true } } });
+    expect(m.chamadas('ia_atendente_responder')[0]?.p_texto).toBe(TEXTO);
+    expect(m.banco.downloads).toEqual([{ balde: 'anuncios', caminho: CAPA }]);
+    expect(m.banco.uploads).toHaveLength(1);
+    expect(m.banco.uploads[0]).toMatchObject({ balde: 'mensagens', tipo: 'image/jpeg' });
+    expect(m.banco.uploads[0]?.caminho).toMatch(new RegExp(`^ia/${CONVERSA}/[0-9a-f-]{36}\\.jpg$`));
+    const nomes = m.banco.chamadasDeRpc.map((c) => c.nome);
+    expect(nomes.indexOf('ia_atendente_mostrar_foto')).toBeGreaterThan(nomes.indexOf('ia_atendente_responder'));
+    expect(m.chamadas('ia_atendente_mostrar_foto')[0]).toMatchObject({
+      p_conversation_id: CONVERSA,
+      p_em_resposta_a: ULTIMA,
+      p_imovel_codigo: 'TE0004_IMOVA',
+      p_media_path: m.banco.uploads[0]?.caminho,
+      p_legenda: 'É este aqui que você viu?',
+      p_prompt_version: 'atendente-imova@v8',
+    });
+  });
+
+  it('anúncio sem foto (ou código desconhecido): a pergunta vai no texto e nenhuma foto é pedida', async () => {
+    const m = comMapa(saidaComFoto(), { rpcs: { ia_atendente_capa_do_imovel: () => null } });
+    const r = await atenderCliente(m.contexto, PAYLOAD);
+    expect(r).toMatchObject({ feito: true, motivo: 'responder', detalhes: { foto: { saiu: false } } });
+    expect(m.chamadas('ia_atendente_responder')[0]?.p_texto).toBe(`${TEXTO} É este aqui que você viu?`);
+    expect(m.chamadas('ia_atendente_mostrar_foto')).toEqual([]);
+    expect(m.banco.uploads).toEqual([]);
+  });
+
+  it('a mesma foto já foi mandada nesta conversa: não copia de novo, a pergunta vai no texto', async () => {
+    const entrada = entradaNoBanco();
+    const mensagens = [
+      ...(entrada.mensagens as Record<string, unknown>[]).slice(0, 2),
+      {
+        id: 'aaaaaaaa-0000-4000-8000-000000000009',
+        de: 'ia',
+        quem: null,
+        quando: '11/11 14:30',
+        texto: '[foto do anúncio TE0004_IMOVA que você mandou] É este aqui que você viu?',
+      },
+      ...(entrada.mensagens as Record<string, unknown>[]).slice(2),
+    ];
+    const m = comMapa(saidaComFoto(), { rpcs: capaExiste, arquivos: fotoNoBalde, entrada: { ...entrada, mensagens } });
+    await atenderCliente(m.contexto, PAYLOAD);
+    expect(m.banco.downloads).toEqual([]);
+    expect(m.chamadas('ia_atendente_responder')[0]?.p_texto).toBe(`${TEXTO} É este aqui que você viu?`);
+    expect(m.chamadas('ia_atendente_mostrar_foto')).toEqual([]);
+  });
+
+  it('o Storage recusou a cópia: a pergunta vai no texto, e a resposta não cai', async () => {
+    const m = comMapa(saidaComFoto(), { rpcs: capaExiste, arquivos: fotoNoBalde, erroNaSubida: 'sem espaço' });
+    const r = await atenderCliente(m.contexto, PAYLOAD);
+    expect(r.feito).toBe(true);
+    expect(m.chamadas('ia_atendente_responder')[0]?.p_texto).toBe(`${TEXTO} É este aqui que você viu?`);
+    expect(m.chamadas('ia_atendente_mostrar_foto')).toEqual([]);
+  });
+
+  it('o banco recusou a foto depois do texto: a resposta conta como respondida, sem foto', async () => {
+    const m = comMapa(saidaComFoto(), {
+      rpcs: { ...capaExiste, ia_atendente_mostrar_foto: () => ({ ok: false, motivo: 'chegou_mensagem_nova' }) },
+      arquivos: fotoNoBalde,
+    });
+    const r = await atenderCliente(m.contexto, PAYLOAD);
+    expect(r).toMatchObject({ feito: true, motivo: 'responder', detalhes: { foto: { saiu: false } } });
+    expect(m.chamadas('ia_atendente_responder')[0]?.p_texto).toBe(TEXTO);
+  });
+
+  it('legenda vazia vira a padrão; o texto da resposta nunca leva a pergunta duas vezes', async () => {
+    const m = comMapa(saidaComFoto('   '), { rpcs: { ia_atendente_capa_do_imovel: () => null } });
+    await atenderCliente(m.contexto, PAYLOAD);
+    expect(m.chamadas('ia_atendente_responder')[0]?.p_texto).toBe(`${TEXTO} É este aqui que você viu?`);
+  });
+
+  it('sem foto pedida, nada muda: nem capa, nem cópia', async () => {
+    const m = comMapa({ ...saidaDoModelo({ acao: 'responder', mensagem: TEXTO, agenda: null }), fotoParaConfirmar: null }, {
+      rpcs: capaExiste,
+      arquivos: fotoNoBalde,
+    });
+    const r = await atenderCliente(m.contexto, PAYLOAD);
+    expect(r).toMatchObject({ feito: true, motivo: 'responder' });
+    expect(m.chamadas('ia_atendente_capa_do_imovel')).toEqual([]);
+    expect(m.banco.downloads).toEqual([]);
   });
 });

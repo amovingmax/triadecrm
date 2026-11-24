@@ -37,6 +37,7 @@ import {
   type ImovelDaBaseV2,
   type PromptVersionado,
   type SaidaDoAtendenteV6,
+  type SaidaDoAtendenteV8,
   type TipoDaAgenda,
   CANAIS_DE_CHEGADA,
   MODELOS,
@@ -46,16 +47,17 @@ import {
   MAX_BUSCAS_NO_MAPA,
   MAX_VOLTAS_DO_ATENDENTE,
   atendenteImovaV6,
-  atendenteImovaV7,
+  atendenteImovaV8,
   reidratar,
   sistemaComBaseV6,
-  sistemaComBaseV7,
+  sistemaComBaseV8,
 } from '@komune/prompts';
 
 import { ErroDaEsteira } from '../fila/esteira';
 import { buscarContatoDaFicha } from './banco';
 import { ferramentaBuscarNoMapa } from './busca-no-mapa';
 import { ErroDoModelo, RespostaIlegivelError } from './cliente';
+import { type FotoPreparada, prepararFotoDoImovel, textoComALegenda } from './foto-do-imovel';
 import {
   aplicarReconhecimentos,
   ensinarFotos,
@@ -466,11 +468,12 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
 
   // A busca no mapa (v7, 23/11/2026): com o mapa no worker (NOMINATIM_USER_AGENT), a IA
   // tem a ferramenta `buscar_no_mapa` e a chamada vira um laço; sem ele, a v6 de sempre.
+  // Desde 24/11/2026, com o mapa vai a v8: a v7 com a foto para confirmar o imóvel.
   const mapa = contexto.mapa;
   const comMapa = mapa !== undefined && typeof contexto.modelo.conversarComFerramentas === 'function';
   const modelo = (await modeloEscolhido(contexto)) as typeof atendenteImovaV6.modelo;
-  const prompt: PromptVersionado<EntradaDoAtendenteV6, SaidaDoAtendenteV6> = comMapa
-    ? { ...atendenteImovaV7, modelo, sistema: sistemaComBaseV7(base) }
+  const prompt: PromptVersionado<EntradaDoAtendenteV6, SaidaDoAtendenteV6 | SaidaDoAtendenteV8> = comMapa
+    ? { ...atendenteImovaV8, modelo, sistema: sistemaComBaseV8(base) }
     : { ...atendenteImovaV6, modelo, sistema: sistemaComBaseV6(base) };
 
   let executada;
@@ -586,6 +589,9 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   // O que de fato saiu: na recusa do imóvel, a ação do modelo era o link e o que saiu
   // foi a pergunta.
   let feita: string = saida.acao;
+  // A foto para confirmar o imóvel (v8): preparada no "responder", e se saiu.
+  let foto: FotoPreparada | null = null;
+  let fotoSaiu = false;
   switch (saida.acao) {
     case 'nao_responder': {
       await rpc(contexto, 'ia_atendente_registrar_silencio', {
@@ -689,7 +695,55 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
           executada.aiRunId,
         );
       }
-      resultado = await rpc(contexto, 'ia_atendente_responder', { ...comum, p_texto: texto, p_detalhes: detalhes });
+      // A foto para confirmar o imóvel (v8, 24/11/2026): preparada antes, para a
+      // legenda ir no texto quando a foto não puder sair; mandada logo depois do texto.
+      const pedidoDeFoto = 'fotoParaConfirmar' in saida ? saida.fotoParaConfirmar : null;
+      if (pedidoDeFoto !== null) {
+        foto = await prepararFotoDoImovel(
+          contexto,
+          payload.conversation_id,
+          {
+            imovelCodigo: pedidoDeFoto.imovelCodigo,
+            legenda: semOCalendlyNoTexto(limparTexto(reidratar(pedidoDeFoto.legenda, executada.mapa))),
+          },
+          e.mensagens ?? [],
+        );
+      }
+      const textoQueSai = foto !== null && !foto.pronta ? textoComALegenda(texto, foto.legenda) : texto;
+      const detalhesComFoto =
+        foto === null ? detalhes : { ...detalhes, foto: { codigo: foto.codigo, pronta: foto.pronta } };
+      resultado = await rpc(contexto, 'ia_atendente_responder', {
+        ...comum,
+        p_texto: textoQueSai,
+        p_detalhes: detalhesComFoto,
+      });
+      if (resultado.ok === true && foto !== null && foto.pronta) {
+        const r = await rpc(contexto, 'ia_atendente_mostrar_foto', {
+          p_conversation_id: payload.conversation_id,
+          p_em_resposta_a: payload.message_id,
+          p_imovel_codigo: foto.codigo,
+          p_media_path: foto.caminho,
+          p_legenda: foto.legenda,
+          p_detalhes: { motivo: detalhes.motivo },
+          p_ai_run_id: executada.aiRunId,
+          p_prompt_version: executada.promptVersion,
+        }).catch((erro: unknown) => ({ ok: false, motivo: erro instanceof Error ? erro.message : String(erro) }));
+        fotoSaiu = r.ok === true;
+        if (fotoSaiu) feita = 'respondeu_com_foto';
+        else {
+          contexto.logger.warn('a foto do imóvel não saiu depois do texto', {
+            conversa: payload.conversation_id,
+            codigo: foto.codigo,
+            motivo: r.motivo ?? null,
+          });
+        }
+      } else if (foto !== null && !foto.pronta) {
+        contexto.logger.info('a foto do imóvel não foi preparada: a pergunta foi no texto', {
+          conversa: payload.conversation_id,
+          codigo: foto.codigo,
+          motivo: foto.motivo,
+        });
+      }
       break;
     }
   }
@@ -703,6 +757,7 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
     treino: e.treino === true,
     anotadas,
     fotos_ensinadas: fotosEnsinadas,
+    foto: foto === null ? null : { codigo: foto.codigo, saiu: fotoSaiu, motivo: foto.pronta ? null : foto.motivo },
     confianca: saida.confianca,
     custo_usd: executada.custoUsd,
   });
@@ -711,6 +766,12 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
     motivo: resultado.ok === true ? feita : String(resultado.motivo ?? 'recusado'),
     aiRunId: executada.aiRunId,
     custoUsd: executada.custoUsd,
-    detalhes: { acao: saida.acao, anotadas, fotosEnsinadas, ...(saida.agenda === null ? {} : { agenda: saida.agenda }) },
+    detalhes: {
+      acao: saida.acao,
+      anotadas,
+      fotosEnsinadas,
+      ...(saida.agenda === null ? {} : { agenda: saida.agenda }),
+      ...(foto === null ? {} : { foto: { codigo: foto.codigo, saiu: fotoSaiu } }),
+    },
   };
 }

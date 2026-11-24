@@ -25,7 +25,12 @@ import {
  * (`atendente.test.ts`) e no banco (pgTAP 203).
  */
 
-const CONTATO = { leadId: 'lead-24', nome: 'Janio Ramalho', empresa: null, telefones: ['+5584988776655'] };
+const CONTATO = {
+  leadId: 'lead-24',
+  nome: 'Janio Ramalho',
+  empresa: null,
+  telefones: ['+5584988776655'],
+};
 
 describe('atendente-imova@v8', () => {
   it('é a vigente; a v7 continua no catálogo', () => {
@@ -43,7 +48,12 @@ describe('atendente-imova@v8', () => {
     expect(v8.entrada).toBe(v7.entrada);
     expect(v8.ferramentas).toEqual(v7.ferramentas);
     expect(v8.montarMensagem).toBe(v7.montarMensagem);
-    expect([v8.modelo, v8.proposito, v8.escala, v8.maxTokens]).toEqual([v7.modelo, v7.proposito, v7.escala, v7.maxTokens]);
+    expect([v8.modelo, v8.proposito, v8.escala, v8.maxTokens]).toEqual([
+      v7.modelo,
+      v7.proposito,
+      v7.escala,
+      v7.maxTokens,
+    ]);
     expect(v8.tokensDeSistema).toBeGreaterThan(v7.tokensDeSistema);
   });
 
@@ -64,13 +74,21 @@ describe('atendente-imova@v8', () => {
     if (base === undefined) throw new Error('a v8 tem exemplos');
     expect(v8.saida.safeParse({ ...base, fotoParaConfirmar: null }).success).toBe(true);
     expect(
-      v8.saida.safeParse({ ...base, fotoParaConfirmar: { imovelCodigo: 'TE0006', legenda: LEGENDA_PADRAO_DA_FOTO } }).success,
+      v8.saida.safeParse({
+        ...base,
+        fotoParaConfirmar: { imovelCodigo: 'TE0006', legenda: LEGENDA_PADRAO_DA_FOTO },
+      }).success,
     ).toBe(true);
     expect(
-      v8.saida.safeParse({ ...base, fotoParaConfirmar: { imovelCodigo: 'TE0006', legenda: 'a'.repeat(TETO_DA_LEGENDA + 1) } })
+      v8.saida.safeParse({
+        ...base,
+        fotoParaConfirmar: { imovelCodigo: 'TE0006', legenda: 'a'.repeat(TETO_DA_LEGENDA + 1) },
+      }).success,
+    ).toBe(false);
+    expect(
+      v8.saida.safeParse({ ...base, fotoParaConfirmar: { imovelCodigo: '', legenda: 'É este?' } })
         .success,
     ).toBe(false);
-    expect(v8.saida.safeParse({ ...base, fotoParaConfirmar: { imovelCodigo: '', legenda: 'É este?' } }).success).toBe(false);
     const { fotoParaConfirmar: _sem, ...semOCampo } = { ...base, fotoParaConfirmar: null };
     expect(v8.saida.safeParse(semOCampo).success).toBe(false);
     const esquema = JSON.stringify(esquemaDeSaida(v8));
@@ -91,7 +109,11 @@ describe('atendente-imova@v8', () => {
   it('a montagem com a base passa na auditoria', () => {
     expect(varrerMontagem(sistemaComBaseV8(BASE_DO_ENSAIO_V5))).toEqual([]);
     for (const e of v8.exemplos) {
-      const chamada = prepararChamada({ ...v8, sistema: sistemaComBaseV8(BASE_DO_ENSAIO_V5) }, e.entrada, CONTATO);
+      const chamada = prepararChamada(
+        { ...v8, sistema: sistemaComBaseV8(BASE_DO_ENSAIO_V5) },
+        e.entrada,
+        CONTATO,
+      );
       expect(chamada.sistema).toContain('A FOTO PARA CONFIRMAR O IMÓVEL');
     }
   });

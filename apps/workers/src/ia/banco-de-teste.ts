@@ -42,6 +42,8 @@ export interface OpcoesDoBancoFalso {
    * Storage de verdade responde. Um `Error` é lançado no download (rede caiu no meio).
    */
   readonly arquivos?: Record<string, Blob | Error>;
+  /** A subida ao Storage responde este erro (a foto da IA, 24/11/2026). */
+  readonly erroNaSubida?: string;
 }
 
 export interface BancoFalso {
@@ -53,6 +55,8 @@ export interface BancoFalso {
   readonly acessos: string[];
   /** Todo download do Storage, na ordem. */
   readonly downloads: { balde: string; caminho: string }[];
+  /** Toda subida ao Storage, na ordem, com o tipo do arquivo. */
+  readonly uploads: { balde: string; caminho: string; tipo: string | null }[];
 }
 
 /**
@@ -194,6 +198,7 @@ export function bancoFalso(
   const chamadasDeRpc: { nome: string; argumentos: Record<string, unknown> }[] = [];
   const acessos: string[] = [];
   const downloads: { balde: string; caminho: string }[] = [];
+  const uploads: { balde: string; caminho: string; tipo: string | null }[] = [];
   const banco: TabelasFalsas = { ...tabelas };
   const linhasDe = (tabela: string): LinhaFalsa[] => (banco[tabela] ??= []);
 
@@ -274,6 +279,13 @@ export function bancoFalso(
                 : { data: arquivo, error: null },
             );
           },
+          async upload(caminho: string, _dados: unknown, opcoesDaSubida?: { contentType?: string }) {
+            if (opcoes.erroNaSubida !== undefined) {
+              return await Promise.resolve({ data: null, error: { message: opcoes.erroNaSubida } });
+            }
+            uploads.push({ balde, caminho, tipo: opcoesDaSubida?.contentType ?? null });
+            return await Promise.resolve({ data: { path: caminho }, error: null });
+          },
         };
       },
     },
@@ -285,5 +297,6 @@ export function bancoFalso(
     chamadasDeRpc,
     acessos,
     downloads,
+    uploads,
   };
 }
