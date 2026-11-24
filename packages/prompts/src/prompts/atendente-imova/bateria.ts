@@ -198,7 +198,8 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       algum: [NOVECENTOS_PRECO, r(/terreno[^?]*\?/i, 'confirma o terreno antes do valor')],
       nunca: [
         NAO_TEMOS,
-        r(/parnamirim|bonor|capim macio/i, 'oferece outro terreno no lugar'),
+        // Capim Macio saiu daqui em 24/11: é o bairro do próprio terreno (FICHA 1 nova).
+        r(/parnamirim|bonor|3\.000 ?m²/i, 'oferece outro terreno no lugar'),
         PERGUNTA_DE_AREA,
       ],
     },
@@ -496,11 +497,10 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
     espera: {
       acoes: RESPONDEU,
       deve: [NOVECENTOS_PRECO],
+      // Desde 24/11 a FICHA 1 deixa dizer a rua e o bairro (decisão do dono); a esquina
+      // e o que fica perto, além da Monte Sinai, continuam sem confirmação.
       nunca: [
-        r(
-          /etelvino|capim macio|cidade jardim|nelson queiroz|monte sinai/i,
-          'afirma bairro ou rua (FICHA 1)',
-        ),
+        r(/esquina|nelson queiroz|cidade jardim/i, 'afirma a esquina ou outro bairro (FICHA 1)'),
         LINK_OU_CONVITE,
       ],
     },
