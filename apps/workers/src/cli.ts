@@ -12,7 +12,17 @@ export type WorkerCommand = (typeof WORKER_COMMANDS)[number];
  */
 export const OPCOES_POR_COMANDO: Record<WorkerCommand, readonly string[]> = {
   wa: ['uma-vez', 'conectar', 'sincronizar-modelos'],
-  ai: ['uma-vez', 'chamada-de-teste', 'foto', 'ensaio'],
+  ai: [
+    'uma-vez',
+    'chamada-de-teste',
+    'foto',
+    'ensaio',
+    'versao',
+    'repeticoes',
+    'teto',
+    'juiza',
+    'casos',
+  ],
   rotas: ['uma-vez', 'geocodificar'],
   mercado: ['uma-vez', 'fonte', 'ensaio'],
 };
@@ -45,6 +55,11 @@ Opções de "ai":
                          Manda os cenários da IA que atende (a visita pelo link) ao modelo
                          de verdade, confere cada resposta e imprime o que errou e o custo.
                          Conversas de mentira: nada sai para cliente nenhum.
+  --ensaio=bateria [--versao=7] [--repeticoes=1] [--teto=8] [--juiza=nao] [--casos=I01,A04]
+                         Os 40 casos da bateria (conversas reais e regras do caderno) com a
+                         base de PRODUÇÃO, pelo caminho da IA que atende; cada resposta passa
+                         pela régua e pela IA avaliadora. Para no teto (US$, até 20). Imprime
+                         o relatório e o resultado em JSON. Nenhuma mensagem sai.
 
 Opções de "rotas":
   --geocodificar         Faz UMA passada de geocodificação no Nominatim (1 req/s) e sai.

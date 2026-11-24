@@ -33,7 +33,12 @@ import {
 import { modeloEscolhido } from './atendente';
 import { type ContextoDaIa, executar } from './execucao';
 
-export const ENSAIOS = ['atendente-imova'] as const;
+/**
+ * `atendente-imova`: os cenários de agenda da v5, com a base de mentira (11/11/2026).
+ * `bateria`: os 40 casos reais com a base de produção e a avaliadora (23/11/2026, em
+ * `bateria-do-atendente.ts`).
+ */
+export const ENSAIOS = ['atendente-imova', 'bateria'] as const;
 export type Ensaio = (typeof ENSAIOS)[number];
 
 export function eEnsaio(valor: unknown): valor is Ensaio {
