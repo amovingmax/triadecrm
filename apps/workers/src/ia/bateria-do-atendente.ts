@@ -257,6 +257,8 @@ export async function rodarBateria(
                     busca,
                     logger: contexto.logger,
                     maxBuscas: MAX_BUSCAS_NO_MAPA,
+                    // Sem isto a régua via "não buscou no mapa" (bateria v8, 24/11/2026).
+                    uso,
                   }),
                 },
                 { maxVoltas: MAX_VOLTAS_DO_ATENDENTE },

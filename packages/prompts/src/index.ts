@@ -122,6 +122,7 @@ export {
   BLOCO_DA_FOTO,
   LEGENDA_PADRAO_DA_FOTO,
   TETO_DA_LEGENDA,
+  TROCAS_DO_CORRETOR,
   type SaidaDoAtendenteV8,
   atendenteImovaV8,
   sistemaComBaseV8,

@@ -21,6 +21,8 @@
  *   depois do "é esse sim". O exemplo é o modelo que o usuário pediu, sem a metragem (a
  *   nota 13 do caderno proíbe confirmar pela área).
  * - A linha da saída ganha o campo novo.
+ * - "Corretor" sai das regras herdadas (`TROCAS_DO_CORRETOR`): vale o que a nota 9 (d) do
+ *   caderno manda, "diga que vai verificar e retorna".
  *
  * Entrada, ferramenta, mensagem e exemplos são os da v7 (os exemplos com
  * `fotoParaConfirmar: null`, mais um da foto). Voltar à v7 é trocar o número em `VIGENTES`
@@ -94,7 +96,42 @@ Na conversa, a foto que você mandou aparece como "[foto do anúncio ... que voc
 Nunca escreva que vai mandar a foto nem a descreva: ela vai sozinha. É a única foto que sai
 daqui; se ele pedir mais fotos ou vídeo, siga o caderno.`;
 
-const sistema = `${trocarUmaVez(v7.sistema, OFERTAS_NA_SAIDA, OFERTAS_E_FOTO_NA_SAIDA)}\n\n${BLOCO_DA_FOTO}`;
+/**
+ * "Corretor" sai das regras herdadas (24/11/2026). A bateria da v8 mostrou a IA dizendo
+ * "já vou passar a conversa para um corretor" em 5 de 9 passagens: as regras antigas
+ * mandavam isso, e só a nota 9 (d) do caderno ("Nunca diga corretor: diga que vai
+ * verificar e retorna") desmentia. Ficam o nome da ação (`passar_para_corretor`), o
+ * pedido do cliente ("pede corretor") e a proibição da frase da visita.
+ */
+export const TROCAS_DO_CORRETOR: readonly (readonly [string, string])[] = [
+  [
+    'Na passagem, a mensagem responde o que der e diz que você já vai passar para um corretor,',
+    'Na passagem, a mensagem responde o que der e diz que você vai verificar e já retorna,',
+  ],
+  [
+    'Não sabe? Diga que vai confirmar com o corretor e, se for importante para ele, passe.',
+    'Não sabe? Diga que vai verificar e retorna e, se for importante para ele, passe.',
+  ],
+  ['passe para o corretor.', 'passe para a equipe.'],
+  [
+    'vai confirmar o valor atualizado com o corretor.',
+    'vai verificar o valor atualizado e retorna.',
+  ],
+  ['diga que vai confirmar\n  com o corretor.', 'diga que vai verificar\n  e retorna.'],
+  ['diga só que vai confirmar com o corretor.', 'diga só que vai verificar e retorna.'],
+];
+
+function semCorretor(texto: string): string {
+  let saida = texto;
+  for (const [de, para] of TROCAS_DO_CORRETOR) {
+    if (!saida.includes(de))
+      throw new Error(`atendente-imova@v8: a regra herdada mudou, falta "${de}"`);
+    saida = saida.split(de).join(para);
+  }
+  return saida;
+}
+
+const sistema = `${trocarUmaVez(semCorretor(v7.sistema), OFERTAS_NA_SAIDA, OFERTAS_E_FOTO_NA_SAIDA)}\n\n${BLOCO_DA_FOTO}`;
 
 /** O bloco de sistema de uma chamada da v8: as regras, mais a base da Imova (a da v2). */
 export function sistemaComBaseV8(base: BaseDoAtendenteV2): string {

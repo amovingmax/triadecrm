@@ -240,7 +240,7 @@ describe('preços e conta por chamada', () => {
         // prefixo (regras, caderno e imóveis) lido do cache.
         id: 'atendente-imova',
         modelo: 'claude-haiku-5-5',
-        tokensDeSistema: 5090,
+        tokensDeSistema: 5082,
         tokensDaMensagem: 165,
         tokensDeSaida: 115,
         semCache: 0.00058,

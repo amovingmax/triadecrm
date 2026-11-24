@@ -9,6 +9,7 @@ import {
   BLOCO_DA_FOTO,
   LEGENDA_PADRAO_DA_FOTO,
   TETO_DA_LEGENDA,
+  TROCAS_DO_CORRETOR,
   atendenteImovaV8 as v8,
   sistemaComBaseV8,
 } from '../src/prompts/atendente-imova/v8';
@@ -44,7 +45,9 @@ describe('atendente-imova@v8', () => {
     expect(v8.versao).toBe(8);
     expect(v8.sistema.endsWith(`\n\n${BLOCO_DA_FOTO}`)).toBe(true);
     const semOBloco = v8.sistema.slice(0, v8.sistema.length - BLOCO_DA_FOTO.length - 2);
-    expect(semOBloco.replace(/\n- `fotoParaConfirmar`:[^\n]*/, '')).toBe(v7.sistema);
+    let v7SemCorretor = v7.sistema;
+    for (const [de, para] of TROCAS_DO_CORRETOR) v7SemCorretor = v7SemCorretor.split(de).join(para);
+    expect(semOBloco.replace(/\n- `fotoParaConfirmar`:[^\n]*/, '')).toBe(v7SemCorretor);
     expect(v8.entrada).toBe(v7.entrada);
     expect(v8.ferramentas).toEqual(v7.ferramentas);
     expect(v8.montarMensagem).toBe(v7.montarMensagem);
@@ -59,7 +62,9 @@ describe('atendente-imova@v8', () => {
 
   it('o bloco ensina as duas mensagens: a frase sem preço, sem metragem e sem pergunta, e a foto com a pergunta', () => {
     expect(BLOCO_DA_FOTO).toMatch(/^A FOTO PARA CONFIRMAR O IMÓVEL \(acao = responder\):/);
-    expect(BLOCO_DA_FOTO).toMatch(/Sem preço \(mesmo que ele tenha perguntado[^)]*\), sem documentação, sem metragem/);
+    expect(BLOCO_DA_FOTO).toMatch(
+      /Sem preço \(mesmo que ele tenha perguntado[^)]*\), sem documentação, sem metragem/,
+    );
     expect(BLOCO_DA_FOTO).toMatch(/Acho que já sei qual é!/);
     expect(BLOCO_DA_FOTO).not.toMatch(/\d+ ?m²/);
     expect(BLOCO_DA_FOTO).not.toMatch(/R\$/);
@@ -67,6 +72,18 @@ describe('atendente-imova@v8', () => {
     expect(BLOCO_DA_FOTO).toMatch(/mais de um imóvel possível/);
     expect(BLOCO_DA_FOTO).toMatch(/Nunca escreva que vai mandar a foto/);
     expect(v8.sistema).toMatch(/- `fotoParaConfirmar`: \{ imovelCodigo, legenda \} ou null/);
+  });
+
+  it('"corretor" só sobra no nome da ação, no pedido do cliente e na proibição da frase da visita', () => {
+    const sobras = [...v8.sistema.matchAll(/[^\n]*corretor[^\n]*/gi)].map((m) => m[0]);
+    for (const linha of sobras) {
+      expect(linha, linha).toMatch(
+        /passar_para_corretor|pede corretor|não\s*$|vai passar para um corretor nem/,
+      );
+    }
+    expect(v8.sistema).not.toMatch(
+      /confirmar com o corretor|passe para o corretor|já vai passar para um corretor/,
+    );
   });
 
   it('a saída aceita a foto ou null, e recusa legenda longa ou código vazio', () => {
