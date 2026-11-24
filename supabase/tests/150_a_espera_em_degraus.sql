@@ -410,8 +410,9 @@ select results_eq(
   $$select tipo, ordem from app.avisos_catalogo() where tipo in ('espera', 'espera_gestao') order by ordem$$,
   $$values ('espera', 13), ('espera_gestao', 14)$$,
   'o catálogo da Imova ganha "Cliente esperando resposta" (13) e "Cliente esperando há 1 hora" (14)');
-select is((select count(*) from app.avisos_catalogo()), 11::bigint,
-          'a Imova tem os 6 comuns, ligando, ligação perdida, lead novo e os dois da espera');
+-- 24/11/2026: e o "Pedido de visita" (migração 20261124190000).
+select is((select count(*) from app.avisos_catalogo()), 12::bigint,
+          'a Imova tem os 6 comuns, ligando, ligação perdida, lead novo, os dois da espera e o pedido de visita');
 select lives_ok($$select app.avisos_push_rodar()$$, 'na Imova a rodada chama a varredura da espera sem erro');
 select ok(exists (select 1 from pg_constraint
                    where conname = 'push_fila_tipo_check'
