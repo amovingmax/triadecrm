@@ -11374,3 +11374,20 @@ Pedido: "Preciso que o testflight suba os pushs quando algum evento acontecer e 
 - **Decisões humanas:** a conta do celular do Rafael (acima); se Recusar deve derrubar a ligação para todos; se a ligação deve tocar de madrugada (hoje toca a qualquer hora, como o botão do WhatsApp, que está sempre disponível).
 - **Decidido pelo usuário (23/11/2026):** o toque é o padrão do iPhone (o de Ajustes → Sons e Tato → Toque de cada pessoa); o toque próprio da Imova, mostrado no protótipo, não entra.
 - **Sem Android** (não há build do Android).
+
+## 24/11/2026 — App 1.1.1: a ligação no iPhone com som, e o diário da ligação (só na Imova)
+
+Pedido, depois do primeiro teste de verdade: "O áudio não saiu, a pessoa não conseguiu me escutar; aparenta que a ligação não foi começada mesmo depois de eu ter aceitado; o app ainda não recebe ligação se estiver com o app fechado [...] Corrija esses pontos."
+
+- **O que o servidor mostrou do teste (10h27 e 10h28):** as duas ligações foram atendidas pela Meta (reserva, `pre_accept` e `accept` em 3 s), e o cliente não ouviu nada. Antes, às 10h14 e 10h27, o app mandou "recusar" (alguém tocou em Recusar, ou o Atender sem microfone). A ligação das 10h15 recebeu o aviso da Apple (200) e não deu sinal no servidor: é a do app fechado.
+- **A causa provável do silêncio:** a página do CRM, aberta no app, mantém um `AudioContext` ligado para o som dos avisos (`components/avisos/som.ts`, que religa a cada toque na tela). No iPhone o som da página é o som do app: com ele ativo, o CallKit não consegue ligar o áudio da ligação (o `didActivate` não vem, e o WebRTC nunca grava nem toca), e o WebKit troca o modo de áudio no meio da conversa. Um engenheiro da Apple descreve exatamente isso nos fóruns de desenvolvedores (thread 783870: "Having an active audio session means that CallKit cannot activate the audio session"). Bate com o teste: só tocou com o app aberto, e o app aberto é a página aberta.
+- **Correções no app 1.1.1 (build 9):**
+  - a página do CRM fica calada enquanto uma ligação toca ou está em curso (`apps/app/src/audio-da-pagina.ts`, injetado antes do código do site: suspende os `AudioContext`, trava o `resume` e o `play`); no fim, tudo volta, e o som dos avisos religa no toque seguinte. O site não mudou;
+  - o áudio de ligação é configurado antes de mostrar a chamada, como a Apple recomenda (sem ligar nada);
+  - se o iPhone não ligar o áudio em 2 s depois do Atender, o app liga sozinho (o caminho reserva; a Apple prefere o do CallKit, mas ligação muda é pior), e desliga no fim;
+  - o PushKit é registrado já no `willFinishLaunching`, o primeiro ponto do app.
+- **O diário da ligação:** o app anota cada passo (o app abriu pelo aviso? a tela de chamada apareceu? o iPhone ligou o áudio? a conexão subiu? quantos bytes foram e vieram, o nível do microfone) no próprio aparelho e manda ao servidor com o convite da ligação (ação `diario` da `wa-chamada-app`; migração `20261124120000`, tabela `app.voip_diarios`, apaga em 30 dias). O que aconteceu com o app fechado chega no toque seguinte. Sem telefone nem conversa.
+- **O app fechado pelo usuário:** o código de abertura está certo (conferido no próprio build 8 baixado do EAS: modos `voip` e `audio`, o módulo e o registro do Expo presentes) e não achei a causa lendo. O diário vai dizer se o iPhone chegou a abrir o app: se não abrir, é o iPhone; se abrir e não tocar, o passo aparece.
+- **Publicado:** migração `20261124120000` na Imova (ensaio desfeito antes, conferido que não deixou nada) e a função `wa-chamada-app` com a ação `diario` (compatível com o 1.1.0). App 1.1.1 (build 9) enviado ao TestFlight.
+- **Verificado:** Vitest do app (55, com os 6 novos da página calada), `tsc`, `eslint`; Swift checado contra o WebRTC 155 (Mac Catalyst; a compilação de verdade é a do EAS).
+- **Pendente:** o teste com o 1.1.1 (atender e falar; app fechado); a 1.1.0 está na revisão da Apple e não deve ir à loja (ligação muda): trocar pelo 1.1.1 quando o teste passar.
