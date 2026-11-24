@@ -11327,7 +11327,7 @@ Pedido: "Quero conseguir filtrar e categorizar todas as pessoas que tenho contat
 - **KOMUNE não foi tocada:** nem banco nem site. Na próxima `komune migrar` recebe a 20261123120000, a 20261123200000 (só a regra da coluna) e a 20261123210000 (`p_perfil`, sem mudança sem ele).
 - **Não deu para conferir aqui:** a tela em produção com login de verdade.
 
-## 23/11/2026 — A ligação toca no iPhone, com o app fechado, e o diagnóstico dos avisos do app (branch `ligacao-no-app`; só na Imova; nada publicado)
+## 23/11/2026 — A ligação toca no iPhone, com o app fechado, e o diagnóstico dos avisos do app (branch `ligacao-no-app`; só na Imova; publicado em 23/11, chave desligada até o teste)
 
 Pedido: "Preciso que o testflight suba os pushs quando algum evento acontecer e também preciso que o celular receba ligações com o app fechado [...] uma interface para aceitar ou rejeitar chamada, assim como a do WhatsApp, e que também tenha um toque que seja audível."
 
@@ -11351,15 +11351,26 @@ Pedido: "Preciso que o testflight suba os pushs quando algum evento acontecer e 
 ### Verificado
 
 - **Apple, de verdade:** a chave "Aurora push" (`Q2FD3T3CSC`) e o tópico `app.triade.ios.voip` foram aceitos pela Apple nos servidores de produção e de teste (resposta `BadDeviceToken` para um endereço inventado: nada chegou a aparelho nenhum).
-- **Banco isolado** (`supabase start` com outro `project_id`, migrações do zero): pgTAP **199** 53/53; 118, 135 e 152 sem falha. Na suíte inteira, as falhas que aparecem (08, 52, 107, 119, 127, 151, 154, 170, 171, 183, 186 e 196) são as mesmas sem esta migração (conferido desfazendo-a numa transação).
+- **Banco isolado** (`supabase start` com outro `project_id`, migrações do zero): pgTAP **201** (era 199; renumerado porque a main ganhou outro 199) 53/53; 118, 135 e 152 sem falha. Na suíte inteira, as falhas que aparecem (08, 52, 107, 119, 127, 151, 154, 170, 171, 183, 186 e 196) são as mesmas sem esta migração (conferido desfazendo-a numa transação).
 - **De ponta a ponta no local**, com as funções servidas pelo `supabase functions serve` e o dublê da Meta: a ligação que entra cutuca a `voip-push`, que fala com a Apple e anota a resposta; o convite falso é recusado; o convite verdadeiro reserva a ligação e devolve a oferta; `pre_accept`, `accept` e `terminate` chegam à Meta (dublê); o "parar" vai só aos aparelhos que não atenderam.
 - **Deno:** 7 testes de `apns.ts` (JWT conferido com a chave pública, cabeçalhos do aviso de voz) e `deno check` das três funções.
 - **App:** `tsc`, `eslint` e Vitest (49); o Expo gera o projeto do iPhone com `voip` e `audio` e acha o módulo local. O Swift passou na checagem de tipos contra as APIs do iPhone (Mac Catalyst 16.4, com os cabeçalhos do WebRTC 155): **não há Xcode de iPhone neste Mac, então a compilação de verdade só acontece na montagem do EAS.**
 - **Site:** Vitest dos arquivos tocados (24), `typecheck` e `eslint` verdes.
 
+### Publicado (pedido do usuário em 23/11/2026: "Aplique essa atualização no testflight e ja publique ela na apple")
+
+- **Banco da Imova:** migração `20261124090000` (`publicar-banco imova migrar`), depois de um ensaio em produção numa transação desfeita (chave desligada, colunas e gatilho criados; conferido que o ensaio não deixou nada).
+- **Funções da Imova:** `voip-push` e `wa-chamada-app` (`--no-verify-jwt`). Conferidas no ar com dados inválidos: `voip-push` responde `{"ok":true,"enviados":0}`; `wa-chamada-app` recusa o convite falso (409 `convite_invalido`).
+- **Segredos da Imova:** `APNS_CHAVE_P8`, `APNS_CHAVE_ID`, `APNS_EQUIPE_ID`.
+- **Site da Imova:** `imova-qdqg4mn3y` em imova-crm.vercel.app (volta: `imova-ft8s50sr7`), pela cópia limpa `~/triadecrm-publicar-imova`, da main `de571e9`. O teste pgTAP virou `201_a_ligacao_toca_no_app.sql` (a main ganhou outro 199).
+- **App 1.1.0, build 8:** montado no EAS em 3,5 min (a compilação do Swift e do WebRTC passou de primeira) e enviado à Apple. No TestFlight desde 23/11 à noite para o grupo Equipe, criptografia isenta. Na mesma noite o iPhone do Janio instalou e registrou o endereço de chamada (a parte nativa sobe no aparelho).
+- **App Store:** a versão da loja passou de 1.0.0 a 1.1.0, com o build 8, e as notas para o revisor ganharam o parágrafo "INCOMING CALLS" (CallKit e PushKit; só a Imova recebe ligação, a conta de demonstração é da KOMUNE). O usuário preencheu e publicou a "Privacidade do app" no painel em 24/11 (as respostas de `app-store.md`); a versão foi **enviada à revisão em 24/11/2026 às 10h08** (`WAITING_FOR_REVIEW`, liberação manual).
+- **A chave `ligacao.app` segue desligada** até o primeiro teste com o usuário: ninguém perde o aviso "está ligando" enquanto isso.
+
 ### Pendente
 
-- **Publicar, só com pedido**, na ordem do guia: migração na Imova; funções `voip-push` e `wa-chamada-app`; segredos `APNS_CHAVE_P8`, `APNS_CHAVE_ID`, `APNS_EQUIPE_ID`; site; app 1.1.0 no TestFlight; cada pessoa atualiza e abre o app; ligar a chave `ligacao.app`; teste entre celulares nossos.
+- **Para ligar:** cada pessoa atualiza pelo TestFlight e entra na Imova (o Rafael ainda está no app antigo); ligar a chave `ligacao.app`; teste entre celulares nossos.
+- **App Store:** a resposta da revisão; o pedido de app não listado (developer.apple.com/contact/request/unlisted-app); liberar a versão à mão.
 - **Decisões humanas:** a conta do celular do Rafael (acima); se Recusar deve derrubar a ligação para todos; se a ligação deve tocar de madrugada (hoje toca a qualquer hora, como o botão do WhatsApp, que está sempre disponível).
 - **Decidido pelo usuário (23/11/2026):** o toque é o padrão do iPhone (o de Ajustes → Sons e Tato → Toque de cada pessoa); o toque próprio da Imova, mostrado no protótipo, não entra.
 - **Sem Android** (não há build do Android).
