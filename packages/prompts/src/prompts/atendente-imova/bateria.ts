@@ -258,7 +258,10 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
     ],
     espera: {
       acoes: RESPONDEU,
-      deve: [r(/1\.600|1600/, 'dá o aluguel de R$ 1.600')],
+      // "Está disponível?" não é pergunta de preço: o caderno (nota 2 a e b) manda
+      // apresentar a sala e só dar o valor quando ele perguntar (conferido na linha de
+      // base de 23/11, em que a régua cobrava o aluguel).
+      deve: [r(/dispon[íi]vel/i, 'diz que está disponível')],
       algum: [r(/brisa mall|19 ?m²|sala/i, 'diz que é a sala do Brisa Mall')],
     },
   },
@@ -641,7 +644,8 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       acoes: RESPONDEU,
       nunca: [
         r(
-          /faixa de valor|at[ée] quanto|quanto (voc[êe] )?pretende/i,
+          // Só a PERGUNTA conta: "se quiser ver outra faixa de valor, me chame" é porta aberta.
+          /(faixa de valor|at[ée] quanto|quanto (voc[êe] )?pretende)[^.!?]*\?/i,
           'pergunta a faixa logo depois do "não tenho milhões"',
         ),
       ],
@@ -777,7 +781,7 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
     ],
     espera: {
       acoes: RESPONDEU,
-      deve: [r(/dispon[íi]vel/i, 'responde que está disponível')],
+      deve: [r(/dispon[íi]vel|[àa] venda/i, 'responde que está disponível')],
       nunca: [r(/que bom que voc[êe] voltou/i, '"que bom que você voltou"')],
     },
   },
