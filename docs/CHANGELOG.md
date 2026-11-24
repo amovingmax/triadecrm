@@ -11391,3 +11391,14 @@ Pedido, depois do primeiro teste de verdade: "O áudio não saiu, a pessoa não 
 - **Publicado:** migração `20261124120000` na Imova (ensaio desfeito antes, conferido que não deixou nada) e a função `wa-chamada-app` com a ação `diario` (compatível com o 1.1.0). App 1.1.1 (build 9) enviado ao TestFlight.
 - **Verificado:** Vitest do app (55, com os 6 novos da página calada), `tsc`, `eslint`; Swift checado contra o WebRTC 155 (Mac Catalyst; a compilação de verdade é a do EAS).
 - **Pendente:** o teste com o 1.1.1 (atender e falar; app fechado); a 1.1.0 está na revisão da Apple e não deve ir à loja (ligação muda): trocar pelo 1.1.1 quando o teste passar.
+
+## 24/11/2026 — A IA que atende responde os Parceiros Colaboradores (só na Imova)
+
+Pedido, depois de ver a IA calada com o Janio (contato marcado como Parceiro, tag Colaborador, em 23/11 às 17h22): "A IA responde sim, Janio sim. Todos os parceiros colaboradores a IA responde, os demais parceiros ela não fala."
+
+- **A regra:** a IA que atende responde Clientes e Parceiros com a tag **Colaborador**. **Proprietário**, **Inquilino** e a marca sem tag (de antes das três tags) continuam com a equipe. As outras regras valem igual para o Colaborador: o time que escreveu nas últimas 24 h, "Parar a IA" à mão, passagem para a equipe, robô pausado.
+- **Banco:** migração `20261124150000_a_ia_responde_os_colaboradores.sql` muda `app.ia_atende` (o passo do Parceiro deixa passar `tipo = 'colaborador'`) e `public.ia_conversa_estado` (`parceiro` passa a dizer "Parceiro que a IA não atende", então o Colaborador volta a ver os controles da IA na conversa sem publicar o site). Na KOMUNE não faz nada. Desfazer: reaplicar as duas funções da `20261123120000`.
+- **Site:** os avisos que diziam "a IA que atende não responde Parceiros" agora contam a regra nova: o diálogo de virar Parceiro (conversa e Prospectados), o aviso depois de virar Parceiro e o de corrigir a tag quando a troca muda a resposta da IA (`aIaRespondeOParceiro`, `avisoDaIaNoParceiro`, `REGRA_DA_IA_NOS_PARCEIROS` em `components/conversas/perfil-regra.ts`).
+- **Verificado:** pgTAP **202** (16/16) no banco local da Imova, e 196 (30), 199 (24), 133 (66), 136 (27), 143 (26), 156 (114), 170 (130), 183 (16) e 185 (30) sem falha. A 187 falha no banco local por falta das colunas de coordenadas da `20261119120000` (o banco local não recebeu essa migração; nada a ver com esta). Vitest de `components/conversas` (384), `typecheck` e `eslint` verdes.
+- **A IA não sabe que a pessoa é Colaborador:** ela atende como atende um cliente. Se for preciso outro tom com Colaboradores, é mudança no prompt (v8).
+- **A varredura da IA** (a cada minuto, mensagens das últimas 24 h sem resposta) pega o Colaborador que ficou esperando: logo depois de publicar, ela responde a última mensagem do Janio (13h42). O ensaio em produção mostrou que ele era o único na fila.

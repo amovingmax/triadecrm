@@ -17,7 +17,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { EscolhaDaTag } from '@/components/conversas/perfil-da-conversa';
-import { rotuloDaParceria } from '@/components/conversas/perfil-regra';
+import {
+  avisoDaIaNoParceiro,
+  REGRA_DA_IA_NOS_PARCEIROS,
+  rotuloDaParceria,
+} from '@/components/conversas/perfil-regra';
 import type { TipoDeParceria } from '@/components/conversas/tipos';
 
 import {
@@ -112,8 +116,7 @@ export function useConsultoria(ligada: boolean) {
       }
       void clientes.invalidateQueries({ queryKey: CHAVE_CONSULTORIA });
       toast.success(avisoDaTag(tipo, ids.length, r.mudaram), {
-        description:
-          'Aparece em Conversas → Parceiros, e a IA que atende não responde lá. A etapa do funil não muda.',
+        description: `Aparece em Conversas → Parceiros. ${avisoDaIaNoParceiro(tipo)} A etapa do funil não muda.`,
         action:
           r.mudaram > 0 && eramClientes
             ? { label: 'Desfazer', onClick: () => void desfazer(ids, false) }
@@ -191,8 +194,8 @@ function FormularioDaTag({
         <DialogTitle className="font-heading text-lg leading-tight">{titulo}</DialogTitle>
         <DialogDescription>
           {quantos === 1
-            ? 'A conversa sai de Clientes e passa a ficar em Parceiros, com a tag que você escolher. A IA que atende não responde Parceiros.'
-            : 'Todos recebem a mesma tag. Quem já era Parceiro fica com a tag nova. A IA que atende não responde Parceiros.'}
+            ? `A conversa sai de Clientes e passa a ficar em Parceiros, com a tag que você escolher. ${REGRA_DA_IA_NOS_PARCEIROS}`
+            : `Todos recebem a mesma tag. Quem já era Parceiro fica com a tag nova. ${REGRA_DA_IA_NOS_PARCEIROS}`}
         </DialogDescription>
       </DialogHeader>
 

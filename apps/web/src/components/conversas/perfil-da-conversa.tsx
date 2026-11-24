@@ -23,9 +23,12 @@ import { CHAVE_CONSULTORIA } from '@/components/parceiros/consultoria';
 
 import { CHAVE_CONVERSAS } from './dados';
 import {
+  aIaRespondeOParceiro,
+  avisoDaIaNoParceiro,
   CLIENTES_E_PARCEIROS,
   descricaoDoParceiro,
   recadoDoPerfil,
+  REGRA_DA_IA_NOS_PARCEIROS,
   rotuloDaParceria,
   SEM_TAG,
   TIPOS_DE_PARCERIA,
@@ -115,13 +118,17 @@ export function ProvedorDoPerfil({ children }: { children: React.ReactNode }) {
           duration: 8_000,
         });
       } else if (alvo.parceiro) {
+        // A tag mudou de um lado para o outro da regra da IA: a tela avisa.
+        const mudouAIa =
+          aIaRespondeOParceiro(alvo.parceiro.tipo) !== aIaRespondeOParceiro(pedido.tipo);
         toast.success('Parceria corrigida.', {
+          description: mudouAIa ? avisoDaIaNoParceiro(pedido.tipo) : undefined,
           action: { label: 'Desfazer', onClick: desfazer },
           duration: 8_000,
         });
       } else {
         toast.success(`${alvo.nome} agora está em Parceiros.`, {
-          description: 'A IA que atende não responde Parceiros: quem responde é a equipe.',
+          description: avisoDaIaNoParceiro(pedido.tipo),
           action: { label: 'Desfazer', onClick: desfazer },
           duration: 8_000,
         });
@@ -228,7 +235,7 @@ function FormularioDoParceiro({
         <DialogDescription>
           {corrigindo
             ? 'Corrija a tag ou o imóvel. A conversa continua em Parceiros.'
-            : `A conversa sai de Clientes e passa a ficar em Parceiros. Quando escrever de novo, continua lá. A IA que atende não responde Parceiros: quem responde é a equipe.`}
+            : `A conversa sai de Clientes e passa a ficar em Parceiros. Quando escrever de novo, continua lá. ${REGRA_DA_IA_NOS_PARCEIROS}`}
         </DialogDescription>
       </DialogHeader>
 

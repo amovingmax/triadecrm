@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  aIaRespondeOParceiro,
+  avisoDaIaNoParceiro,
   contarPorTipo,
   dataCurta,
   descricaoDoParceiro,
@@ -10,6 +12,7 @@ import {
   mapaDosParceiros,
   RECORTE_INICIAL,
   recadoDoPerfil,
+  REGRA_DA_IA_NOS_PARCEIROS,
   rotuloDaParceria,
   rotuloDoImovel,
   SEM_TAG,
@@ -115,6 +118,20 @@ describe('rotuloDoImovel e rotuloDaParceria', () => {
     expect(TIPOS_DE_PARCERIA.map((t) => t.id)).toEqual(['proprietario', 'colaborador', 'inquilino']);
     expect(ehTipoDeParceria('comprador')).toBe(false);
     expect(ehTipoDeParceria('outro')).toBe(false);
+  });
+});
+
+describe('a IA que atende nos Parceiros (24/11/2026)', () => {
+  it('responde só o Colaborador; Proprietário, Inquilino e sem tag ficam com a equipe', () => {
+    expect(aIaRespondeOParceiro('colaborador')).toBe(true);
+    expect(aIaRespondeOParceiro('proprietario')).toBe(false);
+    expect(aIaRespondeOParceiro('inquilino')).toBe(false);
+    expect(aIaRespondeOParceiro(null)).toBe(false);
+  });
+  it('o aviso diz o que acontece com a tag escolhida', () => {
+    expect(avisoDaIaNoParceiro('colaborador')).toMatch(/continua respondendo/);
+    expect(avisoDaIaNoParceiro('inquilino')).toMatch(/quem responde é a equipe/);
+    expect(REGRA_DA_IA_NOS_PARCEIROS).toMatch(/Colaboradores.*Proprietários e Inquilinos/);
   });
 });
 

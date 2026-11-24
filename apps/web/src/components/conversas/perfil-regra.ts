@@ -14,7 +14,8 @@
  * sem ela). A placa dos Clientes é o canal de chegada, que não muda.
  *
  * Decidido no protótipo (as quatro sugestões aceitas):
- *   1. a IA que atende não responde Parceiros (no banco, `app.ia_atende`);
+ *   1. a IA que atende não responde Parceiros (no banco, `app.ia_atende`),
+ *      menos os de tag Colaborador, que ela responde (24/11/2026);
  *   2. negócio ganho não muda o perfil sozinho: a conversa só sugere;
  *   3. a mudança guarda a tag e, se houver, o imóvel;
  *   4. quem atende muda o perfil (admin, gestor e SDR: `app.is_manager()`).
@@ -55,6 +56,26 @@ export function ehTipoDeParceria(valor: unknown): valor is TipoDeParceria {
 export function rotuloDaParceria(tipo: TipoDeParceria | null): string {
   return TIPOS_DE_PARCERIA.find((t) => t.id === tipo)?.rotulo ?? 'Sem tag';
 }
+
+/**
+ * A IA que atende responde este Parceiro? Só o Colaborador (24/11/2026: "Todos
+ * os parceiros colaboradores a IA responde, os demais parceiros ela não fala").
+ * No banco, a mesma regra está em `app.ia_atende`.
+ */
+export function aIaRespondeOParceiro(tipo: TipoDeParceria | null): boolean {
+  return tipo === 'colaborador';
+}
+
+/** O que a tela diz sobre a IA quando a ficha vira Parceiro, ou muda de tag. */
+export function avisoDaIaNoParceiro(tipo: TipoDeParceria | null): string {
+  return aIaRespondeOParceiro(tipo)
+    ? 'A IA que atende continua respondendo: ela responde os Colaboradores.'
+    : 'A IA que atende não responde Proprietários nem Inquilinos: quem responde é a equipe.';
+}
+
+/** A regra inteira, para o diálogo antes de escolher a tag. */
+export const REGRA_DA_IA_NOS_PARCEIROS =
+  'A IA que atende responde os Colaboradores; Proprietários e Inquilinos ficam com a equipe.';
 
 /** A linha de `public.consultoria` como o banco devolve, com o anúncio junto. */
 export type MarcaDeParceiro = {
