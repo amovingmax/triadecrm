@@ -333,9 +333,9 @@ describe('o texto que volta para a IA', () => {
     expect(texto).not.toMatch(/\d{5}/);
   });
 
-  it('não achado: pede referência mais geral', () => {
+  it('não achado: pede referência mais geral, nunca um pedaço do nome (24/11/2026)', () => {
     expect(textoDoResultado('Condomínio Serv Club, Nísia Floresta, RN', [], imoveis)).toBe(
-      '"Condomínio Serv Club, Nísia Floresta": não achado no mapa. Tente a referência mais geral que o cliente deu (avenida, praia, bairro ou cidade).',
+      '"Condomínio Serv Club, Nísia Floresta": não achado no mapa. Tente a referência mais geral que o cliente deu (avenida, praia, bairro ou cidade), nunca um pedaço do nome que ele não disse sozinho.',
     );
   });
 
@@ -378,7 +378,8 @@ describe('o caso da Alinne, no laço da v7', () => {
   it('com o pino novo: o condomínio não é achado, a avenida é, e o TE0004 fica na mesma região', async () => {
     const { executada, resultados, banco, aoMapa, pedidos } = await rodarAlinne(PINO_NOVO);
     expect(resultados.map((r) => r.texto)).toEqual([
-      '"Condomínio Serv Club, Nísia Floresta": não achado no mapa. Tente a referência mais geral que o cliente deu (avenida, praia, bairro ou cidade).',
+      // Desde 24/11/2026 o sistema repete sem a cidade antes de dizer "não achado".
+      '"Condomínio Serv Club, Nísia Floresta": não achado no mapa (o sistema já tentou sem a cidade). Tente a referência mais geral que o cliente deu (avenida, praia, bairro ou cidade), nunca um pedaço do nome que ele não disse sozinho.',
       '"Avenida Praia de Camurupim, Nísia Floresta": achado no mapa: Avenida Praia de Camurupim (rua), em Camurupim, Nísia Floresta. ' +
         'Imóveis nossos na mesma região: TE0004_IMOVA (terreno, Praia de Tabatinga).',
     ]);
@@ -395,12 +396,13 @@ describe('o caso da Alinne, no laço da v7', () => {
       { nome: 'buscar_no_mapa', entrada: { referencia: 'Condomínio Serv Club', cidade: 'Nísia Floresta' } },
     ]);
     // O mapa: o User-Agent, até três resultados, só no RN, e a resposta no cache.
-    expect(aoMapa).toHaveLength(2);
+    // O condomínio com a cidade e sem ela; a avenida, achada de primeira.
+    expect(aoMapa).toHaveLength(3);
     expect(aoMapa.every((p) => p.userAgent === 'teste-do-mapa/1.0')).toBe(true);
     expect(aoMapa[0]!.url).toContain('limit=3');
     expect(aoMapa[0]!.url).toContain('bounded=1');
     expect(decodeURIComponent(aoMapa[0]!.url)).toContain('viewbox=-38.6,-4.8,-34.9,-7.0');
-    expect(banco.chamadasDeRpc.filter((c) => c.nome === 'ia_lugar_no_mapa_gravar')).toHaveLength(2);
+    expect(banco.chamadasDeRpc.filter((c) => c.nome === 'ia_lugar_no_mapa_gravar')).toHaveLength(3);
     // O sistema que foi ao modelo leva as notas 13 e 14, e passa na auditoria.
     expect(pedidos[0]!.sistema).toContain('14. BUSCA NO MAPA');
     expect(pedidos[0]!.sistema).toContain('13. COMO IDENTIFICAR O IMÓVEL');
@@ -461,7 +463,9 @@ describe('teto, falha e auditoria', () => {
     await ferramenta({ referencia: 'Camurupim', cidade: 'Nísia Floresta' });
     const quarta = await ferramenta({ referencia: 'Avenida Praia de Camurupim', cidade: 'Nísia Floresta' });
     expect(quarta).toEqual({ texto: 'Acabaram as buscas desta resposta: responda com o que já tem.', erro: true });
-    expect(pedidos).toHaveLength(3);
+    // Três buscas da IA; as duas que não acharam repetiram sem a cidade (24/11/2026), sem
+    // gastar busca da resposta: Serv Club ×2, Camurupim ×1.
+    expect(pedidos).toHaveLength(5);
   });
 
   it('o mapa caiu: "busca indisponível", sem lançar', async () => {

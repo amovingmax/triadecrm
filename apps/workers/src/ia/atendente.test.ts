@@ -593,7 +593,8 @@ describe('a busca no mapa (v7, 23/11/2026): só com o mapa no worker', () => {
     ]);
     const r = await atenderCliente(contexto, PAYLOAD);
     expect(r).toMatchObject({ feito: true, motivo: 'enviar_link_da_agenda' });
-    expect(buscas).toEqual(['Condomínio Serv Club, Nísia Floresta, RN']);
+    // Não achado com a cidade, o sistema repete sem ela (conserto 1 do mapa, 24/11/2026).
+    expect(buscas).toEqual(['Condomínio Serv Club, Nísia Floresta, RN', 'Condomínio Serv Club, RN']);
     expect(pedidos).toHaveLength(2);
     expect(pedidos[0]?.ferramentas.map((f) => f.nome)).toEqual(['buscar_no_mapa']);
     expect(pedidos[0]?.sistema).toContain('A BUSCA NO MAPA:');

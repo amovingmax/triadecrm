@@ -22,8 +22,8 @@ import { atendenteImovaV7 as v7, sistemaComBaseV7 } from '../src/prompts/atenden
  */
 
 describe('bateria do atendente: os casos', () => {
-  it('são 41 (o A14 entrou em 24/11), com id único, e cobrem os quatro grupos', () => {
-    expect(CASOS_DA_BATERIA).toHaveLength(41);
+  it('são 43 (o A14, o I16 e o I17 entraram em 24/11), com id único, e cobrem os quatro grupos', () => {
+    expect(CASOS_DA_BATERIA).toHaveLength(43);
     const ids = CASOS_DA_BATERIA.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const grupo of GRUPOS_DA_BATERIA) {
@@ -151,6 +151,37 @@ describe('bateria do atendente: a régua', () => {
     expect(
       conferirCasoDaBateria(caso('I11'), { ...semBusca, ferramentas: ['buscar_no_mapa'] }, comMapa),
     ).toEqual([]);
+  });
+
+  it('I17 (conserto 3 do mapa, 24/11): perguntar o lugar passa; oferecer Tabatinga ou Pipa, não', () => {
+    const comMapa = { temMapa: true, temFoto: true } as const;
+    const busca = { ferramentas: ['buscar_no_mapa'] } as const;
+    expect(
+      conferirCasoDaBateria(
+        caso('I17'),
+        {
+          acao: 'responder',
+          mensagem:
+            'Você consegue me dizer o bairro, a rua e o CEP de onde fica o terreno? O que souber já me ajuda.',
+          agenda: null,
+          ...busca,
+        },
+        comMapa,
+      ),
+    ).toEqual([]);
+    expect(
+      conferirCasoDaBateria(
+        caso('I17'),
+        {
+          acao: 'responder',
+          mensagem: 'É o nosso terreno de frente para o mar, em Tabatinga.',
+          agenda: null,
+          foto: { imovelCodigo: 'TE0004_IMOVA', legenda: 'É este aqui que você viu?' },
+          ...busca,
+        },
+        comMapa,
+      ),
+    ).toContain('fala do terreno de frente para o mar em Nísia Floresta');
   });
 
   it('passar sem texto é aceito; o que o texto devia dizer, não', () => {

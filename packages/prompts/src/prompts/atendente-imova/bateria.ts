@@ -498,6 +498,53 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
     },
   },
 
+  {
+    id: 'I16',
+    titulo: 'Perto da "Rua" Gustavo Neves (no mapa é Avenida)',
+    grupo: 'identificar',
+    origem: 'conserto 2 do mapa (24/11): "Rua Gustavo Neves" não existe no OpenStreetMap',
+    critico: false,
+    ...TERCA,
+    nome: 'Lúcia Campos',
+    falas: [
+      {
+        de: 'cliente',
+        antes: 1,
+        texto:
+          'Boa tarde! Vi um terreno à venda perto da Rua Gustavo Neves, em Natal. Ainda está disponível?',
+      },
+    ],
+    espera: {
+      acoes: RESPONDEU,
+      algum: [r(/etelvino|capim macio/i, 'fala do terreno da Rua Professor Etelvino Cunha')],
+      nunca: [NAO_TEMOS, AREA_NA_CONFIRMACAO, TABATINGA],
+      buscaNoMapa: true,
+      foto: { quando: 'deve', codigo: /^TE0006/i },
+    },
+  },
+  {
+    id: 'I17',
+    titulo: 'Rotatória do Golfinho "em Ponta Negra" (a rotatória fica em Nísia Floresta)',
+    grupo: 'identificar',
+    origem: 'conserto 3 do mapa (24/11): nunca usar lugar de outra cidade',
+    critico: true,
+    ...TERCA,
+    nome: 'Lúcia Campos',
+    falas: [
+      {
+        de: 'cliente',
+        antes: 1,
+        texto:
+          'Vi um terreno perto da Rotatória do Golfinho, em Ponta Negra. Ainda está disponível?',
+      },
+    ],
+    espera: {
+      acoes: ['responder', 'passar_para_corretor'],
+      deve: [r(/bairro|rua|cep/i, 'pergunta o bairro, a rua e o CEP (nota 7 a)')],
+      nunca: [TABATINGA, r(/\bpipa\b|tibau/i, 'oferece terreno de Pipa'), PERGUNTA_DE_AREA],
+      buscaNoMapa: true,
+    },
+  },
   // ================================================================ atender
   {
     id: 'A01',

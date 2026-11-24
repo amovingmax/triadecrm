@@ -491,6 +491,9 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
               busca: mapa,
               logger: contexto.logger,
               maxBuscas: MAX_BUSCAS_NO_MAPA,
+              // "Nunca outra cidade" (24/11/2026): só a cidade ou o bairro que o CLIENTE
+              // escreveu barra um lugar longe. Fica no worker; não vai ao modelo nem ao mapa.
+              falasDoCliente: (e.mensagens ?? []).filter((m) => m.de === 'cliente').map((m) => m.texto ?? ''),
             }),
           },
           { maxVoltas: MAX_VOLTAS_DO_ATENDENTE },

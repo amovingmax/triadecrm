@@ -290,6 +290,9 @@ export async function rodarBateria(
                     maxBuscas: MAX_BUSCAS_NO_MAPA,
                     // Sem isto a régua via "não buscou no mapa" (bateria v8, 24/11/2026).
                     uso,
+                    falasDoCliente: caso.falas
+                      .filter((f) => f.de === 'cliente')
+                      .map((f) => f.texto),
                   }),
                 },
                 { maxVoltas: MAX_VOLTAS_DO_ATENDENTE },
