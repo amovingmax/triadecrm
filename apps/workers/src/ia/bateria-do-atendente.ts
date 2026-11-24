@@ -92,8 +92,15 @@ export interface RespostaDaBateria {
   readonly mensagem: string;
   readonly agenda: SaidaDoAtendenteV6['agenda'];
   readonly buscas: readonly string[];
-  /** A foto para confirmar que a IA pediu (v8); `existe` = o banco acha a capa. */
-  readonly foto: { readonly imovelCodigo: string; readonly legenda: string; readonly existe: boolean } | null;
+  /**
+   * A foto para confirmar que a IA pediu (v8). `existe`: o banco acha a capa; null quando
+   * não deu para perguntar (banco ainda sem a porta da foto).
+   */
+  readonly foto: {
+    readonly imovelCodigo: string;
+    readonly legenda: string;
+    readonly existe: boolean | null;
+  } | null;
   readonly motivo: string;
   readonly confianca: number | null;
   readonly falhas: readonly string[];
@@ -270,10 +277,12 @@ export async function rodarBateria(
             : {
                 imovelCodigo: pedida.imovelCodigo,
                 legenda: limparTexto(reidratar(pedida.legenda, executada.mapa)),
-                existe:
-                  (await rpc<unknown>(contexto, 'ia_atendente_capa_do_imovel', {
-                    p_codigo: pedida.imovelCodigo,
-                  }).catch(() => null)) !== null,
+                existe: await rpc<unknown>(contexto, 'ia_atendente_capa_do_imovel', {
+                  p_codigo: pedida.imovelCodigo,
+                }).then(
+                  (capa) => capa !== null,
+                  () => null,
+                ),
               };
         const falhas = conferirCasoDaBateria(
           caso,
@@ -286,8 +295,10 @@ export async function rodarBateria(
           },
           { temMapa: comMapa, temFoto: comFoto },
         );
-        if (foto !== null && !foto.existe) {
-          falhas.push(`a foto pedida (${foto.imovelCodigo}) não existe: código desconhecido ou anúncio sem foto`);
+        if (foto !== null && foto.existe === false) {
+          falhas.push(
+            `a foto pedida (${foto.imovelCodigo}) não existe: código desconhecido ou anúncio sem foto`,
+          );
         }
 
         let nota: NotaDaJuiza | null = null;
@@ -296,7 +307,11 @@ export async function rodarBateria(
             const avaliada = await executar<EntradaDaAvaliacao, SaidaDaAvaliacaoV2>(
               contexto,
               avaliacaoDoAtendimentoV2,
-              entradaDaJuiza(caso, saida.acao, oQueSaiu(saida.acao, mensagem, foto?.legenda ?? null)),
+              entradaDaJuiza(
+                caso,
+                saida.acao,
+                oQueSaiu(saida.acao, mensagem, foto?.legenda ?? null),
+              ),
               contato,
               {},
             );
