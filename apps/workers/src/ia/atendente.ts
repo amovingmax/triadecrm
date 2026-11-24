@@ -713,8 +713,11 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
         );
       }
       const textoQueSai = foto !== null && !foto.pronta ? textoComALegenda(texto, foto.legenda) : texto;
+      // A chave é `foto_pedida`, nunca `foto`: a porta da foto no banco reconhece o registro da
+      // PRÓPRIA foto por `detalhes ? 'foto'`, e com essa chave no texto ela recusava a foto com
+      // "sem_texto_antes" (1º teste real, conversa do Janio, 24/11/2026 17h28).
       const detalhesComFoto =
-        foto === null ? detalhes : { ...detalhes, foto: { codigo: foto.codigo, pronta: foto.pronta } };
+        foto === null ? detalhes : { ...detalhes, foto_pedida: { codigo: foto.codigo, pronta: foto.pronta } };
       resultado = await rpc(contexto, 'ia_atendente_responder', {
         ...comum,
         p_texto: textoQueSai,

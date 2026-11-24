@@ -665,6 +665,29 @@ describe('a foto para confirmar o imóvel (v8, 24/11/2026)', () => {
     });
   });
 
+  it('o registro do texto não leva a chave "foto": a porta da foto no banco recusaria (1º teste real, 24/11)', async () => {
+    // A mesma regra de `public.ia_atendente_mostrar_foto` (migração 20261124170000): a foto só
+    // sai se houver o registro do texto daquela resposta SEM `detalhes ? 'foto'`.
+    const textos: Record<string, unknown>[] = [];
+    const m = comMapa(saidaComFoto(), {
+      rpcs: {
+        ...capaExiste,
+        ia_atendente_responder: (a) => {
+          textos.push((a.p_detalhes ?? {}) as Record<string, unknown>);
+          return { ok: true, message_id: 'r' };
+        },
+        ia_atendente_mostrar_foto: () =>
+          textos.some((d) => !('foto' in d)) ? { ok: true, message_id: 'f' } : { ok: false, motivo: 'sem_texto_antes' },
+      },
+      arquivos: fotoNoBalde,
+    });
+    const r = await atenderCliente(m.contexto, PAYLOAD);
+    expect(r).toMatchObject({ feito: true, motivo: 'respondeu_com_foto' });
+    expect(textos).toHaveLength(1);
+    expect(textos[0]).not.toHaveProperty('foto');
+    expect(textos[0]).toMatchObject({ foto_pedida: { codigo: 'TE0004_IMOVA', pronta: true } });
+  });
+
   it('anúncio sem foto (ou código desconhecido): a pergunta vai no texto e nenhuma foto é pedida', async () => {
     const m = comMapa(saidaComFoto(), { rpcs: { ia_atendente_capa_do_imovel: () => null } });
     const r = await atenderCliente(m.contexto, PAYLOAD);
