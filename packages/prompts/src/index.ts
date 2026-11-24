@@ -123,6 +123,15 @@ export {
 } from './prompts/atendente-imova/v7';
 
 export {
+  BLOCO_DA_FOTO,
+  LEGENDA_PADRAO_DA_FOTO,
+  TETO_DA_LEGENDA,
+  type SaidaDoAtendenteV8,
+  atendenteImovaV8,
+  sistemaComBaseV8,
+} from './prompts/atendente-imova/v8';
+
+export {
   BASE_DO_ENSAIO_V5,
   CENARIOS_DE_VISITA_V5,
   CENARIOS_DO_ATENDENTE_V5,

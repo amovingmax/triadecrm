@@ -64,6 +64,8 @@ const saida = saidaDoAtendenteV3.extend({
     ),
 });
 export type SaidaDoAtendenteV6 = z.infer<typeof saida>;
+/** O schema da saída, para a v8 estender (24/11/2026). */
+export { saida as saidaDoAtendenteV6 };
 
 const ANTES_DO_BLOCO = 'O QUE É DE GENTE (acao = passar_para_corretor):';
 

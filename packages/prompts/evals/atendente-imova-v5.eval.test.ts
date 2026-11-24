@@ -42,7 +42,7 @@ const comBase = { ...v5, sistema: sistemaComBaseV5(BASE_DO_ENSAIO_V5) };
 
 describe('atendente-imova@v5: o contrato', () => {
   it('continua no catálogo (a vigente é a v6, desde 17/11/2026), e a v4 também', () => {
-    expect(VIGENTES['atendente-imova']).toBe(7);
+    expect(VIGENTES['atendente-imova']).toBe(8);
     expect(promptVigente('atendente-imova')).not.toBe(v5);
     expect(obterPrompt('atendente-imova', 5)).toBe(v5);
     expect(obterPrompt('atendente-imova', 4)).toBe(v4);

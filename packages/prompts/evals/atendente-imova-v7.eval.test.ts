@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { VIGENTES, obterPrompt, promptVigente } from '../src/catalogo';
+import { VIGENTES, obterPrompt } from '../src/catalogo';
 import { varrerMontagem } from '../src/nucleo/auditoria-pii';
 import { esquemaDeSaida, prepararChamada } from '../src/nucleo/chamada';
 import { BASE_DO_ENSAIO_V5 } from '../src/prompts/atendente-imova/cenarios-v5';
@@ -26,9 +26,9 @@ import {
 const CONTATO = { leadId: 'lead-21', nome: 'Alinne Fernandes', empresa: null, telefones: ['+5584988776655'] };
 
 describe('atendente-imova@v7', () => {
-  it('é a vigente; a v6 continua no catálogo, sem ferramenta', () => {
-    expect(VIGENTES['atendente-imova']).toBe(7);
-    expect(promptVigente('atendente-imova')).toBe(v7);
+  it('deu lugar à v8 (24/11/2026) e continua no catálogo; a v6 também, sem ferramenta', () => {
+    expect(VIGENTES['atendente-imova']).toBe(8);
+    expect(obterPrompt('atendente-imova', 7)).toBe(v7);
     expect(obterPrompt('atendente-imova', 6)).toBe(v6);
     expect(v6.ferramentas).toBeUndefined();
     expect(v6.sistema).not.toMatch(/buscar_no_mapa/);
