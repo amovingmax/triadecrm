@@ -11,6 +11,7 @@ import {
   ferramentaBuscarNoMapa,
   lugarComOTipoTrocado,
   lugarSemTipo,
+  regioesConhecidas,
   regioesDoCliente,
   textoDeLonge,
   variacoesDaBusca,
@@ -94,6 +95,16 @@ function montar(falasDoCliente?: readonly string[]) {
             cep: null,
             latitude: -5.8623832,
             longitude: -35.1979617,
+          },
+          {
+            codigo: 'PT0001_IMOVA',
+            tipo: 'casa',
+            bairro: 'Ponta Negra',
+            cidade: 'Natal',
+            endereco: null,
+            cep: null,
+            latitude: -5.8800579,
+            longitude: -35.1790818,
           },
         ],
       },
@@ -187,6 +198,34 @@ describe('a região que o cliente disse', () => {
       'Ponta Negra',
     ]);
     expect(regioesDoCliente(['Nísia Floresta'], ['nisia floresta'])).toEqual(['Nísia Floresta']);
+    // "Feliz Natal" não é a cidade.
+    expect(regioesDoCliente(['Natal'], ['Feliz Natal! Vi um terreno perto da rotatória'])).toEqual(
+      [],
+    );
+    expect(regioesDoCliente(['Natal'], ['Bom Natal, o terreno é em Natal mesmo'])).toEqual([
+      'Natal',
+    ]);
+  });
+
+  it('as cidades e os bairros dos nossos imóveis contam, menos "Centro"', () => {
+    const imovel = (cidade: string | null, bairro: string | null) => ({
+      codigo: 'X',
+      tipo: null,
+      bairro,
+      cidade,
+      rua: null,
+      cep: null,
+      pino: null,
+    });
+    expect(
+      regioesConhecidas([
+        imovel('Natal', 'Ponta Negra'),
+        imovel('Natal', 'Capim Macio'),
+        imovel('Extremoz', 'Centro'),
+        imovel('Tibau do Sul', 'Pipa'),
+        imovel(null, null),
+      ]),
+    ).toEqual(['Natal', 'Ponta Negra', 'Capim Macio', 'Extremoz', 'Tibau do Sul', 'Pipa']);
   });
 
   it('cidade exige a mesma cidade; bairro, até 5 km; região que o mapa não acha não barra', () => {
@@ -288,6 +327,38 @@ describe('a ferramenta com as respostas reais de 24/11', () => {
     );
   });
 
+  it('conserto 3: o cliente escreveu "Ponta Negra" e a IA buscou só com "Natal" (bateria de 24/11): "não use"', async () => {
+    const { ferramenta, aoMapa } = montar([
+      'Vi um terreno perto da Rotatória do Golfinho, em Ponta Negra. Ainda está disponível?',
+    ]);
+    const r = await ferramenta({ referencia: 'Rotatória do Golfinho', cidade: 'Natal' });
+    expect(r.texto).toBe(
+      '"Rotatória do Golfinho, Natal": o mapa só achou esse lugar longe de Ponta Negra, que o cliente disse: não use. Pergunte o bairro, a rua e o CEP (nota 7 a).',
+    );
+    expect(aoMapa).toEqual([
+      'Rotatória do Golfinho, Natal, RN',
+      'Rotatória do Golfinho, RN',
+      'Ponta Negra, RN',
+    ]);
+    // E a busca sem cidade nenhuma, na mesma resposta, também não passa.
+    const sem = await ferramenta({ referencia: 'Rotatória do Golfinho' });
+    expect(sem.texto).toMatch(/longe de Ponta Negra, que o cliente disse: não use/);
+  });
+
+  it('só as falas recentes do cliente contam: "Ponta Negra" de muitas mensagens atrás não barra', async () => {
+    const antigas = [
+      'Vocês têm algo em Ponta Negra?',
+      'ok',
+      'obrigado',
+      'certo',
+      'entendi',
+      'beleza',
+    ];
+    const { ferramenta } = montar([...antigas, NAO_DISSE_A_CIDADE]);
+    const r = await ferramenta({ referencia: 'Rotatória do Golfinho' });
+    expect(r.texto).toContain('Imóveis nossos bem perto: TE0004_IMOVA');
+  });
+
   it('conserto 2: "Rua Professor Etelvino Cunha" é Avenida no mapa; o TE0006 fica bem perto', async () => {
     const { ferramenta, aoMapa } = montar([
       'Vi um terreno na Rua Professor Etelvino Cunha, em Natal',
@@ -295,7 +366,7 @@ describe('a ferramenta com as respostas reais de 24/11', () => {
     const r = await ferramenta({ referencia: 'Rua Professor Etelvino Cunha', cidade: 'Natal' });
     expect(r.texto).toBe(
       '"Rua Professor Etelvino Cunha, Natal": achado no mapa com outro nome: Avenida Professor Etelvino Cunha (rua), em Zona Sul, Natal. ' +
-        'Imóveis nossos bem perto: TE0006 (terreno, Capim Macio). Imóveis nossos na mesma região: TE0001_IMOVA (terreno, Capim Macio).',
+        'Imóveis nossos bem perto: TE0006 (terreno, Capim Macio). Imóveis nossos na mesma região: TE0001_IMOVA (terreno, Capim Macio); PT0001_IMOVA (casa, Ponta Negra).',
     );
     expect(aoMapa).toEqual([
       'Rua Professor Etelvino Cunha, Natal, RN',

@@ -32,7 +32,8 @@
  *   2. **Trocar Rua e Avenida:** "Rua X" não achada vira "Avenida X" e só "X" (e o
  *      contrário; "R." e "Av." também). "Só X" exige duas palavras e a cidade: "Golfinho"
  *      sozinho acha outro lugar.
- *   3. **Nunca outra cidade:** se o cliente escreveu a cidade ou o bairro, o lugar achado
+ *   3. **Nunca outra cidade:** se o cliente escreveu a cidade ou o bairro (o do pedido, ou
+ *      uma cidade ou bairro dos nossos imóveis, nas falas recentes dele), o lugar achado
  *      tem de estar nessa cidade ou a até 5 km desse bairro; senão a ferramenta diz "não
  *      use" e manda perguntar o bairro, a rua e o CEP. A cidade que a IA deduziu sozinha
  *      não conta: foi o palpite "Natal" que derrubou a Rotatória do Golfinho.
@@ -244,12 +245,38 @@ export function variacoesDaBusca(
  * Golfinho (bateria da v8, 24/11/2026).
  */
 export function regioesDoCliente(regioes: readonly string[], falasDoCliente: readonly string[]): string[] {
-  const falas = falasDoCliente.map(semAcento);
+  // "Feliz Natal" não é a cidade.
+  const falas = falasDoCliente.map((f) =>
+    semAcento(f).replace(/\b(feliz|bom|boas festas( de)?|otimo|excelente)\s+natal\b/g, ' '),
+  );
   return regioes.filter((r) => {
     const alvo = semAcento(r).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const palavra = new RegExp(`(^|[^a-z0-9])${alvo}($|[^a-z0-9])`);
     return falas.some((f) => palavra.test(f));
   });
+}
+
+/** As falas do cliente que contam: as mais recentes (conversa antiga pode falar de outro imóvel). */
+export const MAX_FALAS_DO_CLIENTE = 6;
+
+/** Bairro que é palavra comum ("no centro da cidade") não conta como região dita. */
+const REGIOES_QUE_NAO_CONTAM = new Set(['centro']);
+
+/**
+ * As cidades e os bairros dos nossos imóveis: se o cliente escreveu um deles, é região dele,
+ * mesmo que a IA não o ponha na busca (bateria de 24/11/2026: o cliente disse "em Ponta
+ * Negra" e a IA buscou a rotatória só com "Natal").
+ */
+export function regioesConhecidas(imoveis: readonly ImovelNoMapa[]): string[] {
+  const vistas = new Map<string, string>();
+  for (const i of imoveis) {
+    for (const r of [i.cidade, i.bairro]) {
+      if (r === null || r.trim().length < 3) continue;
+      const k = semAcento(r);
+      if (!REGIOES_QUE_NAO_CONTAM.has(k) && !vistas.has(k)) vistas.set(k, r.trim());
+    }
+  }
+  return [...vistas.values()];
 }
 
 const TIPOS_DE_CIDADE_NA_REGIAO = new Set(['city', 'town', 'municipality']);
@@ -460,7 +487,8 @@ export function ferramentaBuscarNoMapa(argumentos: {
         erro: erro instanceof Error ? erro.message.slice(0, 200) : String(erro),
       });
 
-    const doCliente = regioesDoCliente(regioes, argumentos.falasDoCliente ?? []);
+    const falas = (argumentos.falasDoCliente ?? []).slice(-MAX_FALAS_DO_CLIENTE);
+    let doCliente: string[] = [];
     const ondeFica = async (regiao: string): Promise<LugarNoMapa | null> => {
       const k = semAcento(regiao);
       if (regioesNoMapa.has(k)) return regioesNoMapa.get(k) ?? null;
@@ -486,6 +514,12 @@ export function ferramentaBuscarNoMapa(argumentos: {
     };
 
     try {
+      const imoveis = await imoveisComPino(cliente, busca, logger);
+      const candidatas = [...regioes];
+      for (const r of regioesConhecidas(imoveis)) {
+        if (!candidatas.some((c) => semAcento(c) === semAcento(r))) candidatas.push(r);
+      }
+      doCliente = regioesDoCliente(candidatas, falas);
       let lugares = await procurar(consulta);
       const tentadas: ComoAchou[] = [];
       let achado: { lugar: LugarNoMapa; como: ComoAchou } | null = null;
@@ -514,7 +548,6 @@ export function ferramentaBuscarNoMapa(argumentos: {
         logger.info('o mapa achou o lugar por uma variação', { consulta, como: achado.como });
       }
 
-      const imoveis = await imoveisComPino(cliente, busca, logger);
       const texto =
         achado !== null
           ? textoDoResultado(consulta, [achado.lugar], imoveis, { como: achado.como, regioes, tentadas })
