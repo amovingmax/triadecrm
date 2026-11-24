@@ -50,6 +50,13 @@ export interface Expectativa {
   readonly semPergunta?: boolean;
   /** A busca no mapa é obrigatória (nota 14); vale só para versão com a ferramenta. */
   readonly buscaNoMapa?: boolean;
+  /**
+   * A foto para confirmar o imóvel (v8, 24/11/2026); vale só para versão com a foto.
+   * `deve`: manda a foto deste imóvel. `pode`: a foto deste imóvel, ou (sem foto) as
+   * regras `deve`/`algum` de sempre, para referência tão precisa que dispensa confirmar.
+   * Ausente: sem foto.
+   */
+  readonly foto?: { readonly quando: 'deve' | 'pode'; readonly codigo: RegExp };
 }
 
 /** Uma fala da conversa: quem, quantos minutos antes de "agora" e o texto. */
@@ -145,6 +152,7 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       acoes: RESPONDEU,
       algum: [TABATINGA],
       nunca: [NAO_TEMOS, AREA_NA_CONFIRMACAO, PERGUNTA_DE_AREA],
+      foto: { quando: 'deve', codigo: /^TE0004/i },
     },
   },
   {
@@ -176,6 +184,7 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
           'pergunta a rua ou a avenida de novo',
         ),
       ],
+      foto: { quando: 'deve', codigo: /^TE0004/i },
     },
   },
   {
@@ -202,6 +211,7 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
         r(/parnamirim|bonor|3\.000 ?m²/i, 'oferece outro terreno no lugar'),
         PERGUNTA_DE_AREA,
       ],
+      foto: { quando: 'deve', codigo: /^TE0006/i },
     },
   },
   {
@@ -224,6 +234,7 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       acoes: RESPONDEU,
       algum: [NOVECENTOS_PRECO],
       nunca: [NAO_TEMOS, r(/parnamirim|bonor/i, 'oferece outro terreno')],
+      foto: { quando: 'pode', codigo: /^TE0006/i },
     },
   },
   {
@@ -238,7 +249,12 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       { de: 'cliente', antes: 2, texto: 'Oi' },
       { de: 'cliente', antes: 1, texto: 'Preço do terreno Monte Sinai' },
     ],
-    espera: { acoes: RESPONDEU, algum: [NOVECENTOS_PRECO], nunca: [NAO_TEMOS] },
+    espera: {
+      acoes: RESPONDEU,
+      algum: [NOVECENTOS_PRECO],
+      nunca: [NAO_TEMOS],
+      foto: { quando: 'pode', codigo: /^TE0006/i },
+    },
   },
   {
     id: 'I06',
@@ -380,6 +396,7 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       algum: [TABATINGA],
       nunca: [NAO_TEMOS, AREA_NA_CONFIRMACAO],
       buscaNoMapa: true,
+      foto: { quando: 'deve', codigo: /^TE0004/i },
     },
   },
   {
@@ -1120,11 +1137,15 @@ export interface RespostaParaConferir {
   readonly agenda: SaidaDoAtendenteV6['agenda'];
   /** Os nomes das ferramentas que a IA chamou (v7: buscar_no_mapa). */
   readonly ferramentas?: readonly string[];
+  /** A foto para confirmar que a IA pediu (v8), ou null. */
+  readonly foto?: { readonly imovelCodigo: string; readonly legenda: string } | null;
 }
 
 export interface OpcoesDaConferencia {
   /** A versão tem a busca no mapa? Sem ela, `buscaNoMapa` não é cobrada. */
   readonly temMapa: boolean;
+  /** A versão manda a foto para confirmar (v8)? Sem ela, `foto` não é cobrada. */
+  readonly temFoto?: boolean;
 }
 
 /** Vazio é acerto. Cada item diz o que falhou, para o relatório. */
@@ -1135,7 +1156,10 @@ export function conferirCasoDaBateria(
 ): string[] {
   const falhas: string[] = [];
   const { espera } = caso;
+  const foto = opcoes.temFoto === true ? (resposta.foto ?? null) : null;
+  // O que o cliente lê: o texto e, com a foto, a legenda logo depois.
   const texto = resposta.mensagem;
+  const lido = foto === null ? texto : `${texto}\n${foto.legenda}`;
 
   if (!espera.acoes.includes(resposta.acao)) {
     falhas.push(`ação ${resposta.acao}; esperava ${espera.acoes.join(' ou ')}`);
@@ -1154,22 +1178,43 @@ export function conferirCasoDaBateria(
   if (espera.semPergunta === true && perguntas > 0) falhas.push('faz pergunta quando não devia');
   else if (perguntas > 1) falhas.push(`${perguntas} perguntas na mesma mensagem (nota 9 g)`);
 
-  for (const regra of SEMPRE_PROIBIDO) if (regra.re.test(texto)) falhas.push(regra.diz);
-  if (espera.podeCorretor !== true && CORRETOR.re.test(texto)) falhas.push(CORRETOR.diz);
+  for (const regra of SEMPRE_PROIBIDO) if (regra.re.test(lido)) falhas.push(regra.diz);
+  if (espera.podeCorretor !== true && CORRETOR.re.test(lido)) falhas.push(CORRETOR.diz);
+
+  // A foto para confirmar (v8): a do imóvel certo, só quando o caso pede, e a frase antes
+  // dela sem preço, sem metragem e sem pergunta (a pergunta é a legenda).
+  if (opcoes.temFoto === true) {
+    const pedida = espera.foto;
+    if (foto === null && pedida?.quando === 'deve') falhas.push('não manda a foto para confirmar o imóvel');
+    if (foto !== null && pedida === undefined) falhas.push('manda foto quando não devia');
+    if (foto !== null && pedida !== undefined && !pedida.codigo.test(foto.imovelCodigo)) {
+      falhas.push(`manda a foto de ${foto.imovelCodigo}, que não é o imóvel do caso`);
+    }
+    if (foto !== null) {
+      if (/R\$/.test(texto)) falhas.push('dá o preço antes de o cliente confirmar o imóvel');
+      if (/\d[\d.]*\s?m²/i.test(texto)) falhas.push('dá a metragem antes de o cliente confirmar o imóvel');
+      if (contarPerguntas(texto) > 0) falhas.push('pergunta no texto, além da legenda da foto');
+      if (contarPerguntas(foto.legenda) !== 1) falhas.push('a legenda da foto não é uma pergunta');
+    }
+  }
+  // Com a foto num caso "pode", as regras de conteúdo de sempre (o preço) não se aplicam:
+  // o preço vem depois da confirmação.
+  const regrasDeConteudo = !(foto !== null && espera.foto?.quando === 'pode');
 
   // Passar sem texto é aceito (o CRM manda o aviso padrão): as regras de conteúdo valem
   // para o que a IA escreveu.
   const semTexto = texto.trim() === '';
-  for (const regra of espera.deve ?? []) {
-    if (semTexto || !regra.re.test(texto)) falhas.push(`não ${regra.diz}`);
+  for (const regra of regrasDeConteudo ? (espera.deve ?? []) : []) {
+    if (semTexto || !regra.re.test(lido)) falhas.push(`não ${regra.diz}`);
   }
   if (
+    regrasDeConteudo &&
     (espera.algum ?? []).length > 0 &&
-    (semTexto || !(espera.algum ?? []).some((regra) => regra.re.test(texto)))
+    (semTexto || !(espera.algum ?? []).some((regra) => regra.re.test(lido)))
   ) {
     falhas.push(`não ${(espera.algum ?? []).map((regra) => regra.diz).join(' nem ')}`);
   }
-  for (const regra of espera.nunca ?? []) if (regra.re.test(texto)) falhas.push(regra.diz);
+  for (const regra of espera.nunca ?? []) if (regra.re.test(lido)) falhas.push(regra.diz);
 
   if (
     espera.buscaNoMapa === true &&

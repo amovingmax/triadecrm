@@ -26,10 +26,12 @@ import {
   type PromptVersionado,
   type SaidaDaAvaliacaoV2,
   type SaidaDoAtendenteV6,
+  type SaidaDoAtendenteV8,
   MAX_BUSCAS_NO_MAPA,
   MAX_VOLTAS_DO_ATENDENTE,
   atendenteImovaV6,
   atendenteImovaV7,
+  atendenteImovaV8,
   avaliacaoDoAtendimentoV2,
   casosDaBateria,
   conferirCasoDaBateria,
@@ -38,6 +40,7 @@ import {
   reidratar,
   sistemaComBaseV6,
   sistemaComBaseV7,
+  sistemaComBaseV8,
 } from '@komune/prompts';
 
 import { ErroDaEsteira } from '../fila/esteira';
@@ -61,8 +64,8 @@ import {
 const AVISO_PADRAO = 'Vou verificar isso direitinho e já te retorno por aqui.';
 
 export interface OpcoesDaBateria {
-  /** 7 (vigente, com a busca no mapa) ou 6 (sem mapa). */
-  readonly versao: 6 | 7;
+  /** 8 (vigente: mapa e foto para confirmar), 7 (mapa) ou 6 (sem mapa). */
+  readonly versao: 6 | 7 | 8;
   /** Quantas vezes cada caso roda (a IA não responde sempre igual). */
   readonly repeticoes: number;
   /** Teto da rodada inteira, em US$, conferido antes de cada caso. */
@@ -89,6 +92,8 @@ export interface RespostaDaBateria {
   readonly mensagem: string;
   readonly agenda: SaidaDoAtendenteV6['agenda'];
   readonly buscas: readonly string[];
+  /** A foto para confirmar que a IA pediu (v8); `existe` = o banco acha a capa. */
+  readonly foto: { readonly imovelCodigo: string; readonly legenda: string; readonly existe: boolean } | null;
   readonly motivo: string;
   readonly confianca: number | null;
   readonly falhas: readonly string[];
@@ -136,9 +141,14 @@ function acaoNoDia(acao: SaidaDoAtendenteV6['acao']): (typeof ACOES_DA_IA_NO_DIA
 }
 
 /** O que o cliente veria: o texto, o aviso padrão na passagem sem texto, o link no fim. */
-function oQueSaiu(acao: SaidaDoAtendenteV6['acao'], mensagem: string): string {
+function oQueSaiu(
+  acao: SaidaDoAtendenteV6['acao'],
+  mensagem: string,
+  legendaDaFoto: string | null = null,
+): string {
   if (acao === 'passar_para_corretor' && mensagem === '') return AVISO_PADRAO;
   if (acao === 'enviar_link_da_agenda') return `${mensagem}\n\n[link da agenda]`.trim();
+  if (legendaDaFoto !== null) return `${mensagem}\n\n[foto do imóvel] ${legendaDaFoto}`;
   return mensagem;
 }
 
@@ -180,14 +190,15 @@ export async function rodarBateria(
 ): Promise<ResultadoDaBateria> {
   if (contexto.empresa !== 'imova')
     throw new Error('a bateria é da IA que atende, que só existe na Imova');
-  const comMapa = opcoes.versao === 7;
+  const comMapa = opcoes.versao >= 7;
+  const comFoto = opcoes.versao >= 8;
   const mapa = contexto.mapa;
   if (
     comMapa &&
     (mapa === undefined || typeof contexto.modelo.conversarComFerramentas !== 'function')
   ) {
     throw new Error(
-      'a v7 precisa do mapa no worker (NOMINATIM_USER_AGENT); sem ele, rode com --versao=6',
+      `a v${opcoes.versao} precisa do mapa no worker (NOMINATIM_USER_AGENT); sem ele, rode com --versao=6`,
     );
   }
 
@@ -197,9 +208,12 @@ export async function rodarBateria(
     caderno: lida.caderno.map((k) => ({ ...k, texto: semOLinkDaAgenda(k.texto) })),
   };
   const modelo = (await modeloEscolhido(contexto)) as typeof atendenteImovaV6.modelo;
-  const prompt: PromptVersionado<EntradaDoAtendenteV6, SaidaDoAtendenteV6> = comMapa
-    ? { ...atendenteImovaV7, modelo, sistema: sistemaComBaseV7(base) }
-    : { ...atendenteImovaV6, modelo, sistema: sistemaComBaseV6(base) };
+  const prompt: PromptVersionado<EntradaDoAtendenteV6, SaidaDoAtendenteV6 | SaidaDoAtendenteV8> =
+    comFoto
+      ? { ...atendenteImovaV8, modelo, sistema: sistemaComBaseV8(base) }
+      : comMapa
+        ? { ...atendenteImovaV7, modelo, sistema: sistemaComBaseV7(base) }
+        : { ...atendenteImovaV6, modelo, sistema: sistemaComBaseV6(base) };
   const promptVersion = `${prompt.id}@v${prompt.versao}`;
 
   // Só existe com a v7 (conferido acima): é o que decide entre o laço e a chamada única.
@@ -247,6 +261,20 @@ export async function rodarBateria(
           soOPrimeiroNome(limparTexto(reidratar(saida.mensagem, executada.mapa)), caso.nome),
         );
         const buscas = [...uso.consultas];
+        // A foto (v8): a legenda limpa como o worker faz, e se o banco acha a capa (só
+        // leitura; a bateria nunca copia nem manda a foto).
+        const pedida = 'fotoParaConfirmar' in saida ? saida.fotoParaConfirmar : null;
+        const foto =
+          pedida === null
+            ? null
+            : {
+                imovelCodigo: pedida.imovelCodigo,
+                legenda: limparTexto(reidratar(pedida.legenda, executada.mapa)),
+                existe:
+                  (await rpc<unknown>(contexto, 'ia_atendente_capa_do_imovel', {
+                    p_codigo: pedida.imovelCodigo,
+                  }).catch(() => null)) !== null,
+              };
         const falhas = conferirCasoDaBateria(
           caso,
           {
@@ -254,9 +282,13 @@ export async function rodarBateria(
             mensagem,
             agenda: saida.agenda,
             ferramentas: buscas.map(() => 'buscar_no_mapa'),
+            foto,
           },
-          { temMapa: comMapa },
+          { temMapa: comMapa, temFoto: comFoto },
         );
+        if (foto !== null && !foto.existe) {
+          falhas.push(`a foto pedida (${foto.imovelCodigo}) não existe: código desconhecido ou anúncio sem foto`);
+        }
 
         let nota: NotaDaJuiza | null = null;
         if (opcoes.juiza && saida.acao !== 'nao_responder') {
@@ -264,7 +296,7 @@ export async function rodarBateria(
             const avaliada = await executar<EntradaDaAvaliacao, SaidaDaAvaliacaoV2>(
               contexto,
               avaliacaoDoAtendimentoV2,
-              entradaDaJuiza(caso, saida.acao, oQueSaiu(saida.acao, mensagem)),
+              entradaDaJuiza(caso, saida.acao, oQueSaiu(saida.acao, mensagem, foto?.legenda ?? null)),
               contato,
               {},
             );
@@ -295,6 +327,7 @@ export async function rodarBateria(
           mensagem,
           agenda: saida.agenda,
           buscas,
+          foto,
           motivo: limparTexto(reidratar(saida.motivo, executada.mapa)),
           confianca: saida.confianca,
           falhas,
@@ -314,6 +347,7 @@ export async function rodarBateria(
           mensagem: '',
           agenda: null,
           buscas: [],
+          foto: null,
           motivo: '',
           confianca: null,
           falhas: [`a chamada falhou (${motivo.slice(0, 300)})`],
@@ -368,8 +402,9 @@ export function relatorioDaBateria(r: ResultadoDaBateria): string {
     linhas.push(`${ok === lista.length ? '✓' : '✗'} ${caso} ${ok}/${lista.length}`);
     for (const x of lista) {
       const busca = x.buscas.length > 0 ? ` [mapa: ${x.buscas.join('; ')}]` : '';
+      const foto = x.foto === null ? '' : ` [foto ${x.foto.imovelCodigo}: ${x.foto.legenda}]`;
       linhas.push(
-        `    ${x.rodada}. ${x.acao ?? 'falhou'}${busca}: ${x.mensagem.replace(/\s+/g, ' ')}`,
+        `    ${x.rodada}. ${x.acao ?? 'falhou'}${busca}: ${x.mensagem.replace(/\s+/g, ' ')}${foto}`,
       );
       for (const falha of x.falhas) linhas.push(`       → ${falha}`);
     }

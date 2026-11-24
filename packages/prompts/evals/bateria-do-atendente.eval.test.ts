@@ -170,6 +170,103 @@ describe('bateria do atendente: a régua', () => {
     ).toEqual(['não pede desculpa']);
   });
 
+  it('a foto para confirmar (v8): a do imóvel certo, a frase sem preço nem pergunta, e só quando o caso pede', () => {
+    const comFoto = { temMapa: true, temFoto: true };
+    const frase =
+      'Acho que já sei qual é! Temos um terreno de frente para o mar em Tabatinga, perto de Camurupim.';
+    const fotoTabatinga = { imovelCodigo: 'TE0004_IMOVA', legenda: 'É este aqui que você viu?' };
+    const resp = (mensagem: string, foto: typeof fotoTabatinga | null) => ({
+      acao: 'responder' as const,
+      mensagem,
+      agenda: null,
+      foto,
+    });
+    // I01: a foto certa, a frase limpa.
+    expect(conferirCasoDaBateria(caso('I01'), resp(frase, fotoTabatinga), comFoto)).toEqual([]);
+    // Sem a foto, num caso "deve".
+    expect(conferirCasoDaBateria(caso('I01'), resp(frase, null), comFoto)).toContain(
+      'não manda a foto para confirmar o imóvel',
+    );
+    // A foto de outro imóvel.
+    expect(
+      conferirCasoDaBateria(
+        caso('I01'),
+        resp(frase, { ...fotoTabatinga, imovelCodigo: 'TE0006' }),
+        comFoto,
+      ).join(' | '),
+    ).toMatch(/foto de TE0006, que não é o imóvel do caso/);
+    // Preço, metragem e pergunta no texto que vai antes da foto.
+    const falhas = conferirCasoDaBateria(
+      caso('I01'),
+      resp(`${frase} Tem 816 m² e está à venda por R$ 520.000. Quer saber mais?`, fotoTabatinga),
+      comFoto,
+    );
+    expect(falhas).toEqual(
+      expect.arrayContaining([
+        'dá o preço antes de o cliente confirmar o imóvel',
+        'dá a metragem antes de o cliente confirmar o imóvel',
+        'pergunta no texto, além da legenda da foto',
+      ]),
+    );
+    // Legenda que não pergunta.
+    expect(
+      conferirCasoDaBateria(
+        caso('I01'),
+        resp(frase, { ...fotoTabatinga, legenda: 'Segue a foto.' }),
+        comFoto,
+      ),
+    ).toContain('a legenda da foto não é uma pergunta');
+    // I10 (dois terrenos em Pipa): foto nenhuma.
+    expect(
+      conferirCasoDaBateria(
+        caso('I10'),
+        resp('Temos dois em Pipa: 1.338 m² e 2.000 m².', fotoTabatinga),
+        comFoto,
+      ),
+    ).toContain('manda foto quando não devia');
+    // I04 ("pode"): com a foto, o preço não é cobrado; sem a foto, é.
+    const fotoDe900 = { imovelCodigo: 'TE0006', legenda: 'É este aqui que você viu?' };
+    expect(
+      conferirCasoDaBateria(
+        caso('I04'),
+        resp(
+          'Acho que já sei qual é! Temos um terreno na Rua Professor Etelvino Cunha, em Capim Macio.',
+          fotoDe900,
+        ),
+        comFoto,
+      ),
+    ).toEqual([]);
+    expect(
+      conferirCasoDaBateria(
+        caso('I04'),
+        resp('Temos um terreno na Rua Professor Etelvino Cunha.', null),
+        comFoto,
+      ).join(' | '),
+    ).toMatch(/não dá o valor do terreno de 900 m²/);
+    // I03: a pergunta da legenda conta como a confirmação que o caso pede.
+    expect(
+      conferirCasoDaBateria(
+        caso('I03'),
+        resp(
+          'Acho que já sei qual é! Temos um terreno na Rua Professor Etelvino Cunha, em Capim Macio.',
+          {
+            imovelCodigo: 'TE0006',
+            legenda: 'É este o terreno que você viu?',
+          },
+        ),
+        comFoto,
+      ),
+    ).toEqual([]);
+    // Versão sem foto (v7): o campo é ignorado.
+    expect(
+      conferirCasoDaBateria(
+        caso('I10'),
+        resp('Temos dois em Pipa: 1.338 m² e 2.000 m².', fotoTabatinga),
+        comMapa,
+      ),
+    ).toEqual([]);
+  });
+
   it('o "tudo bem?" do cumprimento não conta como pergunta', () => {
     expect(contarPerguntas('Olá, tudo bem? Como posso te ajudar?')).toBe(1);
     expect(contarPerguntas('Qual dia? E qual período?')).toBe(2);

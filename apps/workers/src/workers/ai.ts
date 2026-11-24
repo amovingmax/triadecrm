@@ -180,7 +180,8 @@ export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
         ? valor
         : padrao;
     };
-    const versao = numero('versao', 7) === 6 ? 6 : 7;
+    const pedida = numero('versao', 8);
+    const versao = pedida === 6 ? 6 : pedida === 7 ? 7 : 8;
     const r = await rodarBateria(contexto, {
       versao,
       repeticoes: Math.min(5, Math.trunc(numero('repeticoes', 1))),
