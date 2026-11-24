@@ -1015,6 +1015,96 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
     },
   },
 
+  {
+    id: 'G06',
+    titulo: '"Show de bola. Vou querer!" logo depois do preço (quer o imóvel, não pediu visita)',
+    grupo: 'agenda',
+    origem:
+      'teste real de 24/11 (17h42): a IA perguntou o dia da visita; o dono quer o link (nota 5 b)',
+    critico: true,
+    ...TERCA,
+    nome: 'Lúcia Campos',
+    falas: [
+      {
+        de: 'cliente',
+        antes: 5,
+        texto: 'Vi um terreno perto da Rotatória do Golfinho. Ainda está disponível?',
+      },
+      {
+        de: 'ia',
+        antes: 4,
+        texto:
+          'É o nosso terreno de frente para o mar, em Tabatinga, perto da Rotatória do Golfinho.',
+      },
+      {
+        de: 'ia',
+        antes: 4,
+        texto: '[foto do anúncio TE0004_IMOVA que você mandou] É este o terreno que você viu?',
+      },
+      { de: 'cliente', antes: 3, texto: 'sim' },
+      {
+        de: 'ia',
+        antes: 2,
+        texto:
+          'Esse mesmo! Ele está disponível, sim. Fica de frente para o mar, em Nísia Floresta, e o valor de venda é R$ 520.000.',
+      },
+      { de: 'cliente', antes: 1, texto: 'show de bola. vou querer!' },
+    ],
+    espera: {
+      acoes: ['enviar_link_da_agenda'],
+      agenda: 'reuniao',
+      nunca: [
+        r(
+          /qual dia|per[íi]odo|manh[ãa] ou (à |de )?tarde/i,
+          'pergunta o dia e o período da visita',
+        ),
+      ],
+    },
+  },
+  {
+    id: 'G07',
+    titulo: '"Quero fechar negócio" depois do preço',
+    grupo: 'agenda',
+    origem:
+      'decisão do dono em 24/11: quem quer o imóvel recebe o link da reunião online (nota 5 b)',
+    critico: false,
+    ...TERCA,
+    nome: 'Sílvia Rocha',
+    falas: [
+      { de: 'cliente', antes: 3, texto: 'Qual o valor do terreno de Tabatinga?' },
+      {
+        de: 'ia',
+        antes: 2,
+        texto:
+          'É o terreno de frente para o mar em Tabatinga, em Nísia Floresta. O valor de venda é R$ 520.000.',
+      },
+      { de: 'cliente', antes: 1, texto: 'Gostei. Quero fechar negócio.' },
+    ],
+    espera: {
+      acoes: ['enviar_link_da_agenda'],
+      agenda: 'reuniao',
+      nunca: [
+        r(
+          /qual dia|per[íi]odo|manh[ãa] ou (à |de )?tarde/i,
+          'pergunta o dia e o período da visita',
+        ),
+      ],
+    },
+  },
+  {
+    id: 'G08',
+    titulo: '"Olá! Tenho interesse neste terreno" na primeira mensagem (é curiosidade, sem link)',
+    grupo: 'agenda',
+    origem: 'mensagem padrão dos portais; nota 2 (a) e nota 5 (b)',
+    critico: true,
+    ...TERCA,
+    nome: 'Sílvia Rocha',
+    falas: [{ de: 'cliente', antes: 1, texto: 'Olá! Tenho interesse neste terreno de Tabatinga.' }],
+    espera: {
+      acoes: RESPONDEU,
+      nunca: [LINK_OU_CONVITE, r(/link|agenda/i, 'manda o link da agenda na primeira resposta')],
+    },
+  },
   // ================================================================ limites
   {
     id: 'L01',

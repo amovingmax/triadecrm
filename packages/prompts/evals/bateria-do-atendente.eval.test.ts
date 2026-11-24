@@ -22,8 +22,8 @@ import { atendenteImovaV7 as v7, sistemaComBaseV7 } from '../src/prompts/atenden
  */
 
 describe('bateria do atendente: os casos', () => {
-  it('são 43 (o A14, o I16 e o I17 entraram em 24/11), com id único, e cobrem os quatro grupos', () => {
-    expect(CASOS_DA_BATERIA).toHaveLength(43);
+  it('são 46 (o A14, o I16, o I17 e os G06 a G08 entraram em 24/11), com id único, e cobrem os quatro grupos', () => {
+    expect(CASOS_DA_BATERIA).toHaveLength(46);
     const ids = CASOS_DA_BATERIA.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const grupo of GRUPOS_DA_BATERIA) {
