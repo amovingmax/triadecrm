@@ -335,6 +335,9 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       acoes: RESPONDEU,
       deve: [r(/\?/, 'pergunta qual dos terrenos')],
       nunca: [PERGUNTA_DE_AREA, r(/tabatinga|parnamirim|pipa/i, 'fala de terreno de outra cidade')],
+      // A FICHA 1 (e) diz desde 17/11 que a frente do terreno de 900 m² é murada: a foto
+      // dele para o cliente confirmar é um jeito certo de perguntar qual (24/11).
+      foto: { quando: 'pode', codigo: /^TE0006/i },
     },
   },
   {
