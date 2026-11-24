@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { SaidaDoAtendenteV6 } from '@komune/prompts';
 
-import { entradaDaJuiza, relatorioDaBateria, rodarBateria } from './bateria-do-atendente';
+import {
+  entradaDaJuiza,
+  relatorioDaBateria,
+  rodarBateria,
+  trocasDoCadernoDoAmbiente,
+} from './bateria-do-atendente';
 import { bancoFalso } from './banco-de-teste';
 import { clienteDuble } from './duble';
 import type { ContextoDaIa } from './execucao';
@@ -123,6 +128,51 @@ describe('a bateria de ensaio no worker', () => {
     });
     expect(r.respostas).toHaveLength(1);
     expect(r.parouEm).toMatch(/teto de US\$ 0\.00 alcançado antes de A01 \(rodada 1\)/);
+  });
+
+  it('as notas trocadas só no ensaio entram no lugar das do banco, e nota que não existe para tudo', async () => {
+    const { contexto, duble } = montar();
+    const sistemas: string[] = [];
+    const r = await rodarBateria(
+      {
+        ...contexto,
+        modelo: {
+          conversar: (pedido) => {
+            sistemas.push(pedido.sistema);
+            return duble.conversar(pedido);
+          },
+        },
+      },
+      {
+        versao: 6,
+        repeticoes: 1,
+        tetoUsd: 5,
+        juiza: false,
+        casos: ['I01'],
+        trocasDoCaderno: [{ id: 55, texto: 'FICHA 5. TEXTO NOVO SÓ NO ENSAIO.' }],
+      },
+    );
+    expect(r.baseVersao).toMatchObject({ notasTrocadas: [55] });
+    expect(sistemas.at(-1)).toContain('TEXTO NOVO SÓ NO ENSAIO');
+    expect(sistemas.at(-1)).not.toContain('FICHA 5. TERRENO FRENTE-MAR EM TABATINGA E CAMURUPIM.');
+    await expect(
+      rodarBateria(montar().contexto, {
+        versao: 6,
+        repeticoes: 1,
+        tetoUsd: 5,
+        juiza: false,
+        trocasDoCaderno: [{ id: 999, texto: 'x' }],
+      }),
+    ).rejects.toThrow(/nota do caderno que não existe: 999/);
+  });
+
+  it('as trocas vêm do ambiente em base64; lixo vira nenhuma', () => {
+    const b64 = Buffer.from(JSON.stringify([{ id: 75, texto: 'nova' }, { id: 'x' }])).toString(
+      'base64',
+    );
+    expect(trocasDoCadernoDoAmbiente(b64)).toEqual([{ id: 75, texto: 'nova' }]);
+    expect(trocasDoCadernoDoAmbiente('não é base64 de json')).toEqual([]);
+    expect(trocasDoCadernoDoAmbiente(undefined)).toEqual([]);
   });
 
   it('só roda na Imova, e a v7 exige o mapa', async () => {

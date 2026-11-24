@@ -74,6 +74,31 @@ export interface OpcoesDaBateria {
   readonly juiza: boolean;
   /** Só estes casos (ids); vazio, todos. */
   readonly casos?: readonly string[];
+  /**
+   * Notas do caderno trocadas só neste ensaio (24/11/2026): o texto novo de uma nota que
+   * existe, pelo id, para testar antes de gravar. Nada vai para o banco.
+   */
+  readonly trocasDoCaderno?: readonly { readonly id: number; readonly texto: string }[];
+}
+
+/** As trocas do caderno a partir do ambiente (JSON em base64); inválido, nenhuma. */
+export function trocasDoCadernoDoAmbiente(
+  valor: string | undefined,
+): { id: number; texto: string }[] {
+  if (valor === undefined || valor.trim() === '') return [];
+  try {
+    const lido: unknown = JSON.parse(Buffer.from(valor, 'base64').toString('utf8'));
+    if (!Array.isArray(lido)) return [];
+    return lido.filter(
+      (n): n is { id: number; texto: string } =>
+        typeof n === 'object' &&
+        n !== null &&
+        typeof (n as { id?: unknown }).id === 'number' &&
+        typeof (n as { texto?: unknown }).texto === 'string',
+    );
+  } catch {
+    return [];
+  }
 }
 
 export interface NotaDaJuiza {
@@ -210,9 +235,15 @@ export async function rodarBateria(
   }
 
   const lida = baseDoBanco.parse(await rpc(contexto, 'ia_atendente_base', {}));
+  const trocas = new Map((opcoes.trocasDoCaderno ?? []).map((n) => [n.id, n.texto]));
+  const faltam = [...trocas.keys()].filter((id) => !lida.caderno.some((k) => k.id === id));
+  if (faltam.length > 0) throw new Error(`nota do caderno que não existe: ${faltam.join(', ')}`);
   const base = {
     ...lida,
-    caderno: lida.caderno.map((k) => ({ ...k, texto: semOLinkDaAgenda(k.texto) })),
+    caderno: lida.caderno.map((k) => ({
+      ...k,
+      texto: semOLinkDaAgenda(trocas.get(k.id) ?? k.texto),
+    })),
   };
   const modelo = (await modeloEscolhido(contexto)) as typeof atendenteImovaV6.modelo;
   const prompt: PromptVersionado<EntradaDoAtendenteV6, SaidaDoAtendenteV6 | SaidaDoAtendenteV8> =
@@ -385,7 +416,10 @@ export async function rodarBateria(
   return {
     promptVersion,
     modelo,
-    baseVersao: base.versao ?? null,
+    baseVersao:
+      trocas.size > 0
+        ? { ...(base.versao ?? {}), notasTrocadas: [...trocas.keys()] }
+        : (base.versao ?? null),
     inicio,
     fim: new Date().toISOString(),
     repeticoes: opcoes.repeticoes,
