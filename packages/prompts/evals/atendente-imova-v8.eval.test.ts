@@ -59,7 +59,7 @@ describe('atendente-imova@v8', () => {
 
   it('o bloco ensina as duas mensagens: a frase sem preço, sem metragem e sem pergunta, e a foto com a pergunta', () => {
     expect(BLOCO_DA_FOTO).toMatch(/^A FOTO PARA CONFIRMAR O IMÓVEL \(acao = responder\):/);
-    expect(BLOCO_DA_FOTO).toMatch(/Sem preço, sem documentação, sem metragem/);
+    expect(BLOCO_DA_FOTO).toMatch(/Sem preço \(mesmo que ele tenha perguntado[^)]*\), sem documentação, sem metragem/);
     expect(BLOCO_DA_FOTO).toMatch(/Acho que já sei qual é!/);
     expect(BLOCO_DA_FOTO).not.toMatch(/\d+ ?m²/);
     expect(BLOCO_DA_FOTO).not.toMatch(/R\$/);
