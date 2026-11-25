@@ -40,6 +40,7 @@ Authorization: Bearer trd_imova_3f9a1c...
 | `conversas:ler` | Ler conversas e mensagens do WhatsApp. |
 | `mensagens:enviar` | Mandar texto (na janela de 24 h) e modelo aprovado pela Meta. Lista os modelos. |
 | `webhooks` | Criar e apagar avisos para fora pela própria API. |
+| `sistema:ler` | Ler o sistema inteiro: as consultas das telas (relatórios, Progresso da IA, Meu dia, agenda, mercado...) e as tabelas e visões que as telas leem (anúncios, caderno da IA, visitas...). Só leitura. Vale só em chave em nome de um **admin** (desde 25/11/2026). |
 
 **Cuidados.** A chave dá acesso a nomes, telefones e conversas de clientes. Ela fica **só no servidor** de quem integra: nunca em código de página, aplicativo, planilha compartilhada, e-mail ou mensagem. Desconfiou que vazou: **Ajustes → Integrações → Revogar**. A próxima chamada com ela recebe 401.
 
@@ -114,6 +115,10 @@ Cada chave faz até **120 chamadas por minuto**. Passou disso: `429`, com `Retry
 | `POST /v1/webhooks` | `webhooks` | Cria um aviso para fora. |
 | `DELETE /v1/webhooks/{id}` | `webhooks` | Apaga um aviso que esta chave criou. |
 | `POST /v1/webhooks/{id}/teste` | `webhooks` | Manda um aviso de teste. |
+| `GET /v1/consultas` | `sistema:ler` | As consultas das telas, com área, descrição e parâmetros. |
+| `GET /v1/consultas/{nome}` | `sistema:ler` | Roda uma consulta (parâmetros na URL). |
+| `GET /v1/tabelas` | `sistema:ler` | As tabelas e visões que as telas leem. |
+| `GET /v1/tabelas/{nome}` | `sistema:ler` | Lê uma tabela, com filtro, ordem e página. |
 
 ### `GET /v1` — testar a chave
 
@@ -341,6 +346,77 @@ Texto com CPF não sai (`cpf_nao_sai`).
 
 ---
 
+### O sistema inteiro: consultas e tabelas (`sistema:ler`)
+
+Desde 25/11/2026 (pedido do Rafael, para a ISA na Imova). Duas portas só de leitura que alcançam tudo o que o admin vê nas telas, e acompanham o CRM sozinhas: tela nova, consulta nova ou tabela nova aparecem nelas sem mudar a API.
+
+- **Consulta** é uma função do banco que a tela chama e que o Postgres garante que não grava (STABLE ou IMMUTABLE). Ficam de fora a gerência de chaves (`api_*`) e as que preparam envio ou ligação.
+- **Tabela** é uma tabela ou visão de `public` que a tela pode ler. As colunas de segredo de link e de aparelho (`token`, `voip_token`, `claim_token_hash`, `chave_crua`) não saem.
+- Nenhuma das duas grava nem manda mensagem. A chave precisa estar em nome de um admin; em nome de gestor a resposta é 403 `sistema_so_admin`.
+
+**`GET /v1/consultas`** — o catálogo (`?busca=relatorio` filtra por nome, área ou descrição). Cada item:
+
+```json
+{ "nome": "relatorio_imova_painel_visao", "area": "Relatórios e metas",
+  "descricao": "…", "devolve": "valor", "tipo": "jsonb",
+  "parametros": [ { "nome": "p_de", "tipo": "date", "obrigatorio": false },
+                  { "nome": "p_ate", "tipo": "date", "obrigatorio": false } ] }
+```
+
+Áreas: Relatórios e metas · IA que atende · Anúncios e portais · Inteligência de mercado · Agenda e visitas · Meu dia e tarefas · Conversas e WhatsApp · Funil · Disparos · Fichas e contatos · Radar e importação · Ligações · Equipe, ajustes e registros.
+
+**`GET /v1/consultas/{nome}`** — roda a consulta. O parâmetro vai com o nome da função (`p_de`) ou sem o `p_` (`de`). Datas em `AAAA-MM-DD`, sim/não em `sim`/`nao` (ou `true`/`false`), lista em `a,b,c`, vazio em `nulo`. O que a consulta devolve vem em `dados`, igual ao que a tela recebe; quando ela devolve várias linhas, `dados` é uma lista, cortada em `limite` (padrão 1000, até 5000; `cortado_no_limite` avisa).
+
+```bash
+curl "https://kkqadgxvmzulcamuakzk.supabase.co/functions/v1/api/v1/consultas/relatorio_imova_painel_ia" \
+  -H "Authorization: Bearer $CHAVE"
+curl "https://kkqadgxvmzulcamuakzk.supabase.co/functions/v1/api/v1/consultas/relatorio_imova_painel_visao?de=2026-11-01&ate=2026-11-30" \
+  -H "Authorization: Bearer $CHAVE"
+```
+
+Algumas das mais úteis na Imova:
+
+| Consulta | O que é |
+| --- | --- |
+| `relatorio_imova_painel_ia` | A aba Progresso da IA, inteira. |
+| `relatorio_imova_painel_visao` (`de`, `ate`) | A visão geral dos relatórios. |
+| `relatorio_imova_painel_imoveis`, `relatorio_imova_painel_imovel` (`codigo`) | Os imóveis e um imóvel. |
+| `relatorio_imova_painel_origem`, `relatorio_imova_painel_funil`, `relatorio_imova_painel_oportunidades` | Origem e interesse, funil da equipe, oportunidades. |
+| `ia_atendente_painel` (`dias`), `ia_retomada_painel` (`dias`) | A tela da IA que atende e a retomada. |
+| `meu_dia_painel`, `meu_dia` | O painel do dia e a lista do Meu dia. |
+| `visita_pedidos_abertos`, `visita_pedidos_aguardando` | Pedidos de visita. |
+| `mercado_m2`, `mercado_liquidez`, `mercado_vantagens_para_ia` | Inteligência de mercado. |
+
+Recusas: 404 `consulta_inexistente` (não existe ou grava), 400 `parametro_faltando`, `parametro_desconhecido` ou `parametro_invalido` — a mensagem lista os parâmetros que a consulta aceita.
+
+**`GET /v1/tabelas`** — o catálogo: nome, tipo (tabela ou visão), área, descrição e linhas aproximadas. As colunas (nome e tipo) vêm com `?colunas=sim` ou com `?busca=` (o catálogo inteiro com colunas passa de 150 KB).
+
+**`GET /v1/tabelas/{nome}`** — as linhas, como a tela lê. Na Imova: `anuncios` (e `anuncios_na_lista`, `anuncio_fotos`), `ia_caderno`, `ia_respostas`, `tasks`, `visita_pedidos`, `calendly_agendamentos`, `portal_leads`, `mercado_anuncios`...
+
+| Na URL | Faz |
+| --- | --- |
+| `coluna=valor` | igual (`nulo` = vazio) |
+| `coluna.diferente=valor` | diferente |
+| `coluna.de=` / `coluna.ate=` | de / até; data sozinha numa coluna de data e hora vale o dia inteiro |
+| `coluna.contem=texto` | contém, sem diferença de maiúscula |
+| `coluna.em=a,b,c` | um destes |
+| `coluna.nulo=sim` / `nao` | vazio / preenchido |
+| `colunas=a,b` | só estas colunas |
+| `ordem=coluna,-outra` | ordem (`-` = decrescente); sem ela, a mais recente primeiro |
+| `limite=` / `pagina=` | até 1000 por página (padrão 100); páginas a partir de 1 |
+
+```bash
+curl "https://kkqadgxvmzulcamuakzk.supabase.co/functions/v1/api/v1/tabelas/anuncios?situacao=no_ar&colunas=codigo,titulo,bairro,preco_venda&ordem=codigo" \
+  -H "Authorization: Bearer $CHAVE"
+```
+
+```json
+{ "dados": [ { "codigo": "TE0001", "titulo": "…", "bairro": "…", "preco_venda": 0 } ],
+  "tabela": "anuncios", "total": 8, "pagina": 1, "limite": 100, "proxima_pagina": null }
+```
+
+Recusas: 404 `tabela_inexistente`, 400 `coluna_inexistente` (a mensagem lista as colunas), `filtro_invalido` ou `parametro_invalido`.
+
 ## 4. Avisos para fora (webhooks)
 
 Em vez de perguntar ao CRM de tempos em tempos, o seu sistema pode **receber um POST** quando algo acontece.
@@ -434,7 +510,7 @@ def aviso_valido(corpo_cru: bytes, cabecalho: str, segredo: str, tolerancia_s: i
 - trocar o telefone de uma ficha, excluir ficha, juntar fichas duplicadas;
 - criar tarefa, visita ou reunião na Agenda;
 - avisar a equipe no celular quando um lead chega pela API (ele aparece em Prospectados e no aviso `ficha.criada`);
-- anúncios e imóveis da Imova.
+- mexer em anúncios e imóveis da Imova (ler, desde 25/11/2026, pelo `sistema:ler`).
 
 Pedidos para uma próxima versão: falar com quem administra o CRM.
 
@@ -443,6 +519,7 @@ Pedidos para uma próxima versão: falar com quem administra o CRM.
 ## 6. Para a equipe técnica
 
 - **Onde está:** banco `supabase/migrations/20261117200000_a_api_externa.sql` (tabelas em `app.api_*`, a porta `public.api_atender`, as telas `public.api_*`, os gatilhos de aviso e a entrega por `pg_cron` + `pg_net`); a função `supabase/functions/api` (só a porta); testes `supabase/tests/180_a_api_externa.sql` (pgTAP) e `supabase/functions/api/atender.test.ts` (Deno).
+- **Consultas e tabelas (`sistema:ler`, 25/11/2026):** migração `20261125185000_a_api_le_o_sistema_inteiro.sql`. O que entra é decidido na hora pelo catálogo do Postgres (`app.api_consultas_permitidas`, `app.api_tabelas_permitidas`): função de `public` STABLE/IMMUTABLE que `authenticated` executa; tabela ou visão de `public` que `authenticated` lê. As funções rodam com os parâmetros nomeados e convertidos pelo tipo declarado (`%L::tipo`); os filtros de tabela, com `%I`/`%L`. Teste: `supabase/tests/206_a_api_le_o_sistema_inteiro.sql` (pgTAP).
 - **Em nome de:** `public.api_atender` põe o `request.jwt.claims` da pessoa da chave na transação (`app.api_agir_como`) e chama as funções de sempre (`move_deal`, `wa_enviar_modelo`, o insert em `messages` que passa pelo `messages_guard`). Nenhuma regra de negócio foi copiada.
 - **Avisos:** gatilhos adiados para o fim da transação (`deferrable initially deferred`) gravam uma linha em `app.api_avisos` por webhook inscrito; um gatilho de aviso nunca derruba o que o disparou. `app.api_avisos_rodar` (pg_cron, a cada 15 s) assina com o segredo do Vault, manda pelo `pg_net` e confere a resposta na rodada seguinte.
 - **CORS:** a função não põe cabeçalho de CORS, mas o gateway do Supabase põe `Access-Control-Allow-Origin: *` e responde sozinho o pré-voo do navegador. A proteção contra chave em página é a regra de uso e o botão de revogar.
