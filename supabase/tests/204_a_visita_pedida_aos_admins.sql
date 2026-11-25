@@ -190,7 +190,7 @@ select is(public.visita_pedido_decidir(pg_temp.id('p_caio'), 'outro_dia', now() 
           'true', 'outro dia: a proposta sai');
 select matches((select body from public.messages
                  where conversation_id = pg_temp.id('conversa_caio') and direction = 'out'::app.msg_direction),
-               'Nesse dia não vamos conseguir\. Pode ser [a-zç-]+, \d{2}/\d{2}, às \d{1,2}h(\d{2})?\?$',
+               'Nesse dia não vamos conseguir\. Pode ser [a-záéíóúâêôãõç-]+, \d{2}/\d{2}, às \d{1,2}h(\d{2})?\?$',
                'com o dia e a hora propostos');
 select is((select r ->> 'mensagem_saiu' from (select public.visita_pedido_decidir(pg_temp.id('p_rita'), 'recusada', null, 'sem horário') as r) x),
           'false', 'recusar não manda nada ao cliente');
