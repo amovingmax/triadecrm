@@ -129,7 +129,9 @@ insert into t191 values ('cm', public.mercado_coleta_abrir('chavesnamao-mcp', nu
 select public.mercado_anuncios_registrar((select valor::bigint from t191 where chave = 'cm'),
   jsonb_build_array(pg_temp.an('v-manual', 'terreno', 500000, 600, 'Candelária', 'Natal')));
 select public.mercado_coleta_fechar((select valor::bigint from t191 where chave = 'cm'));
+do $v$ begin if to_regprocedure('app.mercado_verificar_se_pendente()') is not null then execute 'select app.mercado_verificar_se_pendente()'; end if; end $v$; -- 20261125120000: a veracidade roda depois
 select public.mercado_coleta_fechar((select valor::bigint from t191 where chave = 'c'));
+do $v$ begin if to_regprocedure('app.mercado_verificar_se_pendente()') is not null then execute 'select app.mercado_verificar_se_pendente()'; end if; end $v$; -- 20261125120000: a veracidade roda depois
 
 -- ---------------------------------------------------------------------
 -- 1. Faixas duras
@@ -187,6 +189,7 @@ insert into t191 values ('c2', public.mercado_coleta_abrir('chavesnamao-mcp', 'n
 select public.mercado_anuncios_registrar((select valor::bigint from t191 where chave = 'c2'),
   jsonb_build_array(pg_temp.an('v-cj790', 'terreno', 700000, 900, 'Capim Macio', 'Natal')));
 select public.mercado_coleta_fechar((select valor::bigint from t191 where chave = 'c2'), null, null, null, false);
+do $v$ begin if to_regprocedure('app.mercado_verificar_se_pendente()') is not null then execute 'select app.mercado_verificar_se_pendente()'; end if; end $v$; -- 20261125120000: a veracidade roda depois
 select ok(app.mercado_preco_bloqueado('TE0006T'), 'o anúncio baixou mais de 10%: a pergunta volta e o preço trava de novo');
 
 -- ---------------------------------------------------------------------
@@ -238,6 +241,7 @@ values ('corrida-natal-neopolis-terreno-venda', date_trunc('month', current_date
         'R$/m²', 'Neópolis', 'natal-neopolis', 'terreno', 'venda', 40, false, 'csv', 'corrida-dos-bairros',
         'https://acorridadosbairros.com.br/rn/natal/dados.csv', (select valor::bigint from t191 where chave = 'cc'));
 select public.mercado_coleta_fechar((select valor::bigint from t191 where chave = 'cc'));
+do $v$ begin if to_regprocedure('app.mercado_verificar_se_pendente()') is not null then execute 'select app.mercado_verificar_se_pendente()'; end if; end $v$; -- 20261125120000: a veracidade roda depois
 select app.mercado_verificar();
 select is((select estado from public.mercado_celulas where regiao_id = 'natal-neopolis' and sub = 'terreno'), 'quarentena',
           'nossa mediana o dobro da Corrida: a célula entra em quarentena');

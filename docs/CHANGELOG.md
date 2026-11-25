@@ -11486,3 +11486,10 @@ Item 3 da entrevista de 24/11, aprovado pelo usuário ("repetir sem a cidade", "
 - **Admins que recebem o aviso (25/11):** 4 contas ativas (3 do Rafael, 1 do Janio); só 2 têm celular registrado (Janio, visto 24/11; uma do Rafael, visto 19/11). As outras veem só o cartão no CRM.
 - **Pendente:** o 1º pedido real (conferir `public.visita_pedidos` e `app.push_envios`).
 
+
+## 25/11/2026 — A coleta de mercado não trava mais no fechamento (só na Imova)
+- **O que aconteceu (segunda 23/11, 6h):** a 1ª coleta automática gravou os 4.184 anúncios, mas 8 das 15 coletas ficaram em "rodando". Fechar a coleta (`public.mercado_coleta_fechar`) e o pós-rodada (`public.mercado_pos_rodada`) rodavam a veracidade inteira (`app.mercado_verificar()`) dentro do pedido do worker, que tem teto de 8 s pela API. Com milhares de anúncios passa disso.
+- **Conserto (migração `20261125120000`, o conserto da branch `inteligencia-mercado`, commit `2945091`, separado do resto da etapa 6 e renumerado, porque a `20261124120000` já é o diário da ligação):** fechar e pós-rodada só pedem a veracidade (`app.mercado_verificacao_pedir`, tabela `app.mercado_pendencias`); o pg_cron `mercado_verificar_pendente` roda a cada 5 minutos (`app.mercado_verificar_se_pendente`); `public.mercado_verificacao_estado()` para o worker; coletas presas em "rodando" há mais de 3 horas são fechadas sem perder os anúncios. A troca é feita no texto das duas funções que estão no banco e aborta se não achar o trecho exatamente uma vez. Num banco sem o banco de mercado não faz nada.
+- **O worker não muda:** o da main já não roda o motor das vantagens (`MOTOR_DE_VANTAGENS_NO_WORKER = false`); a espera pela veracidade antes do motor fica na branch `inteligencia-mercado`.
+- **Testes:** pgTAP 205 (era o 202 na branch); 190, 191 e 192 rodam a veracidade pedida depois de fechar.
+- **Ensaio em produção (transação desfeita, 25/11 13h28):** 8 coletas em "rodando" → 0; as duas funções passam a pedir; agendamento `*/5 * * * *`; a veracidade pedida rodou em 4,9 s (3.982 ok, 201 fora, 1 oculto como nosso, 434 grupos, 155 células).

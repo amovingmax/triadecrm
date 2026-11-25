@@ -245,6 +245,7 @@ select is((select bruto from public.mercado_anuncios where id_externo = '190-bru
 select is((select logradouro from public.mercado_anuncios where id_externo = '190-bruto'),
           'Rua do anúncio visto na [fonte removida]', 'o logradouro também passa pela limpeza');
 select public.mercado_coleta_fechar((select valor::bigint from t190 where chave = 'cfeed'), null, null, null, false);
+do $v$ begin if to_regprocedure('app.mercado_verificar_se_pendente()') is not null then execute 'select app.mercado_verificar_se_pendente()'; end if; end $v$; -- 20261125120000: a veracidade roda depois
 
 -- Uma carga manual não mexe no que a coleta automática viu. A carga manual
 -- leva a fonte verdadeira: aqui, uma conferência feita à mão pelo mesmo MCP.
@@ -257,9 +258,11 @@ select is((select origem from public.mercado_anuncios where id_externo = '190-ma
           'o anúncio só do levantamento fica marcado como manual');
 select is(public.mercado_coleta_fechar((select valor::bigint from t190 where chave = 'cm')) ->> 'faltaram', '0',
           'fechar a carga manual não tira ninguém do ar');
+do $v$ begin if to_regprocedure('app.mercado_verificar_se_pendente()') is not null then execute 'select app.mercado_verificar_se_pendente()'; end if; end $v$; -- 20261125120000: a veracidade roda depois
 
 select is(public.mercado_coleta_fechar((select valor::bigint from t190 where chave = 'c1'), null, null, null, true,
                                        repeat('a', 64)) ->> 'situacao', 'ok', 'a rodada fecha com o hash do bruto');
+do $v$ begin if to_regprocedure('app.mercado_verificar_se_pendente()') is not null then execute 'select app.mercado_verificar_se_pendente()'; end if; end $v$; -- 20261125120000: a veracidade roda depois
 select is(public.mercado_anuncios_registrar((select valor::bigint from t190 where chave = 'c1'), '[]'::jsonb) ->> 'motivo',
           'coleta_fechada', 'coleta fechada não recebe mais anúncio');
 
@@ -281,6 +284,7 @@ select is((select count(*)::int from public.mercado_anuncio_precos p join public
             where a.id_externo = '190-pipa'), 1, 'mudança de até 0,1% não enche o histórico');
 select is(public.mercado_coleta_fechar((select valor::bigint from t190 where chave = 'c2')) ->> 'faltaram', '1',
           'quem faltou numa rodada completa ganha uma falta');
+do $v$ begin if to_regprocedure('app.mercado_verificar_se_pendente()') is not null then execute 'select app.mercado_verificar_se_pendente()'; end if; end $v$; -- 20261125120000: a veracidade roda depois
 select ok((select saiu_do_ar_em is null from public.mercado_anuncios where id_externo = '190-2'),
           'uma falta só não tira do ar');
 
@@ -294,6 +298,7 @@ select is((public.mercado_anuncios_registrar((select valor::bigint from t190 whe
           1, 'a 3ª rodada vê só o 190-1');
 select is(public.mercado_coleta_fechar((select valor::bigint from t190 where chave = 'c3')) ->> 'sairam_do_ar', '1',
           'com 2 rodadas completas seguidas sem ele, sai do ar (o 190-2; o 190-pipa faltou só uma)');
+do $v$ begin if to_regprocedure('app.mercado_verificar_se_pendente()') is not null then execute 'select app.mercado_verificar_se_pendente()'; end if; end $v$; -- 20261125120000: a veracidade roda depois
 select ok((select saiu_do_ar_em is not null from public.mercado_anuncios where id_externo = '190-2')
           and (select estado from public.mercado_anuncios where id_externo = '190-2') = 'vencido',
           'quem saiu do ar fica vencido (fora das contas), nunca "vendido"');
@@ -324,6 +329,7 @@ select throws_ok($$
           'https://acorridadosbairros.com.br/rn/natal/dados.csv', (select valor::bigint from t190 where chave = 'cf'))
 $$, '42501', null, 'fonte que não pode ser coletada (A Corrida dos Bairros, ainda não liberada): o V0 recusa');
 select public.mercado_coleta_fechar((select valor::bigint from t190 where chave = 'cf'));
+do $v$ begin if to_regprocedure('app.mercado_verificar_se_pendente()') is not null then execute 'select app.mercado_verificar_se_pendente()'; end if; end $v$; -- 20261125120000: a veracidade roda depois
 select throws_ok($$
   update public.mercado_indices set valor = 1 where serie = 'fipezap-natal-venda' and mes = '2026-10-01'
 $$, '22023', null, 'mudar o número depois da coleta fechada também passa pelo V0: recusado');

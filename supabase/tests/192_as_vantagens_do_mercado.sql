@@ -262,6 +262,7 @@ select public.mercado_anuncios_registrar((select (valor ->> 'coleta_id')::bigint
   jsonb_build_array(jsonb_build_object('id_externo', 'p192', 'url', 'https://exemplo-permitido.com.br/p192', 'tipo', 'terreno',
                                        'preco', 4200000, 'area_total', 3000, 'bairro', 'Capim Macio', 'cidade', 'Natal')));
 select public.mercado_coleta_fechar((select (valor ->> 'coleta_id')::bigint from t192 where chave = 'c'));
+do $v$ begin if to_regprocedure('app.mercado_verificar_se_pendente()') is not null then execute 'select app.mercado_verificar_se_pendente()'; end if; end $v$; -- 20261125120000: a veracidade roda depois
 select ok(app.mercado_preco_bloqueado('TE0001T'), 'um terreno de 3.000 m² a R$ 4,2 milhões no bairro: possível mesmo imóvel');
 insert into t192 values ('r6', public.mercado_argumentos_propor('TE0001T',
   jsonb_build_array(pg_temp.tam(22, 16), pg_temp.renda(), pg_temp.preco()), 'motor@1'));
