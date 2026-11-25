@@ -11518,4 +11518,5 @@ Pedido do dono, depois de testar o protótipo (artifact `Q4gjRrG1gv1kEyVBUEqmrH`
 - **Testes:** pgTAP 205 (34/34) e 204 ajustado para escolher dia útil (30/30); web 2.414, workers 802; typecheck e lint ok.
 - **Teste local:** `next dev -p 3110` no worktree `~/triadecrm-visita-aviso`, banco local da Imova com 3 pedidos de exemplo; os usuários de teste gestor e SDR viraram admins "Rafael (teste)" e "Janio (teste)" só no banco local (voltar com `voltar-usuarios.sql` no scratchpad da sessão).
 - **Decisão do dono (25/11):** a Agenda continua sem sábado, domingo e feriado (regra de 30/09/2026), também para visita de imóvel ("Não, continue da forma que está"). Pedido para sábado: Agendar para um dia útil.
-- **Pendente:** publicar (banco → worker → site da Imova) com "pode subir".
+- **Publicado em 25/11/2026 ~15h25** (pedido do dono: "pode subir"): ensaio em produção desfeito antes (pedido com hora, lista com título/cidade/hora, proposta com reserva "Visita a confirmar", "Cliente não pode" tirando a reserva, sábado recusado pela Agenda); main `e307ac8`; banco da Imova `20261125180000`; `imova-worker-ai` **v19** (volta: v18); site `imova-2fthooy91` (volta `imova-2z6w14pef`). KOMUNE não tocada.
+- **Pendente:** conferir o 1º pedido real com hora e a 1ª proposta respondida (`public.visita_pedidos`: `hora`, `resposta_do_cliente`).
