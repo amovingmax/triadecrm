@@ -58,6 +58,7 @@ import {
   type TomDaSituacao,
 } from './formas';
 import { DialogoDeCorrecao } from './na-conversa';
+import { ConfiguracaoDaRetomada, PlacarDaRetomada } from './retomada';
 
 /**
  * A tela "IA que atende" (Imova, 06/11/2026).
@@ -125,6 +126,7 @@ const ROTULO_DA_ACAO: Readonly<Record<string, string>> = {
   passou_para_pessoa: 'passou para um corretor',
   marcou_visita: 'marcou visita',
   anotou: 'anotou',
+  retomou: 'retomou o contato',
 };
 
 export function TelaDaIa() {
@@ -149,6 +151,8 @@ export function TelaDaIa() {
 
       {p ? <Situacao painel={p} /> : null}
       {p ? <Placar painel={p} /> : null}
+      {/* A IA retoma o contato com quem parou de responder (11/11/2026). */}
+      <PlacarDaRetomada />
 
       {/* As abas (e os filtros das respostas) ficam presas logo abaixo do cabeçalho
           da casca, que tem 56px no celular e 72 do `md` para cima. A faixa vai de
@@ -1147,6 +1151,8 @@ function Configuracao({ painel }: { painel: PainelDaIa }) {
           ))}
         </div>
       </div>
+
+      <ConfiguracaoDaRetomada iaLigada={config.ligada} />
     </section>
   );
 }

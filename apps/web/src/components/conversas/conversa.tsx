@@ -66,6 +66,7 @@ import {
 import { AvisoDaJanela, Janela24h, useJanela } from './janela-24h';
 import { LeituraDaIa } from './leitura-da-ia';
 import { ControleDaIa, SeloDaIa } from '@/components/ia-que-atende/na-conversa';
+import { SeloDaRetomada } from '@/components/ia-que-atende/retomada';
 import { ClienteDeTeste } from '@/components/ia-que-atende/cliente-de-teste';
 import { useLeituraDoFio } from './leitura-do-fio';
 import { LinhaDoTempo } from './linha-do-tempo';
@@ -334,6 +335,8 @@ export function Conversa({
       ) : null}
       {/* A IA que atende sozinha (Imova, 06/11/2026). */}
       {fio ? <SeloDaIa fioId={fio.id} naFolha={naFolha} /> : null}
+      {/* Quando a IA retoma o contato, se o cliente não responder (11/11/2026). */}
+      {fio ? <SeloDaRetomada fioId={fio.id} naFolha={naFolha} /> : null}
       {/* A atitude do cliente (29/10/2026) é da CONVERSA: sem fio, não há. */}
       {fio ? (
         <AtitudeDaConversaNoTopo

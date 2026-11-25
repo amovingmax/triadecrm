@@ -344,13 +344,16 @@ export function DialogoDeCorrecao({
   const id = useId();
   const corrigir = useMutation({
     mutationFn: (r: RespostaDaIa) => avaliarResposta(r.id, 'corrigir', texto.trim()),
-    onSuccess: () => {
+    onSuccess: (_, r) => {
       void clientes.invalidateQueries({ queryKey: CHAVE_DA_IA });
       setTexto('');
       aoFechar();
-      toast.success('Correção anotada no caderno da IA.', {
-        description: 'Ela passa a seguir a partir da próxima resposta.',
-      });
+      // A retomada (11/11/2026) não ensina a IA que atende: a correção fica só registrada.
+      if (r.acao === 'retomou') toast.success('Correção registrada na retomada.');
+      else
+        toast.success('Correção anotada no caderno da IA.', {
+          description: 'Ela passa a seguir a partir da próxima resposta.',
+        });
     },
     onError: (e) => toast.error(mensagemDoErro(e)),
   });
@@ -361,8 +364,9 @@ export function DialogoDeCorrecao({
         <DialogHeader>
           <DialogTitle>Corrigir a resposta da IA</DialogTitle>
           <DialogDescription>
-            A mensagem que já saiu não muda. A correção vai para o caderno, e a IA passa a responder
-            assim nas próximas vezes.
+            {resposta?.acao === 'retomou'
+              ? 'A mensagem que já saiu não muda. A correção de uma retomada fica registrada, mas não vai para o caderno da IA que atende.'
+              : 'A mensagem que já saiu não muda. A correção vai para o caderno, e a IA passa a responder assim nas próximas vezes.'}
           </DialogDescription>
         </DialogHeader>
         {resposta ? (

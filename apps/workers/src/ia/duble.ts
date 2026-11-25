@@ -40,7 +40,8 @@ export type FluxoDoDuble =
   | 'atendente'
   | 'juiza'
   | 'conselheiro_lead'
-  | 'conselheiro_imovel';
+  | 'conselheiro_imovel'
+  | 'retomada';
 
 export class EsquemaDesconhecidoError extends Error {
   constructor(campos: readonly string[]) {
@@ -63,6 +64,8 @@ export function fluxoDoEsquema(esquema: Record<string, unknown>): FluxoDoDuble {
   // O canal de chegada (Imova, 06/11/2026) vem primeiro: `subcanal` só existe nele, e
   // ele tem `confianca` e `motivo`, que outros também têm.
   if (campos.has('subcanal')) return 'canal';
+  // A retomada da IA que atende (Imova, 11/11/2026): a única que decide `retomar`.
+  if (campos.has('retomar')) return 'retomada';
   if (campos.has('textoLimpo')) return 'transcricao';
   // A IA que atende o cliente da Imova (06/11/2026): é a única que devolve uma ação
   // e as anotações do treino.
@@ -166,7 +169,9 @@ function redigir(mensagem: string): Record<string, unknown> {
   const linhas = [
     'Oi, [[NOME_1]], foi bom falar com você agora há pouco.',
     `Só pra registrar o que ficou: ${retomada}`,
-    combinado === null ? 'Posso te ligar amanhã às 10h?' : `${limitar(combinado, 90)} Confirma pra mim?`,
+    combinado === null
+      ? 'Posso te ligar amanhã às 10h?'
+      : `${limitar(combinado, 90)} Confirma pra mim?`,
   ];
   return {
     mensagem: limitar(linhas.join('\n'), 300),
@@ -477,14 +482,23 @@ function atenderNoDuble(mensagem: string): Record<string, unknown> {
   const ultima = (linhas[linhas.length - 1] ?? '').replace(/^.* — cliente: /, '');
   const minuscula = ultima.toLowerCase();
   const conversa = mensagem.slice(mensagem.indexOf('CONVERSA'));
-  const codigo = /\b([A-Z]{2,5}-?\d{2,6}(?:_[A-Z]+)?)\b/.exec(ultima)?.[1] ?? /\b([A-Z]{2,5}-?\d{2,6}(?:_[A-Z]+)?)\b/.exec(conversa)?.[1] ?? null;
-  const base = { agenda: null, anotacoes: [] as string[], fotosEnsinadas: [] as unknown[], confianca: 0.8 };
+  const codigo =
+    /\b([A-Z]{2,5}-?\d{2,6}(?:_[A-Z]+)?)\b/.exec(ultima)?.[1] ??
+    /\b([A-Z]{2,5}-?\d{2,6}(?:_[A-Z]+)?)\b/.exec(conversa)?.[1] ??
+    null;
+  const base = {
+    agenda: null,
+    anotacoes: [] as string[],
+    fotosEnsinadas: [] as unknown[],
+    confianca: 0.8,
+  };
 
   if (/corretor|ligar|liga[çc][ãa]o|atendente/.test(minuscula)) {
     return {
       ...base,
       acao: 'passar_para_corretor',
-      mensagem: 'Simulação: já vou te passar para um dos nossos corretores, que continua com você por aqui.',
+      mensagem:
+        'Simulação: já vou te passar para um dos nossos corretores, que continua com você por aqui.',
       motivo: 'Simulação: pediu corretor ou ligação.',
     };
   }
@@ -498,11 +512,16 @@ function atenderNoDuble(mensagem: string): Record<string, unknown> {
       anotacoes: regra.length >= 3 ? [regra] : [],
     };
   }
-  if (/(anunciar|vender|alugar|avaliar).*\b(meu|minha|nosso|nossa)\b|\b(tenho|meu|minha)\b.*(anunciar|vender|avaliar)/.test(minuscula)) {
+  if (
+    /(anunciar|vender|alugar|avaliar).*\b(meu|minha|nosso|nossa)\b|\b(tenho|meu|minha)\b.*(anunciar|vender|avaliar)/.test(
+      minuscula,
+    )
+  ) {
     return {
       ...base,
       acao: 'enviar_link_da_agenda',
-      mensagem: 'Simulação: vou te mandar o link da agenda para você escolher um horário para conversar com um corretor.',
+      mensagem:
+        'Simulação: vou te mandar o link da agenda para você escolher um horário para conversar com um corretor.',
       agenda: { tipo: 'reuniao', imovelCodigo: null },
       motivo: 'Simulação: proprietário quer anunciar; link da reunião.',
     };
@@ -512,14 +531,16 @@ function atenderNoDuble(mensagem: string): Record<string, unknown> {
       return {
         ...base,
         acao: 'responder',
-        mensagem: 'Simulação: qual imóvel você quer visitar? Pode me dizer o bairro ou onde viu o anúncio.',
+        mensagem:
+          'Simulação: qual imóvel você quer visitar? Pode me dizer o bairro ou onde viu o anúncio.',
         motivo: 'Simulação: quer visitar sem dizer o imóvel.',
       };
     }
     return {
       ...base,
       acao: 'enviar_link_da_agenda',
-      mensagem: 'Simulação: vou te mandar o link da agenda para você escolher o dia e o horário da visita.',
+      mensagem:
+        'Simulação: vou te mandar o link da agenda para você escolher o dia e o horário da visita.',
       agenda: { tipo: 'visita', imovelCodigo: codigo },
       motivo: `Simulação: quer visitar o ${codigo}; link da visita.`,
     };
@@ -530,8 +551,59 @@ function atenderNoDuble(mensagem: string): Record<string, unknown> {
   return {
     ...base,
     acao: 'responder',
-    mensagem: limitar(`Simulação: recebi "${ultima}". Posso te mostrar os imóveis que combinam com isso?`, 600),
+    mensagem: limitar(
+      `Simulação: recebi "${ultima}". Posso te mostrar os imóveis que combinam com isso?`,
+      600,
+    ),
     motivo: 'Simulação: respondeu a pergunta do cliente.',
+  };
+}
+
+/**
+ * A retomada no dublê (Imova; v2 desde 25/11/2026): se a conversa mostra que o cliente
+ * fechou o assunto ("já comprei", "não tenho mais interesse", "mês que vem"), ou se não
+ * há imóvel no ar, não retoma; senão, o imóvel continua disponível e a frase de
+ * disponibilidade, SEM pergunta (a decisão de 25/11). Começa com "Simulação:" e chama
+ * pelo marcador, para o teste ver o nome voltar só no texto que sai.
+ */
+function retomarNoDuble(mensagem: string): Record<string, unknown> {
+  const doCliente = mensagem
+    .split('\n')
+    .filter((l) => / — cliente: /.test(l))
+    .map((l) => l.replace(/^.* — cliente: /, '').toLowerCase())
+    .join(' ');
+  if (
+    /j[áa] (comprei|aluguei|fechei)|n[ãa]o tenho mais interesse|m[êe]s que vem|n[ãa]o quero mais/.test(
+      doCliente,
+    )
+  ) {
+    return {
+      retomar: false,
+      mensagem: '',
+      motivo: 'Simulação: o cliente fechou o assunto.',
+      confianca: 0.9,
+    };
+  }
+  // O nome chega como marcador ([[NOME_1]], ou [[EMPRESA_1]] quando a ficha tem o nome da pessoa).
+  const nome = /^cliente: (\[\[[A-Z]+_\d+\]\])/m.exec(mensagem)?.[1] ?? null;
+  // A v2 não manda o código ao modelo: "IMÓVEL: apartamento em Ponta Negra (disponível: sim)".
+  const imovel = /^IMÓVEL: (.+) \(disponível: sim\)$/m.exec(mensagem);
+  if (!imovel) {
+    return {
+      retomar: false,
+      mensagem: '',
+      motivo: 'Simulação: sem imóvel no ar, não há gancho.',
+      confianca: 0.9,
+    };
+  }
+  return {
+    retomar: true,
+    mensagem: limitar(
+      `Simulação: oi${nome ? `, ${nome}` : ''}! O ${imovel[1] ?? 'imóvel'} que você viu continua disponível. Qualquer dúvida, é só me chamar.`,
+      300,
+    ),
+    motivo: 'Simulação: parou depois da nossa última mensagem; retomei com o imóvel, sem pergunta.',
+    confianca: 0.8,
   };
 }
 
@@ -580,9 +652,19 @@ function julgarNoDuble(mensagem: string): Record<string, unknown> {
     duvida: perguntou ? (satisfacao === 2 ? 2 : 4) : null,
     informacao: 4,
     satisfacao,
-    interesse: /visita|pode ser|combinado/i.test(reacao) ? 'subiu' : satisfacao === 2 ? 'caiu' : 'igual',
-    porque: limitar(`Simulação: o cliente disse "${doCliente[doCliente.length - 1]?.texto ?? ''}".`, 400),
-    melhorar: satisfacao !== null && satisfacao <= 2 ? 'Simulação: responder direto o que o cliente perguntou.' : null,
+    interesse: /visita|pode ser|combinado/i.test(reacao)
+      ? 'subiu'
+      : satisfacao === 2
+        ? 'caiu'
+        : 'igual',
+    porque: limitar(
+      `Simulação: o cliente disse "${doCliente[doCliente.length - 1]?.texto ?? ''}".`,
+      400,
+    ),
+    melhorar:
+      satisfacao !== null && satisfacao <= 2
+        ? 'Simulação: responder direto o que o cliente perguntou.'
+        : null,
     dadosInsuficientes: false,
     // A v2 (09/11/2026): onde a IA falhou. A pergunta do condomínio é a lacuna que o
     // dublê sabe ver; o resto é "outra" quando o cliente reagiu mal.
@@ -623,7 +705,10 @@ const TEMAS_DO_DUBLE: readonly (readonly [RegExp, string])[] = [
  * primeiro no falar. Compromisso VENCIDO vira o começo do falar, como o prompt manda.
  */
 function aconselharClienteNoDuble(mensagem: string): Record<string, unknown> {
-  const carteira = linhasDaSecao(mensagem, 'CARTEIRA DA IMOVA (a única fonte de fatos sobre os imóveis):')
+  const carteira = linhasDaSecao(
+    mensagem,
+    'CARTEIRA DA IMOVA (a única fonte de fatos sobre os imóveis):',
+  )
     .map((l) => /^- ([^:]+):/.exec(l)?.[1] ?? '')
     .filter((c) => c !== '');
   const ligados = linhasDaSecao(mensagem, 'IMÓVEIS QUE O CRM LIGOU A ESTA PESSOA:')
@@ -643,11 +728,22 @@ function aconselharClienteNoDuble(mensagem: string): Record<string, unknown> {
   const quartos = /(\d)\s*quartos?/i.exec(tudo)?.[1];
   const perfil = {
     finalidade: /alug/i.test(tudo) ? 'locacao' : /compr|financ/i.test(tudo) ? 'compra' : null,
-    tipos: (['apartamento', 'casa', 'terreno'] as const).filter((t) => tudo.toLowerCase().includes(t)),
-    bairros: BAIRROS_DE_NATAL.filter((b) => tudo.toLowerCase().includes(b.toLowerCase())).slice(0, 5),
+    tipos: (['apartamento', 'casa', 'terreno'] as const).filter((t) =>
+      tudo.toLowerCase().includes(t),
+    ),
+    bairros: BAIRROS_DE_NATAL.filter((b) => tudo.toLowerCase().includes(b.toLowerCase())).slice(
+      0,
+      5,
+    ),
     quartos_min: quartos === undefined ? null : Number(quartos),
     valor_max: valor === undefined ? null : Number(valor) * 1000,
-    pagamento: /fgts/i.test(tudo) ? 'fgts' : /financ/i.test(tudo) ? 'financiamento' : /[àa] vista/i.test(tudo) ? 'a_vista' : null,
+    pagamento: /fgts/i.test(tudo)
+      ? 'fgts'
+      : /financ/i.test(tudo)
+        ? 'financiamento'
+        : /[àa] vista/i.test(tudo)
+          ? 'a_vista'
+          : null,
   };
   const vencido = /— VENCIDO$/m.test(mensagem);
   const vazio = codigos.length === 0 && perguntas.length === 0 && perfil.finalidade === null;
@@ -689,7 +785,11 @@ function lerCanalNoDuble(mensagem: string, pedido: PedidoAoModelo): Record<strin
       subcanal: 'foto_da_placa',
       confianca: 0.9,
       evidencias: [
-        { messageId, tipo: 'foto', trecho: 'Simulação: o dublê trata a primeira foto como placa da Imova' },
+        {
+          messageId,
+          tipo: 'foto',
+          trecho: 'Simulação: o dublê trata a primeira foto como placa da Imova',
+        },
       ],
       foto: {
         fotoId,
@@ -704,7 +804,9 @@ function lerCanalNoDuble(mensagem: string, pedido: PedidoAoModelo): Record<strin
   const doCliente = linhas
     .map((l) => /^\[(m\d+)\] .* — cliente: (.*)$/.exec(l))
     .filter((achado): achado is RegExpExecArray => achado !== null);
-  const insta = doCliente.find(([, , texto]) => /\binsta(gram)?\b|\[\[INSTAGRAM_\d+\]\]/i.test(texto ?? ''));
+  const insta = doCliente.find(([, , texto]) =>
+    /\binsta(gram)?\b|\[\[INSTAGRAM_\d+\]\]/i.test(texto ?? ''),
+  );
   if (insta) {
     return {
       canal: 'redes_sociais',
@@ -755,7 +857,10 @@ function aconselharImovelNoDuble(mensagem: string): Record<string, unknown> {
   if (objecao) {
     sugestoes.push({
       tipo: 'fazer',
-      acao: objecao.tema === 'preco' ? 'Simulação: converse com o proprietário sobre o preço' : `Simulação: responda a objeção "${objecao.tema}"`,
+      acao:
+        objecao.tema === 'preco'
+          ? 'Simulação: converse com o proprietário sobre o preço'
+          : `Simulação: responda a objeção "${objecao.tema}"`,
       porque: `É a objeção nº 1 (${objecao.leads} leads).`,
     });
   }
@@ -791,6 +896,7 @@ const RESPOSTAS: Readonly<
   juiza: julgarNoDuble,
   conselheiro_lead: aconselharClienteNoDuble,
   conselheiro_imovel: aconselharImovelNoDuble,
+  retomada: retomarNoDuble,
 };
 
 // ---------------------------------------------------------------------------

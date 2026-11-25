@@ -317,6 +317,21 @@ describe('preços e conta por chamada', () => {
         semCache: 0.00018,
         comCache: 0.00008,
       },
+      {
+        // A IA que atende retoma o contato (Imova): o texto do dia 1, uma chamada por
+        // cliente que parou de responder, no Haiku 5.5. Sem o caderno e sem a lista de
+        // imóveis: as regras e o texto do anúncio do imóvel da conversa (v2, 25/11/2026,
+        // de onde sai o gancho). A conversa real é mais longa que o exemplo, e na fatura
+        // entram o esquema da saída e o raciocínio; ainda assim, abaixo de US$ 0,001 por
+        // retomada.
+        id: 'retomar-conversa',
+        modelo: 'claude-haiku-5-5',
+        tokensDeSistema: 1043,
+        tokensDaMensagem: 213,
+        tokensDeSaida: 86,
+        semCache: 0.00017,
+        comCache: 0.00007,
+      },
     ]);
   });
 });

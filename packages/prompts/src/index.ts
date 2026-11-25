@@ -158,6 +158,20 @@ export {
 } from './prompts/atendente-imova/bateria';
 
 export {
+  type EntradaDaRetomada,
+  type SaidaDaRetomada,
+  motivoParaNaoMandar,
+  retomarConversaV1,
+} from './prompts/retomar-conversa/v1';
+
+export {
+  type EntradaDaRetomadaV2,
+  type SaidaDaRetomadaV2,
+  motivoParaNaoMandarV2,
+  retomarConversaV2,
+} from './prompts/retomar-conversa/v2';
+
+export {
   CERTEZAS_DA_FOTO,
   type EntradaDaFoto,
   type SaidaDaFoto,

@@ -26,6 +26,8 @@ describe('fluxoDoEsquema', () => {
     expect(fluxoDoEsquema(esquemaDeSaida(promptVigente('conselheiro-do-imovel')))).toBe(
       'conselheiro_imovel',
     );
+    // A retomada da IA que atende (11/11/2026).
+    expect(fluxoDoEsquema(esquemaDeSaida(promptVigente('retomar-conversa')))).toBe('retomada');
   });
 
   it('esquema que ninguém ensinou falha barulhento', () => {

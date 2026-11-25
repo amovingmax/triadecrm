@@ -22,6 +22,8 @@ import { pulsoDoDiaV1 } from './prompts/pulso-do-dia/v1';
 import { triagemDoRadarV1 } from './prompts/triagem-do-radar/v1';
 import { triagemDoRadarV2 } from './prompts/triagem-do-radar/v2';
 import { resumoLigacaoV1 } from './prompts/resumo-ligacao/v1';
+import { retomarConversaV1 } from './prompts/retomar-conversa/v1';
+import { retomarConversaV2 } from './prompts/retomar-conversa/v2';
 import { transcricaoAudioV1 } from './prompts/transcricao-audio/v1';
 import {
   type CatalogoDePrompts,
@@ -79,6 +81,9 @@ export const CATALOGO = {
   // Só da Imova (06/11/2026): o canal de chegada do lead, lido do começo da conversa e
   // de até três fotos. O worker só o chama quando o banco é o da Imova.
   'canal-de-chegada': { 1: canalDeChegadaV1 },
+  // Só da Imova (11/11/2026): a IA que atende retoma o contato com quem parou de responder
+  // (o texto do dia 1, ainda dentro da janela de 24 h).
+  'retomar-conversa': { 1: retomarConversaV1, 2: retomarConversaV2 },
 } as const;
 
 export type IdDePrompt = keyof typeof CATALOGO;
@@ -140,6 +145,10 @@ export const VIGENTES = {
   'conselheiro-do-lead': 1,
   'conselheiro-do-imovel': 1,
   'canal-de-chegada': 1,
+  // v2 desde 25/11/2026: as decisões do dono (uma retomada só, gancho do imóvel tirado do
+  // anúncio, sem pergunta, sem emoji, sem código, sem "corretor"). Voltar à v1 é trocar
+  // este número e o import do worker (`apps/workers/src/ia/retomar.ts`).
+  'retomar-conversa': 2,
 } as const satisfies Record<IdDePrompt, number>;
 
 /** Uma versão específica, com o tipo daquela versão. */

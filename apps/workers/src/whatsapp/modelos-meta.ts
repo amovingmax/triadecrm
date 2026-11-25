@@ -76,6 +76,9 @@ export const EXEMPLOS_POR_VARIAVEL: Readonly<Record<string, string>> = {
   campos_preenchidos: 'fotos e preços',
   instrucao: 'entrar pelo link e confirmar os dados',
   fundador_autorizado: 'Buffet Sabor Potiguar',
+  // A retomada da IA que atende (Imova, 11/11/2026): "no imóvel {{imovel}}", preenchido
+  // pelo banco (`app.ia_retomada_imovel`).
+  imovel: 'de Ponta Negra (código AP0012)',
 };
 
 export const EXEMPLO_PADRAO = 'exemplo';

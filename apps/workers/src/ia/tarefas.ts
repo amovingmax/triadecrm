@@ -65,6 +65,7 @@ import { ErroDeTranscricao, transcrever as transcreverAudio, type TranscricaoBru
 import { atenderCliente, payloadDoAtendente } from './atendente';
 import { aconselharVendas, payloadDoConselheiro } from './conselheiro';
 import { identificarCanal } from './canal-de-chegada';
+import { payloadDaRetomada, retomarConversa } from './retomar';
 import { RecusaDoModeloError } from './cliente';
 import {
   buscarContatoDaFicha,
@@ -221,6 +222,9 @@ const PAYLOADS = {
   // cliente e por imóvel, `ia/conselheiro.ts`.
   aconselhar_vendas: payloadDoConselheiro,
   identificar_canal: payloadDoCanal,
+  // A IA que atende retoma o contato com quem parou de responder (11/11/2026): o texto
+  // do dia 1, `ia/retomar.ts`.
+  retomar_conversa: payloadDaRetomada,
 } as const;
 
 export type PropositoConhecido = keyof typeof PAYLOADS;
@@ -1277,6 +1281,10 @@ const TRABALHOS: Readonly<
     ...(await aconselharVendas(contexto, bruto)),
   }),
   identificar_canal: lerOCanal,
+  retomar_conversa: async (contexto, bruto) => ({
+    proposito: 'retomar_conversa',
+    ...(await retomarConversa(contexto, bruto)),
+  }),
 };
 
 /**
@@ -1294,10 +1302,15 @@ const TRABALHOS_DA_IMOVA: ReadonlySet<PropositoConhecido> = new Set<PropositoCon
   'aconselhar_vendas',
   // O canal de chegada do lead: placa, anúncio, rede social ou outros (06 e 09/11/2026).
   'identificar_canal',
+  // A IA que atende retoma o contato com quem parou de responder (11/11/2026).
+  'retomar_conversa',
 ]);
 
 /** Os que só existem na Imova. Fora dela, saem da fila sem chamar o modelo. */
-const SO_DA_IMOVA: ReadonlySet<PropositoConhecido> = new Set<PropositoConhecido>(['identificar_canal']);
+const SO_DA_IMOVA: ReadonlySet<PropositoConhecido> = new Set<PropositoConhecido>([
+  'identificar_canal',
+  'retomar_conversa',
+]);
 
 export async function tratarTrabalho(
   contexto: ContextoDaIa,
