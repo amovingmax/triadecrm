@@ -7,6 +7,7 @@ import { atendenteImovaV6 } from './prompts/atendente-imova/v6';
 import { atendenteImovaV7 } from './prompts/atendente-imova/v7';
 import { atendenteImovaV8 } from './prompts/atendente-imova/v8';
 import { atendenteImovaV9 } from './prompts/atendente-imova/v9';
+import { atendenteImovaV10 } from './prompts/atendente-imova/v10';
 import { fotoDoAnuncioV1 } from './prompts/foto-do-anuncio/v1';
 import { avaliacaoDoAtendimentoV1 } from './prompts/avaliacao-do-atendimento/v1';
 import { avaliacaoDoAtendimentoV2 } from './prompts/avaliacao-do-atendimento/v2';
@@ -14,6 +15,7 @@ import { conselheiroDoImovelV1 } from './prompts/conselheiro-do-imovel/v1';
 import { conselheiroDoLeadV1 } from './prompts/conselheiro-do-lead/v1';
 import { canalDeChegadaV1 } from './prompts/canal-de-chegada/v1';
 import { resumoDaPassagemV1 } from './prompts/resumo-da-passagem/v1';
+import { respostaDaDecisaoV1 } from './prompts/resposta-da-decisao/v1';
 import { classificarIntencaoV1 } from './prompts/classificar-intencao/v1';
 import { fichaDaConversaV1 } from './prompts/ficha-da-conversa/v1';
 import { leituraDoClienteV1 } from './prompts/leitura-do-cliente/v1';
@@ -71,6 +73,7 @@ export const CATALOGO = {
     7: atendenteImovaV7,
     8: atendenteImovaV8,
     9: atendenteImovaV9,
+    10: atendenteImovaV10,
   },
   // Só da Imova (09/11/2026): de qual anúncio é a foto que o cliente mandou.
   'foto-do-anuncio': { 1: fotoDoAnuncioV1 },
@@ -88,6 +91,9 @@ export const CATALOGO = {
   // Só da Imova (11/11/2026): o cliente resumido para o corretor quando a IA que atende
   // passa a conversa para a equipe.
   'resumo-da-passagem': { 1: resumoDaPassagemV1 },
+  // Só da Imova (25/11/2026): a resposta que um admin escreveu no aviso de decisão, dita
+  // ao cliente pela IA (só o tom muda).
+  'resposta-da-decisao': { 1: respostaDaDecisaoV1 },
 } as const;
 
 export type IdDePrompt = keyof typeof CATALOGO;
@@ -141,7 +147,10 @@ export const VIGENTES = {
   // v9 desde 24/11/2026: a v8 com o pedido de visita (`visita`): quando passa a conversa
   // por uma visita presencial com o dia dito, a IA devolve o pedido, que vai aos admins
   // aprovarem. Voltar à v8 é trocar este número e o import do worker.
-  'atendente-imova': 9,
+  // v10 desde 25/11/2026: a v9 com o aviso de decisão (`decisao`): na proposta de valor e
+  // na pergunta que só a Imova responde, a IA diz "vou verificar", não passa a conversa e
+  // pede a decisão aos admins. Voltar à v9 é trocar este número e o import do worker.
+  'atendente-imova': 10,
   'foto-do-anuncio': 1,
   // v2 desde 09/11/2026: a juíza diz também a lacuna, onde a IA que atende falhou no
   // dia, para o relatório contar por tema. Voltar é trocar este número.
@@ -154,6 +163,7 @@ export const VIGENTES = {
   // este número e o import do worker (`apps/workers/src/ia/retomar.ts`).
   'retomar-conversa': 2,
   'resumo-da-passagem': 1,
+  'resposta-da-decisao': 1,
 } as const satisfies Record<IdDePrompt, number>;
 
 /** Uma versão específica, com o tipo daquela versão. */

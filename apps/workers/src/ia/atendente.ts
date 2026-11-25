@@ -39,6 +39,7 @@ import {
   type SaidaDoAtendenteV6,
   type SaidaDoAtendenteV8,
   type SaidaDoAtendenteV9,
+  type SaidaDoAtendenteV10,
   type TipoDaAgenda,
   CANAIS_DE_CHEGADA,
   MODELOS,
@@ -48,10 +49,10 @@ import {
   MAX_BUSCAS_NO_MAPA,
   MAX_VOLTAS_DO_ATENDENTE,
   atendenteImovaV6,
-  atendenteImovaV9,
+  atendenteImovaV10,
   reidratar,
   sistemaComBaseV6,
-  sistemaComBaseV9,
+  sistemaComBaseV10,
 } from '@komune/prompts';
 
 import { ErroDaEsteira } from '../fila/esteira';
@@ -59,6 +60,7 @@ import { buscarContatoDaFicha } from './banco';
 import { ferramentaBuscarNoMapa } from './busca-no-mapa';
 import { ErroDoModelo, RespostaIlegivelError } from './cliente';
 import { type FotoPreparada, prepararFotoDoImovel, textoComALegenda } from './foto-do-imovel';
+import { type DecisaoPreparada, falaDaDecisao, prepararDecisao } from './decisao';
 import { horaDoQueDisse } from './hora-da-visita';
 import {
   aplicarReconhecimentos,
@@ -475,11 +477,12 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   const comMapa = mapa !== undefined && typeof contexto.modelo.conversarComFerramentas === 'function';
   const modelo = (await modeloEscolhido(contexto)) as typeof atendenteImovaV6.modelo;
   // Desde 24/11/2026 (noite), a v9: a v8 com o pedido de visita que vai aos admins.
+  // Desde 25/11/2026, a v10: a v9 com o aviso de decisão (a IA pergunta aos admins).
   const prompt: PromptVersionado<
     EntradaDoAtendenteV6,
-    SaidaDoAtendenteV6 | SaidaDoAtendenteV8 | SaidaDoAtendenteV9
+    SaidaDoAtendenteV6 | SaidaDoAtendenteV8 | SaidaDoAtendenteV9 | SaidaDoAtendenteV10
   > = comMapa
-    ? { ...atendenteImovaV9, modelo, sistema: sistemaComBaseV9(base) }
+    ? { ...atendenteImovaV10, modelo, sistema: sistemaComBaseV10(base) }
     : { ...atendenteImovaV6, modelo, sistema: sistemaComBaseV6(base) };
 
   let executada;
@@ -603,6 +606,15 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   let fotoSaiu = false;
   // O pedido de visita (v9): gravado depois da passagem, para os admins aprovarem.
   let pedidoDeVisita: { codigo: string; gravado: boolean; motivo: string | null } | null = null;
+  // O aviso de decisão (v10): gravado depois da fala "vou verificar", para os admins.
+  let pedidoDeDecisao: {
+    tipo: string;
+    gravado: boolean;
+    sugestoes: number;
+    ajustes: readonly string[];
+    fraseTrocada: boolean;
+    motivo: string | null;
+  } | null = null;
   switch (saida.acao) {
     case 'nao_responder': {
       await rpc(contexto, 'ia_atendente_registrar_silencio', {
@@ -732,7 +744,24 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
     }
     case 'responder':
     default: {
-      if (texto === '') {
+      // O aviso de decisão (v10, 25/11/2026): a resposta é da Imova. A IA não passa a
+      // conversa: diz que vai verificar (nunca "à equipe": a frase segura entra no lugar) e
+      // a decisão vai aos admins depois que a fala sair.
+      const pedida = 'decisao' in saida ? saida.decisao : null;
+      let decisao: DecisaoPreparada | null = null;
+      let fala = texto;
+      let fraseTrocada = false;
+      if (pedida !== null) {
+        decisao = prepararDecisao(pedida, {
+          limpar: (t) => limparTexto(reidratar(t, executada.mapa)),
+          falasDoCliente: (e.mensagens ?? []).filter((m) => m.de === 'cliente').map((m) => m.texto ?? ''),
+          contexto: (e.mensagens ?? []).map((m) => m.texto ?? ''),
+        });
+        const conferida = falaDaDecisao(texto, decisao.tipo);
+        fala = conferida.texto;
+        fraseTrocada = conferida.trocada;
+      }
+      if (fala === '') {
         return passarParaGente(
           contexto,
           payload.conversation_id,
@@ -755,7 +784,7 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
           e.mensagens ?? [],
         );
       }
-      const textoQueSai = foto !== null && !foto.pronta ? textoComALegenda(texto, foto.legenda) : texto;
+      const textoQueSai = foto !== null && !foto.pronta ? textoComALegenda(fala, foto.legenda) : fala;
       // A chave é `foto_pedida`, nunca `foto`: a porta da foto no banco reconhece o registro da
       // PRÓPRIA foto por `detalhes ? 'foto'`, e com essa chave no texto ela recusava a foto com
       // "sem_texto_antes" (1º teste real, conversa do Janio, 24/11/2026 17h28).
@@ -764,8 +793,46 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
       resultado = await rpc(contexto, 'ia_atendente_responder', {
         ...comum,
         p_texto: textoQueSai,
-        p_detalhes: detalhesComFoto,
+        p_detalhes:
+          decisao === null ? detalhesComFoto : { ...detalhesComFoto, decisao_pedida: decisao.tipo },
       });
+      if (resultado.ok === true && decisao !== null) {
+        const r = await rpc(contexto, 'ia_atendente_pedir_decisao', {
+          p_conversation_id: payload.conversation_id,
+          p_em_resposta_a: payload.message_id,
+          p_tipo: decisao.tipo,
+          p_pergunta: decisao.pergunta,
+          p_imovel_codigo: decisao.imovelCodigo,
+          p_valor_proposto: decisao.valorProposto,
+          p_sugestoes: decisao.sugestoes,
+          p_resposta_da_ia: textoQueSai,
+          p_ai_run_id: executada.aiRunId,
+          p_prompt_version: executada.promptVersion,
+        }).catch((erro: unknown) => ({ ok: false, motivo: erro instanceof Error ? erro.message : String(erro) }));
+        pedidoDeDecisao = {
+          tipo: decisao.tipo,
+          gravado: r.ok === true,
+          sugestoes: decisao.sugestoes.length,
+          ajustes: decisao.ajustes,
+          fraseTrocada,
+          motivo: r.ok === true ? null : String(r.motivo ?? 'recusado'),
+        };
+        if (r.ok === true) feita = 'pediu_decisao';
+        else {
+          // A fala já saiu ("vou verificar"): sem a decisão gravada, ninguém responde. A
+          // conversa vai para uma pessoa, com o motivo.
+          contexto.logger.warn('a decisão não foi gravada: a conversa vai para a equipe', {
+            conversa: payload.conversation_id,
+            motivo: pedidoDeDecisao.motivo,
+          });
+          await rpc(contexto, 'ia_atendente_passar', {
+            ...comum,
+            p_em_resposta_a: null,
+            p_texto: null,
+            p_motivo: `A IA disse que ia verificar e não conseguiu pedir a decisão aos admins: ${detalhes.motivo}`,
+          }).catch(() => undefined);
+        }
+      }
       if (resultado.ok === true && foto !== null && foto.pronta) {
         const r = await rpc(contexto, 'ia_atendente_mostrar_foto', {
           p_conversation_id: payload.conversation_id,
@@ -808,6 +875,7 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
     fotos_ensinadas: fotosEnsinadas,
     foto: foto === null ? null : { codigo: foto.codigo, saiu: fotoSaiu, motivo: foto.pronta ? null : foto.motivo },
     visita: pedidoDeVisita,
+    decisao: pedidoDeDecisao,
     confianca: saida.confianca,
     custo_usd: executada.custoUsd,
   });
@@ -823,6 +891,7 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
       ...(saida.agenda === null ? {} : { agenda: saida.agenda }),
       ...(foto === null ? {} : { foto: { codigo: foto.codigo, saiu: fotoSaiu } }),
       ...(pedidoDeVisita === null ? {} : { visita: pedidoDeVisita }),
+      ...(pedidoDeDecisao === null ? {} : { decisao: pedidoDeDecisao }),
     },
   };
 }

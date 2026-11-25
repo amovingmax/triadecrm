@@ -585,7 +585,7 @@ describe('a busca no mapa (v7, 23/11/2026): só com o mapa no worker', () => {
       },
       {
         tipo: 'final',
-        json: { ...saidaDoModelo(), fotoParaConfirmar: null, visita: null },
+        json: { ...saidaDoModelo(), fotoParaConfirmar: null, visita: null, decisao: null },
         uso,
         modelo: 'claude-haiku-5-5',
         paradaPor: 'end_turn',
@@ -599,10 +599,10 @@ describe('a busca no mapa (v7, 23/11/2026): só com o mapa no worker', () => {
     expect(pedidos[0]?.ferramentas.map((f) => f.nome)).toEqual(['buscar_no_mapa']);
     expect(pedidos[0]?.sistema).toContain('A BUSCA NO MAPA:');
     const runs = montado.banco.tabelas.ai_runs as Record<string, unknown>[];
-    expect(runs.map((x) => x.prompt_version)).toEqual(['atendente-imova@v9', 'atendente-imova@v9']);
+    expect(runs.map((x) => x.prompt_version)).toEqual(['atendente-imova@v10', 'atendente-imova@v10']);
     expect(montado.chamadas('ia_atendente_enviar_link')[0]).toMatchObject({
       p_ai_run_id: runs[1]?.id,
-      p_prompt_version: 'atendente-imova@v9',
+      p_prompt_version: 'atendente-imova@v10',
     });
     expect(montado.pedidos).toHaveLength(0);
   });
@@ -624,6 +624,7 @@ describe('a foto para confirmar o imóvel (v8, 24/11/2026)', () => {
     ...saidaDoModelo({ acao: 'responder', mensagem: TEXTO, agenda: null }),
     fotoParaConfirmar: { imovelCodigo: 'TE0004', legenda },
     visita: null,
+    decisao: null,
   });
 
   function comMapa(saida: Record<string, unknown>, opcoes: Parameters<typeof montar>[2] = {}) {
@@ -662,7 +663,7 @@ describe('a foto para confirmar o imóvel (v8, 24/11/2026)', () => {
       p_imovel_codigo: 'TE0004_IMOVA',
       p_media_path: m.banco.uploads[0]?.caminho,
       p_legenda: 'É este aqui que você viu?',
-      p_prompt_version: 'atendente-imova@v9',
+      p_prompt_version: 'atendente-imova@v10',
     });
   });
 
@@ -743,7 +744,7 @@ describe('a foto para confirmar o imóvel (v8, 24/11/2026)', () => {
   });
 
   it('sem foto pedida, nada muda: nem capa, nem cópia', async () => {
-    const m = comMapa({ ...saidaDoModelo({ acao: 'responder', mensagem: TEXTO, agenda: null }), fotoParaConfirmar: null, visita: null }, {
+    const m = comMapa({ ...saidaDoModelo({ acao: 'responder', mensagem: TEXTO, agenda: null }), fotoParaConfirmar: null, visita: null, decisao: null }, {
       rpcs: capaExiste,
       arquivos: fotoNoBalde,
     });
@@ -768,6 +769,7 @@ describe('o pedido de visita (v9, 24/11/2026)', () => {
     ...saidaDoModelo({ acao: 'passar_para_corretor', mensagem: FRASE, agenda: null, motivo: 'Visita na quinta de manhã.' }),
     fotoParaConfirmar: null,
     visita,
+    decisao: null,
   });
 
   function comMapa(saida: Record<string, unknown>, opcoes: Parameters<typeof montar>[2] = {}) {
@@ -804,7 +806,7 @@ describe('o pedido de visita (v9, 24/11/2026)', () => {
       p_data: '2026-11-26',
       p_periodo: 'manha',
       p_como_disse: 'quinta de manhã',
-      p_prompt_version: 'atendente-imova@v9',
+      p_prompt_version: 'atendente-imova@v10',
     });
     // Sem hora nas palavras do cliente, a chamada é a de antes (sem `p_hora`).
     expect(m.chamadas('ia_atendente_pedir_visita')[0]).not.toHaveProperty('p_hora');
@@ -853,5 +855,137 @@ describe('o pedido de visita (v9, 24/11/2026)', () => {
     });
     await atenderCliente(m.contexto, PAYLOAD);
     expect(m.chamadas('ia_atendente_pedir_visita')).toEqual([]);
+  });
+});
+
+describe('o aviso de decisão (v10, 25/11/2026)', () => {
+  const uso = { entrada: 100, saida: 20, escritaDeCache: 0, leituraDeCache: 0 };
+  const FALA = 'Entendi. Vou repassar sua proposta ao diretor e te retorno.';
+  const PROPOSTA = 'Achei caro. O proprietário aceita 450 mil?';
+  const conversaDaProposta = entradaNoBanco({
+    mensagens: [
+      { id: 'aaaaaaaa-0000-4000-8000-000000000001', de: 'cliente', quem: null, quando: '25/11 15:20', texto: 'Qual o valor do TE0004?' },
+      { id: 'aaaaaaaa-0000-4000-8000-000000000002', de: 'ia', quem: null, quando: '25/11 15:21', texto: 'O valor de venda é R$ 520.000.' },
+      { id: ULTIMA, de: 'cliente', quem: null, quando: '25/11 15:25', texto: PROPOSTA },
+    ],
+  });
+  const saidaDaDecisao = (decisao: Record<string, unknown> | null, mensagem = FALA) => ({
+    ...saidaDoModelo({ acao: 'responder', mensagem, agenda: null, motivo: 'Proposta: decisão dos admins.' }),
+    fotoParaConfirmar: null,
+    visita: null,
+    decisao,
+  });
+  const proposta = { tipo: 'proposta', imovelCodigo: 'TE0004_IMOVA', valorProposto: 450000, pergunta: PROPOSTA, sugestoes: [] };
+
+  function comMapa(saida: Record<string, unknown>, opcoes: Parameters<typeof montar>[2] = {}) {
+    const montado = montar(saidaDoModelo(), undefined, { entrada: conversaDaProposta, ...opcoes });
+    const contexto: ContextoDaIa = {
+      ...montado.contexto,
+      mapa: { buscar: () => Promise.resolve({ lugares: [], doCache: false }) },
+      modelo: {
+        ...montado.contexto.modelo,
+        conversarComFerramentas: () =>
+          Promise.resolve({ tipo: 'final', json: saida, uso, modelo: 'claude-haiku-5-5', paradaPor: 'end_turn' }),
+      },
+    };
+    return { ...montado, contexto };
+  }
+
+  it('a proposta: responde "vou repassar", NÃO passa a conversa e, depois, grava a decisão com o valor dele', async () => {
+    const m = comMapa(saidaDaDecisao(proposta), {
+      rpcs: { ia_atendente_pedir_decisao: () => ({ ok: true, decisao_id: 'd1' }) },
+    });
+    const r = await atenderCliente(m.contexto, PAYLOAD);
+    expect(r).toMatchObject({
+      feito: true,
+      motivo: 'pediu_decisao',
+      detalhes: { decisao: { tipo: 'proposta', gravado: true, fraseTrocada: false } },
+    });
+    expect(m.chamadas('ia_atendente_passar')).toEqual([]);
+    expect(m.chamadas('ia_atendente_responder')[0]).toMatchObject({
+      p_texto: FALA,
+      p_detalhes: { decisao_pedida: 'proposta' },
+    });
+    const nomes = m.banco.chamadasDeRpc.map((c) => c.nome);
+    expect(nomes.indexOf('ia_atendente_pedir_decisao')).toBeGreaterThan(nomes.indexOf('ia_atendente_responder'));
+    expect(m.chamadas('ia_atendente_pedir_decisao')[0]).toMatchObject({
+      p_conversation_id: CONVERSA,
+      p_em_resposta_a: ULTIMA,
+      p_tipo: 'proposta',
+      p_pergunta: PROPOSTA,
+      p_imovel_codigo: 'TE0004_IMOVA',
+      p_valor_proposto: 450000,
+      p_sugestoes: [],
+      p_resposta_da_ia: FALA,
+      p_prompt_version: 'atendente-imova@v10',
+    });
+  });
+
+  it('a fala que diz "equipe" vira a frase segura (decisão do dono)', async () => {
+    const m = comMapa(saidaDaDecisao(proposta, 'Vou levar sua proposta para a equipe e te retorno.'), {
+      rpcs: { ia_atendente_pedir_decisao: () => ({ ok: true }) },
+    });
+    const r = await atenderCliente(m.contexto, PAYLOAD);
+    expect(r).toMatchObject({ detalhes: { decisao: { fraseTrocada: true } } });
+    expect(m.chamadas('ia_atendente_responder')[0]).toMatchObject({
+      p_texto: 'Vou repassar sua proposta ao diretor e te retorno.',
+    });
+  });
+
+  it('o valor que o cliente não escreveu: vira pergunta, sem valor', async () => {
+    const m = comMapa(saidaDaDecisao({ ...proposta, valorProposto: 400000 }), {
+      rpcs: { ia_atendente_pedir_decisao: () => ({ ok: true }) },
+    });
+    const r = await atenderCliente(m.contexto, PAYLOAD);
+    expect(m.chamadas('ia_atendente_pedir_decisao')[0]).toMatchObject({ p_tipo: 'pergunta', p_valor_proposto: null });
+    expect(r).toMatchObject({ detalhes: { decisao: { ajustes: ['valor_nao_conferido'] } } });
+  });
+
+  it('a pergunta leva as sugestões que passam pela rede; a que fala em equipe sai', async () => {
+    const m = comMapa(
+      saidaDaDecisao(
+        {
+          tipo: 'pergunta',
+          imovelCodigo: null,
+          valorProposto: null,
+          pergunta: 'Vocês ajudam com o financiamento?',
+          sugestoes: [
+            { rotulo: 'Sim', resposta: 'Ajudamos sim com o financiamento, do começo ao fim.' },
+            { rotulo: 'Equipe', resposta: 'A nossa equipe cuida de tudo.' },
+            { rotulo: 'Não', resposta: 'Nesse caso, quem cuida é o banco.' },
+          ],
+        },
+        'Vou verificar e te retorno.',
+      ),
+      { rpcs: { ia_atendente_pedir_decisao: () => ({ ok: true }) } },
+    );
+    await atenderCliente(m.contexto, PAYLOAD);
+    expect(m.chamadas('ia_atendente_pedir_decisao')[0]).toMatchObject({
+      p_tipo: 'pergunta',
+      p_sugestoes: [
+        { rotulo: 'Sim', resposta: 'Ajudamos sim com o financiamento, do começo ao fim.' },
+        { rotulo: 'Não', resposta: 'Nesse caso, quem cuida é o banco.' },
+      ],
+    });
+  });
+
+  it('o banco não gravou a decisão: a fala já saiu, e a conversa vai para a equipe', async () => {
+    const m = comMapa(saidaDaDecisao(proposta), {
+      rpcs: { ia_atendente_pedir_decisao: () => ({ ok: false, motivo: 'conversa_nao_existe' }) },
+    });
+    const r = await atenderCliente(m.contexto, PAYLOAD);
+    expect(r).toMatchObject({ feito: true, motivo: 'responder', detalhes: { decisao: { gravado: false } } });
+    expect(m.chamadas('ia_atendente_passar')[0]).toMatchObject({ p_em_resposta_a: null, p_texto: null });
+  });
+
+  it('a resposta recusada pelo banco não grava decisão', async () => {
+    const m = comMapa(saidaDaDecisao(proposta), {
+      rpcs: {
+        ia_atendente_responder: () => ({ ok: false, motivo: 'chegou_mensagem_nova' }),
+        ia_atendente_pedir_decisao: () => ({ ok: true }),
+      },
+    });
+    await atenderCliente(m.contexto, PAYLOAD);
+    expect(m.chamadas('ia_atendente_pedir_decisao')).toEqual([]);
   });
 });

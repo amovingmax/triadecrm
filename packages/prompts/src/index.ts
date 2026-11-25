@@ -137,6 +137,25 @@ export {
 } from './prompts/atendente-imova/v9';
 
 export {
+  BLOCO_DA_DECISAO,
+  FRASE_DA_DECISAO,
+  MAX_SUGESTOES,
+  TIPOS_DE_DECISAO,
+  type DecisaoDoAtendente,
+  type SaidaDoAtendenteV10,
+  type TipoDeDecisao,
+  atendenteImovaV10,
+  sistemaComBaseV10,
+} from './prompts/atendente-imova/v10';
+
+export {
+  type EntradaDaRespostaDaDecisao,
+  type SaidaDaRespostaDaDecisao,
+  motivoParaNaoMandarDaDecisao,
+  respostaDaDecisaoV1,
+} from './prompts/resposta-da-decisao/v1';
+
+export {
   BASE_DO_ENSAIO_V5,
   CENARIOS_DE_VISITA_V5,
   CENARIOS_DO_ATENDENTE_V5,

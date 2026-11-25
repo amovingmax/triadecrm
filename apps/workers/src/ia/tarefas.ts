@@ -103,6 +103,7 @@ import {
   registrarFimSemResumo,
   resumirPassagem,
 } from './resumo-da-passagem';
+import { payloadDaRespostaDaDecisao, responderDecisao } from './resposta-da-decisao';
 
 import { ErroDaEsteira, type ClienteDoBanco } from '../fila/esteira';
 
@@ -232,6 +233,9 @@ const PAYLOADS = {
   retomar_conversa: payloadDaRetomada,
   // O resumo da passagem para o corretor (Imova, 11/11/2026): `ia/resumo-da-passagem.ts`.
   resumir_passagem: payloadDoResumoDaPassagem,
+  // "Escrever outra resposta" no aviso de decisão (Imova, 25/11/2026): a IA diz ao cliente
+  // o que o admin escreveu, só com o tom ajustado. `ia/resposta-da-decisao.ts`.
+  responder_decisao: payloadDaRespostaDaDecisao,
 } as const;
 
 export type PropositoConhecido = keyof typeof PAYLOADS;
@@ -1323,6 +1327,10 @@ const TRABALHOS: Readonly<
     proposito: 'resumir_passagem',
     ...(await resumirPassagem(contexto, bruto)),
   }),
+  responder_decisao: async (contexto, bruto) => ({
+    proposito: 'responder_decisao',
+    ...(await responderDecisao(contexto, bruto)),
+  }),
 };
 
 /**
@@ -1344,6 +1352,8 @@ const TRABALHOS_DA_IMOVA: ReadonlySet<PropositoConhecido> = new Set<PropositoCon
   'retomar_conversa',
   // O resumo da passagem para o corretor (11/11/2026).
   'resumir_passagem',
+  // A resposta escrita pelo admin no aviso de decisão (25/11/2026).
+  'responder_decisao',
 ]);
 
 /** Os que só existem na Imova. Fora dela, saem da fila sem chamar o modelo. */
@@ -1351,6 +1361,7 @@ const SO_DA_IMOVA: ReadonlySet<PropositoConhecido> = new Set<PropositoConhecido>
   'identificar_canal',
   'retomar_conversa',
   'resumir_passagem',
+  'responder_decisao',
 ]);
 
 export async function tratarTrabalho(

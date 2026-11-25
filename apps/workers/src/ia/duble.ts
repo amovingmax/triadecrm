@@ -26,6 +26,7 @@
 import { estimarTokens } from '@komune/prompts';
 
 import type { PedidoAoModelo, RespostaDoModelo, UsoDoModelo } from './cliente';
+import { valoresDoTexto } from './decisao';
 
 /** Qual dos fluxos o esquema pedido descreve. */
 export type FluxoDoDuble =
@@ -42,7 +43,8 @@ export type FluxoDoDuble =
   | 'conselheiro_lead'
   | 'conselheiro_imovel'
   | 'retomada'
-  | 'resumo_passagem';
+  | 'resumo_passagem'
+  | 'resposta_decisao';
 
 export class EsquemaDesconhecidoError extends Error {
   constructor(campos: readonly string[]) {
@@ -69,6 +71,8 @@ export function fluxoDoEsquema(esquema: Record<string, unknown>): FluxoDoDuble {
   if (campos.has('retomar')) return 'retomada';
   // O resumo da passagem da Imova (11/11/2026): o único que diz por que passou.
   if (campos.has('porquePassou')) return 'resumo_passagem';
+  // A resposta escrita pelo admin no aviso de decisão (Imova, 25/11/2026): só a mensagem.
+  if (campos.has('mensagem') && campos.size === 1) return 'resposta_decisao';
   if (campos.has('textoLimpo')) return 'transcricao';
   // A IA que atende o cliente da Imova (06/11/2026): é a única que devolve uma ação
   // e as anotações do treino.
@@ -548,6 +552,42 @@ function atenderNoDuble(mensagem: string): Record<string, unknown> {
       motivo: `Simulação: quer visitar o ${codigo}; link da visita.`,
     };
   }
+  // O aviso de decisão (v10, 25/11/2026): proposta de valor e pergunta de financiamento
+  // não passam a conversa; a IA diz que vai verificar e pede a decisão aos admins.
+  const valores = valoresDoTexto(ultima);
+  if (/aceita|proposta|ofere[çc]o|fa[çc]o por|pago/.test(minuscula) && valores.length > 0) {
+    return {
+      ...base,
+      acao: 'responder',
+      mensagem: 'Simulação: vou repassar sua proposta ao diretor e te retorno.',
+      motivo: 'Simulação: proposta de valor; decisão dos admins.',
+      decisao: {
+        tipo: 'proposta',
+        imovelCodigo: codigo,
+        valorProposto: valores[0] ?? null,
+        pergunta: limitar(ultima, 200),
+        sugestoes: [],
+      },
+    };
+  }
+  if (/fgts|financiamento|financiar|desconto|permuta/.test(minuscula)) {
+    return {
+      ...base,
+      acao: 'responder',
+      mensagem: 'Simulação: vou verificar e te retorno.',
+      motivo: 'Simulação: pergunta que só a Imova responde; decisão dos admins.',
+      decisao: {
+        tipo: 'pergunta',
+        imovelCodigo: codigo,
+        valorProposto: null,
+        pergunta: limitar(ultima, 200),
+        sugestoes: [
+          { rotulo: 'Sim', resposta: 'Simulação: sim, a gente ajuda com isso.' },
+          { rotulo: 'Não', resposta: 'Simulação: nesse caso, não.' },
+        ],
+      },
+    };
+  }
   if (/^(ok|obrigad[oa]|valeu|👍)[.!]*$/.test(minuscula.trim())) {
     return { ...base, acao: 'nao_responder', mensagem: '', motivo: 'Simulação: só agradeceu.' };
   }
@@ -953,6 +993,15 @@ function aconselharImovelNoDuble(mensagem: string): Record<string, unknown> {
  */
 export const TOKENS_POR_IMAGEM_NO_DUBLE = 1600;
 
+/**
+ * A resposta escrita pelo admin no dublê (Imova, 25/11/2026): o que o admin escreveu, com
+ * "Simulação:" na frente, sem acrescentar nada.
+ */
+function responderDecisaoNoDuble(mensagem: string): Record<string, unknown> {
+  const resposta = /A RESPOSTA DA IMOVA: (.*)/.exec(mensagem)?.[1]?.trim() ?? '';
+  return { mensagem: limitar(`Simulação: ${resposta}`, 300) };
+}
+
 const RESPOSTAS: Readonly<
   Record<FluxoDoDuble, (mensagem: string, pedido: PedidoAoModelo) => Record<string, unknown>>
 > = {
@@ -970,6 +1019,7 @@ const RESPOSTAS: Readonly<
   conselheiro_imovel: aconselharImovelNoDuble,
   retomada: retomarNoDuble,
   resumo_passagem: resumirPassagemNoDuble,
+  resposta_decisao: responderDecisaoNoDuble,
 };
 
 // ---------------------------------------------------------------------------

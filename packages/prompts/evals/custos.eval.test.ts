@@ -240,11 +240,12 @@ describe('preços e conta por chamada', () => {
         // prefixo (regras, caderno e imóveis) lido do cache.
         id: 'atendente-imova',
         modelo: 'claude-haiku-5-5',
-        tokensDeSistema: 5339,
+        // 6.140 desde a v10 (25/11/2026): o bloco do aviso de decisão.
+        tokensDeSistema: 6140,
         tokensDaMensagem: 165,
-        tokensDeSaida: 119,
-        semCache: 0.00061,
-        comCache: 0.00013,
+        tokensDeSaida: 123,
+        semCache: 0.00069,
+        comCache: 0.00014,
       },
       {
         // De qual anúncio é a foto do cliente (09/11/2026, Imova). A conta mede só o
@@ -345,6 +346,17 @@ describe('preços e conta por chamada', () => {
         tokensDeSaida: 241,
         semCache: 0.00028,
         comCache: 0.00016,
+      },
+      {
+        // A resposta que um admin escreveu no aviso de decisão (Imova, 25/11/2026): uma
+        // chamada por "Escrever outra resposta", no Haiku 5.5. Abaixo de US$ 0,0001.
+        id: 'resposta-da-decisao',
+        modelo: 'claude-haiku-5-5',
+        tokensDeSistema: 522,
+        tokensDaMensagem: 78,
+        tokensDeSaida: 20,
+        semCache: 0.00007,
+        comCache: 0.00002,
       },
     ]);
   });

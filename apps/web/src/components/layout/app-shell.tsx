@@ -14,6 +14,7 @@ import { podeLigar } from '@/components/ligacao/chamada-contexto';
 import { ProvedorDoSoftphone } from '@/components/ligacao/voz-provedor';
 import { ProvedorDaLigacaoWhatsapp } from '@/components/ligacao-whatsapp/provedor';
 import { TransicaoPagina } from '@/components/movimento';
+import { VigiaDeDecisoes } from '@/components/decisoes/vigia-de-decisoes';
 import { VigiaDeVisitas } from '@/components/visitas/vigia-de-visitas';
 import { type Sessao } from '@/lib/auth/session';
 import { EMPRESA } from '@/lib/empresa';
@@ -125,12 +126,19 @@ export function AppShell({
                 usuarioId={sessao.id}
                 ligado={EMPRESA.modulos.esperaEmDegraus && recebeAvisos(sessao.papel)}
               />
-              {/* 24/11/2026: o pedido de visita que a IA combinou, para todos os admins. */}
-              <VigiaDeVisitas
-                usuarioId={sessao.id}
-                usuarioNome={sessao.nome}
-                ligado={EMPRESA.modulos.visitaPedida && sessao.papel === 'admin'}
-              />
+              {/* Os cartões dos admins, empilhados no canto de baixo: a decisão que a IA
+          pede (25/11/2026) em cima, o pedido de visita (24/11/2026) embaixo. */}
+              <div className="pointer-events-none fixed inset-x-3 bottom-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+0.75rem)] z-40 flex flex-col gap-2 md:inset-x-auto md:right-5 md:bottom-5 md:w-[25rem]">
+                <VigiaDeDecisoes
+                  usuarioId={sessao.id}
+                  ligado={EMPRESA.modulos.avisoDeDecisao && sessao.papel === 'admin'}
+                />
+                <VigiaDeVisitas
+                  usuarioId={sessao.id}
+                  usuarioNome={sessao.nome}
+                  ligado={EMPRESA.modulos.visitaPedida && sessao.papel === 'admin'}
+                />
+              </div>
               {/* O aviso no WhatsApp de quem não atendeu sai até um minuto depois do
           recibo; quem ligou já está em outro contato (ou outra tela). */}
               <AcompanhanteDeAvisos />

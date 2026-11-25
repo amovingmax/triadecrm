@@ -173,6 +173,14 @@ export interface Empresa {
      */
     visitaPedida: boolean;
     /**
+     * O aviso de decisão (25/11/2026): na proposta de valor e na pergunta que só a Imova
+     * responde, a IA não passa a conversa; diz "vou verificar", todos os admins são avisados
+     * (cartão no CRM e push no celular) e o primeiro que escolhe decide o que a IA responde
+     * (`public.ia_decisoes_abertas` e `public.ia_decisao_decidir`). Só da Imova: no banco da
+     * KOMUNE a migração 20261125200000 não cria nada.
+     */
+    avisoDeDecisao: boolean;
+    /**
      * O lembrete da visita na véspera pelo WhatsApp, com "Confirmo" e "Preciso
      * remarcar" (11/11/2026): o selo "Cliente confirmou" / "Pediu para remarcar"
      * no cartão da Agenda e na agenda do Meu dia, e o interruptor em Ajustes →
@@ -373,6 +381,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       calendly: false,
       esperaEmDegraus: false,
       visitaPedida: false,
+      avisoDeDecisao: false,
       lembreteDeVisita: false,
       agendaComImovel: false,
       emailDeReuniao: true,
@@ -441,6 +450,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       calendly: true,
       esperaEmDegraus: true,
       visitaPedida: true,
+      avisoDeDecisao: true,
       lembreteDeVisita: true,
       agendaComImovel: true,
       // Sem Resend no `imova-worker-wa` (11/11/2026): a Agenda não promete e-mail.

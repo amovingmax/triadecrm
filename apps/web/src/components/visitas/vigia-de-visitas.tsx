@@ -210,7 +210,9 @@ export function VigiaDeVisitas({
   return (
     <aside
       aria-label="Pedidos de visita"
-      className="fixed inset-x-3 bottom-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+0.75rem)] z-40 md:inset-x-auto md:right-5 md:bottom-5 md:w-[25rem]"
+      // O lugar (o canto de baixo) é da pilha dos cartões em `app-shell.tsx` (25/11/2026),
+      // para o aviso de decisão não cobrir este.
+      className="pointer-events-auto"
     >
       <div className="rounded-2xl border bg-card shadow-lg">
         <button

@@ -61,6 +61,8 @@ const visita = z
 
 const saida = saidaDoAtendenteV8.extend({ visita });
 export type SaidaDoAtendenteV9 = z.infer<typeof saida>;
+/** O schema da saída, para a v10 estender (25/11/2026). */
+export const saidaDoAtendenteV9 = saida;
 
 const FOTO_NA_SAIDA =
   '- `fotoParaConfirmar`: { imovelCodigo, legenda } ou null (ver A FOTO PARA CONFIRMAR O IMÓVEL).';
