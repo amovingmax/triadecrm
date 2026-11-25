@@ -14,6 +14,7 @@ import { podeLigar } from '@/components/ligacao/chamada-contexto';
 import { ProvedorDoSoftphone } from '@/components/ligacao/voz-provedor';
 import { ProvedorDaLigacaoWhatsapp } from '@/components/ligacao-whatsapp/provedor';
 import { TransicaoPagina } from '@/components/movimento';
+import { VigiaDeVisitas } from '@/components/visitas/vigia-de-visitas';
 import { type Sessao } from '@/lib/auth/session';
 import { EMPRESA } from '@/lib/empresa';
 import { type ContagemDasFilas } from '@/lib/filas-do-menu';
@@ -81,59 +82,64 @@ export function AppShell({
         usuarioId={sessao.id}
         ligado={EMPRESA.modulos.anuncios && recebeAvisos(sessao.papel)}
       >
-      <ProvedorDoSoftphone podeLigar={podeLigar(sessao.papel)}>
-        <ProvedorDaLigacaoWhatsapp podeLigar={podeLigar(sessao.papel)}>
-        {/* Com uma conversa aberta em tela cheia no celular (`data-area-visivel`), o
+        <ProvedorDoSoftphone podeLigar={podeLigar(sessao.papel)}>
+          <ProvedorDaLigacaoWhatsapp podeLigar={podeLigar(sessao.papel)}>
+            {/* Com uma conversa aberta em tela cheia no celular (`data-area-visivel`), o
             fundo é o da caixa de escrever: qualquer fresta entre ela e o teclado
             subindo fica da cor dela, nunca preta (04/11/2026). */}
-        <div className="flex min-h-dvh bg-background has-[[data-area-visivel]]:bg-wpp-painel2">
-          <Sidebar papel={sessao.papel} filas={filas} />
+            <div className="flex min-h-dvh bg-background has-[[data-area-visivel]]:bg-wpp-painel2">
+              <Sidebar papel={sessao.papel} filas={filas} />
 
-          <div className="flex min-w-0 flex-1 flex-col">
-            <Header sessao={sessao} />
+              <div className="flex min-w-0 flex-1 flex-col">
+                <Header sessao={sessao} />
 
-            <main
-              id="conteudo"
-              className={cn(
-                'flex-1 px-4 pt-4 pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] md:px-5 md:pt-3 md:pb-8',
-                // A tela de Conversas vai de ponta a ponta, como o WhatsApp
-                // (03/11/2026): sem a margem do conteúdo no celular e com 12px no
-                // computador, e sem o teto de 1400px. Ela se anuncia com
-                // `data-tela-cheia`; as outras telas ficam como eram.
-                'has-[[data-tela-cheia]]:px-0 has-[[data-tela-cheia]]:pt-0 has-[[data-tela-cheia]]:pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior))]',
-                'md:has-[[data-tela-cheia]]:px-3 md:has-[[data-tela-cheia]]:pb-3',
-              )}
-            >
-              {/* Coluna centralizada com teto: cada tela ainda escolhe a própria medida de
+                <main
+                  id="conteudo"
+                  className={cn(
+                    'flex-1 px-4 pt-4 pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior)+1rem)] md:px-5 md:pt-3 md:pb-8',
+                    // A tela de Conversas vai de ponta a ponta, como o WhatsApp
+                    // (03/11/2026): sem a margem do conteúdo no celular e com 12px no
+                    // computador, e sem o teto de 1400px. Ela se anuncia com
+                    // `data-tela-cheia`; as outras telas ficam como eram.
+                    'has-[[data-tela-cheia]]:px-0 has-[[data-tela-cheia]]:pt-0 has-[[data-tela-cheia]]:pb-[calc(var(--altura-barra-inferior)+var(--area-segura-inferior))]',
+                    'md:has-[[data-tela-cheia]]:px-3 md:has-[[data-tela-cheia]]:pb-3',
+                  )}
+                >
+                  {/* Coluna centralizada com teto: cada tela ainda escolhe a própria medida de
               leitura, mas nenhuma fica grudada na barra lateral com um terço de vazio
               à direita, e nenhuma tabela se estica por 2500px num monitor ultrawide. */}
-              {/* 1400px e não 1440 (Tríade Design System): o sistema desenha num
+                  {/* 1400px e não 1440 (Tríade Design System): o sistema desenha num
               quadro de 1440 com 20px de margem de cada lado, e o conteúdo que
               sobra é exatamente 1400. */}
-              <div className="mx-auto w-full max-w-[1400px] has-[[data-tela-cheia]]:max-w-none">
-                {/* Fora da transição: a faixa não reaparece animada a cada tela. */}
-                <AvisosDesteComputador usuarioId={sessao.id} />
-                <TransicaoPagina>{children}</TransicaoPagina>
+                  <div className="mx-auto w-full max-w-[1400px] has-[[data-tela-cheia]]:max-w-none">
+                    {/* Fora da transição: a faixa não reaparece animada a cada tela. */}
+                    <AvisosDesteComputador usuarioId={sessao.id} />
+                    <TransicaoPagina>{children}</TransicaoPagina>
+                  </div>
+                </main>
               </div>
-            </main>
-          </div>
 
-          <BottomNav papel={sessao.papel} filas={filas} />
-          <PilhaDeAvisos />
-          <VigiaDeEspera
-            usuarioId={sessao.id}
-            ligado={EMPRESA.modulos.esperaEmDegraus && recebeAvisos(sessao.papel)}
-          />
-          {/* O aviso no WhatsApp de quem não atendeu sai até um minuto depois do
+              <BottomNav papel={sessao.papel} filas={filas} />
+              <PilhaDeAvisos />
+              <VigiaDeEspera
+                usuarioId={sessao.id}
+                ligado={EMPRESA.modulos.esperaEmDegraus && recebeAvisos(sessao.papel)}
+              />
+              {/* 24/11/2026: o pedido de visita que a IA combinou, para todos os admins. */}
+              <VigiaDeVisitas
+                usuarioId={sessao.id}
+                ligado={EMPRESA.modulos.visitaPedida && sessao.papel === 'admin'}
+              />
+              {/* O aviso no WhatsApp de quem não atendeu sai até um minuto depois do
           recibo; quem ligou já está em outro contato (ou outra tela). */}
-          <AcompanhanteDeAvisos />
-          {/* O link tocado esmaece até a tela nova entrar, em qualquer tela. */}
-          <RetornoDoToque />
-          {/* Com o aparelho ocioso, as telas do menu buscam os dados antes do toque. */}
-          <AdiantarDados papel={sessao.papel} telas={telasParaAdiantar(sessao.papel)} />
-        </div>
-        </ProvedorDaLigacaoWhatsapp>
-      </ProvedorDoSoftphone>
+              <AcompanhanteDeAvisos />
+              {/* O link tocado esmaece até a tela nova entrar, em qualquer tela. */}
+              <RetornoDoToque />
+              {/* Com o aparelho ocioso, as telas do menu buscam os dados antes do toque. */}
+              <AdiantarDados papel={sessao.papel} telas={telasParaAdiantar(sessao.papel)} />
+            </div>
+          </ProvedorDaLigacaoWhatsapp>
+        </ProvedorDoSoftphone>
       </VigiaDeLeads>
     </ProvedorDeAvisos>
   );

@@ -14426,6 +14426,16 @@ export type Database = {
         }
         Returns: Json
       }
+      visita_pedido_decidir: {
+        Args: {
+          p_decisao: string
+          p_id: string
+          p_motivo?: string
+          p_quando?: string
+        }
+        Returns: Json
+      }
+      visita_pedidos_abertos: { Args: never; Returns: Json }
       voz_abrir_ligacao: {
         Args: { p_attempt_id?: string; p_organization_id?: string }
         Returns: Json

@@ -165,6 +165,14 @@ export interface Empresa {
      */
     esperaEmDegraus: boolean;
     /**
+     * O pedido de visita presencial (24/11/2026): a IA combina o dia com o cliente, todos
+     * os admins são avisados (cartão no CRM e push no celular) e qualquer um aprova,
+     * propõe outro dia ou recusa (`public.visita_pedidos_abertos` e
+     * `public.visita_pedido_decidir`). Só da Imova: no banco da KOMUNE a migração
+     * 20261124190000 não cria nada.
+     */
+    visitaPedida: boolean;
+    /**
      * O lembrete da visita na véspera pelo WhatsApp, com "Confirmo" e "Preciso
      * remarcar" (11/11/2026): o selo "Cliente confirmou" / "Pediu para remarcar"
      * no cartão da Agenda e na agenda do Meu dia, e o interruptor em Ajustes →
@@ -364,6 +372,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       avisosDaEquipe: false,
       calendly: false,
       esperaEmDegraus: false,
+      visitaPedida: false,
       lembreteDeVisita: false,
       agendaComImovel: false,
       emailDeReuniao: true,
@@ -431,6 +440,7 @@ export const EMPRESAS: Record<EmpresaSlug, Empresa> = {
       avisosDaEquipe: true,
       calendly: true,
       esperaEmDegraus: true,
+      visitaPedida: true,
       lembreteDeVisita: true,
       agendaComImovel: true,
       // Sem Resend no `imova-worker-wa` (11/11/2026): a Agenda não promete e-mail.
