@@ -129,6 +129,14 @@ export {
 } from './prompts/atendente-imova/v8';
 
 export {
+  BLOCO_DA_VISITA,
+  PERIODOS_DA_VISITA,
+  type SaidaDoAtendenteV9,
+  atendenteImovaV9,
+  sistemaComBaseV9,
+} from './prompts/atendente-imova/v9';
+
+export {
   BASE_DO_ENSAIO_V5,
   CENARIOS_DE_VISITA_V5,
   CENARIOS_DO_ATENDENTE_V5,

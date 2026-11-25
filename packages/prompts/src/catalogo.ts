@@ -6,6 +6,7 @@ import { atendenteImovaV5 } from './prompts/atendente-imova/v5';
 import { atendenteImovaV6 } from './prompts/atendente-imova/v6';
 import { atendenteImovaV7 } from './prompts/atendente-imova/v7';
 import { atendenteImovaV8 } from './prompts/atendente-imova/v8';
+import { atendenteImovaV9 } from './prompts/atendente-imova/v9';
 import { fotoDoAnuncioV1 } from './prompts/foto-do-anuncio/v1';
 import { avaliacaoDoAtendimentoV1 } from './prompts/avaliacao-do-atendimento/v1';
 import { avaliacaoDoAtendimentoV2 } from './prompts/avaliacao-do-atendimento/v2';
@@ -66,6 +67,7 @@ export const CATALOGO = {
     6: atendenteImovaV6,
     7: atendenteImovaV7,
     8: atendenteImovaV8,
+    9: atendenteImovaV9,
   },
   // Só da Imova (09/11/2026): de qual anúncio é a foto que o cliente mandou.
   'foto-do-anuncio': { 1: fotoDoAnuncioV1 },
@@ -127,7 +129,10 @@ export const VIGENTES = {
   // v8 desde 24/11/2026: a v7 com a foto para confirmar o imóvel (`fotoParaConfirmar`):
   // a frase curta, sem preço, e a foto de capa do anúncio com a pergunta. Voltar à v7 é
   // trocar este número e o import do worker.
-  'atendente-imova': 8,
+  // v9 desde 24/11/2026: a v8 com o pedido de visita (`visita`): quando passa a conversa
+  // por uma visita presencial com o dia dito, a IA devolve o pedido, que vai aos admins
+  // aprovarem. Voltar à v8 é trocar este número e o import do worker.
+  'atendente-imova': 9,
   'foto-do-anuncio': 1,
   // v2 desde 09/11/2026: a juíza diz também a lacuna, onde a IA que atende falhou no
   // dia, para o relatório contar por tema. Voltar é trocar este número.

@@ -64,6 +64,8 @@ const fotoParaConfirmar = z
 
 const saida = saidaDoAtendenteV6.extend({ fotoParaConfirmar });
 export type SaidaDoAtendenteV8 = z.infer<typeof saida>;
+/** O schema da saída da v8, para a v9 estender (24/11/2026). */
+export { saida as saidaDoAtendenteV8 };
 
 const OFERTAS_NA_SAIDA =
   '- `ofertasPorEmail`: "aceitou", "recusou" ou null (ver O E-MAIL PARA OFERTAS).';

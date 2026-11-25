@@ -63,7 +63,7 @@ describe('atendente-imova@v6: o contrato', () => {
   it('deu lugar à v7 e continua no catálogo, com a v5', () => {
     // Desde 23/11/2026 a vigente é a v7 (a v6 com a busca no mapa); a v6 segue no
     // catálogo, intacta, e é a que o worker usa quando não há mapa.
-    expect(VIGENTES['atendente-imova']).toBe(8);
+    expect(VIGENTES['atendente-imova']).toBe(9);
     expect(promptVigente('atendente-imova')).not.toBe(v6);
     expect(obterPrompt('atendente-imova', 6)).toBe(v6);
     expect(obterPrompt('atendente-imova', 5)).toBe(v5);
