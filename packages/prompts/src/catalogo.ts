@@ -13,6 +13,7 @@ import { avaliacaoDoAtendimentoV2 } from './prompts/avaliacao-do-atendimento/v2'
 import { conselheiroDoImovelV1 } from './prompts/conselheiro-do-imovel/v1';
 import { conselheiroDoLeadV1 } from './prompts/conselheiro-do-lead/v1';
 import { canalDeChegadaV1 } from './prompts/canal-de-chegada/v1';
+import { resumoDaPassagemV1 } from './prompts/resumo-da-passagem/v1';
 import { classificarIntencaoV1 } from './prompts/classificar-intencao/v1';
 import { fichaDaConversaV1 } from './prompts/ficha-da-conversa/v1';
 import { leituraDoClienteV1 } from './prompts/leitura-do-cliente/v1';
@@ -84,6 +85,9 @@ export const CATALOGO = {
   // Só da Imova (11/11/2026): a IA que atende retoma o contato com quem parou de responder
   // (o texto do dia 1, ainda dentro da janela de 24 h).
   'retomar-conversa': { 1: retomarConversaV1, 2: retomarConversaV2 },
+  // Só da Imova (11/11/2026): o cliente resumido para o corretor quando a IA que atende
+  // passa a conversa para a equipe.
+  'resumo-da-passagem': { 1: resumoDaPassagemV1 },
 } as const;
 
 export type IdDePrompt = keyof typeof CATALOGO;
@@ -149,6 +153,7 @@ export const VIGENTES = {
   // anúncio, sem pergunta, sem emoji, sem código, sem "corretor"). Voltar à v1 é trocar
   // este número e o import do worker (`apps/workers/src/ia/retomar.ts`).
   'retomar-conversa': 2,
+  'resumo-da-passagem': 1,
 } as const satisfies Record<IdDePrompt, number>;
 
 /** Uma versão específica, com o tipo daquela versão. */

@@ -59,6 +59,7 @@ import {
   FaixaDaLigacao,
 } from '@/components/ligacao-whatsapp/botao-na-conversa';
 import { SEM_PERDIDAS, type Perdidas } from '@/components/ligacao-whatsapp/logica';
+import { FaixaDoResumoDaPassagem } from '@/components/ia-que-atende/resumo-da-passagem';
 import {
   ACAO_DA_FOLHA,
   AreaDoFio,
@@ -471,6 +472,8 @@ export function ConversaForaDaBase({
           <div className="flex shrink-0 flex-col">
             <FaixaDaLigacao conversaId={fio.id} className={CLASSE_DA_FAIXA_DA_LIGACAO} />
             <AvisoDaJanela estado={janela} />
+            {/* A IA passou este cliente e ninguém respondeu ainda: o resumo no topo (11/11/2026). */}
+            <FaixaDoResumoDaPassagem fioId={fio.id} />
           </div>
           {/* PARECE FORNECEDOR (13/11/2026): o número não está em Prospectados,
               mas no robô de entrada a pessoa disse que é fornecedor. Com as caixas

@@ -142,6 +142,9 @@ describe('catálogo do Tríade', () => {
       'canal-de-chegada',
       // A IA que atende retoma o contato, só da Imova (11/11/2026): o texto do dia 1.
       'retomar-conversa',
+      // O cliente resumido para o corretor quando a IA que atende passa a conversa, só da
+      // Imova (11/11/2026).
+      'resumo-da-passagem',
     ]);
   });
 

@@ -41,7 +41,8 @@ export type FluxoDoDuble =
   | 'juiza'
   | 'conselheiro_lead'
   | 'conselheiro_imovel'
-  | 'retomada';
+  | 'retomada'
+  | 'resumo_passagem';
 
 export class EsquemaDesconhecidoError extends Error {
   constructor(campos: readonly string[]) {
@@ -66,6 +67,8 @@ export function fluxoDoEsquema(esquema: Record<string, unknown>): FluxoDoDuble {
   if (campos.has('subcanal')) return 'canal';
   // A retomada da IA que atende (Imova, 11/11/2026): a única que decide `retomar`.
   if (campos.has('retomar')) return 'retomada';
+  // O resumo da passagem da Imova (11/11/2026): o único que diz por que passou.
+  if (campos.has('porquePassou')) return 'resumo_passagem';
   if (campos.has('textoLimpo')) return 'transcricao';
   // A IA que atende o cliente da Imova (06/11/2026): é a única que devolve uma ação
   // e as anotações do treino.
@@ -767,6 +770,75 @@ function aconselharClienteNoDuble(mensagem: string): Record<string, unknown> {
 }
 
 /**
+ * O resumo da passagem no dublê (Imova, 11/11/2026): lê as falas do cliente na conversa
+ * montada e devolve um resumo coerente com elas, sempre com o rótulo e o TRECHO literal da
+ * mensagem que prova cada campo — "comprar"/"alugar" vira o negócio, "mil" vira o
+ * orçamento, o código escrito pelo cliente (e da lista de imóveis citados) vira imóvel,
+ * "visita" esquenta. Os textos começam com "Simulação:" e levam o marcador do nome quando
+ * há um, para o teste ver o nome voltar só no texto do corretor.
+ */
+function resumirPassagemNoDuble(mensagem: string): Record<string, unknown> {
+  const falas = mensagem
+    .split('\n')
+    .map((l) => /^\[(m\d+)\] em .* — (cliente|ia|equipe[^:]*|sistema): (.*)$/.exec(l))
+    .filter((m): m is RegExpExecArray => m !== null)
+    .map((m) => ({ rotulo: m[1] ?? '', de: m[2] ?? '', texto: m[3] ?? '' }));
+  const doCliente = falas.filter((f) => f.de === 'cliente');
+  const trecho = (padrao: RegExp) => {
+    for (const f of doCliente) {
+      const achado = padrao.exec(f.texto);
+      if (achado) return { prova: f.rotulo, trecho: achado[0] };
+    }
+    return null;
+  };
+  const conhecidos = linhasDaSecao(mensagem, 'IMÓVEIS DA IMOVA CITADOS NA CONVERSA:')
+    .map((l) => /^- ([A-Z0-9_.-]+)/.exec(l)?.[1] ?? '')
+    .filter((c) => c !== '');
+  const negocio = trecho(/\b(compr|alug)\w*/i);
+  const valor = trecho(/\d+\s*mil/i);
+  const financ = trecho(/financi\w*/i);
+  const caro = trecho(/\b(caro|salgad\w*)/i);
+  const imoveis = doCliente
+    .flatMap((f) =>
+      conhecidos
+        .filter((c) => f.texto.includes(c))
+        .map((codigo) => ({ codigo, prova: f.rotulo, confirmacao: null })),
+    )
+    .filter((i, indice, todos) => todos.findIndex((o) => o.codigo === i.codigo) === indice)
+    .slice(0, 5);
+  const nome = /\[\[NOME_\d+\]\]/.exec(mensagem)?.[0] ?? 'o cliente';
+  const motivo = campo(mensagem, 'motivo registrado');
+  const vazio = negocio === null && valor === null && imoveis.length === 0;
+  return {
+    procura: {
+      negocio:
+        negocio === null
+          ? null
+          : { valor: /alug/i.test(negocio.trecho) ? 'locacao' : 'compra', ...negocio },
+      tipo: null,
+      regiao: null,
+    },
+    imoveis,
+    orcamento: {
+      valor: valor === null ? null : { valor: `até ${valor.trecho}`, ...valor },
+      pagamento: financ === null ? null : { valor: 'financiamento', ...financ },
+    },
+    objecao: caro === null ? null : { tipo: 'preco', comoDisse: 'Simulação: achou caro.', ...caro },
+    temperatura: vazio ? null : trecho(/visit|conhecer/i) ? 'quente' : 'morno',
+    temperaturaPorque: limitar(
+      `Simulação: ${nome} disse "${doCliente[doCliente.length - 1]?.texto ?? ''}".`,
+      160,
+    ),
+    porquePassou: limitar(`Simulação: ${motivo ?? 'a IA passou a conversa'}.`, 200),
+    proximoPasso: limitar(
+      `Simulação: responder ${nome} sobre ${imoveis[0]?.codigo ?? 'o que procura'}.`,
+      200,
+    ),
+    dadosInsuficientes: vazio,
+  };
+}
+
+/**
  * O canal de chegada no dublê (Imova, 06/11/2026). Não vê a imagem — nenhum dublê vê —:
  * se veio foto, trata a primeira como placa da Imova; se o cliente falou de Instagram,
  * Redes sociais; senão, Não identificado. O motivo começa com "Simulação:" para ninguém
@@ -897,6 +969,7 @@ const RESPOSTAS: Readonly<
   conselheiro_lead: aconselharClienteNoDuble,
   conselheiro_imovel: aconselharImovelNoDuble,
   retomada: retomarNoDuble,
+  resumo_passagem: resumirPassagemNoDuble,
 };
 
 // ---------------------------------------------------------------------------

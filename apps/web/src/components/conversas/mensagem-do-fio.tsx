@@ -40,6 +40,7 @@ import { dataHoraCompleta, hora } from './formatos';
 import { entregaDaMensagem, separarAssinatura } from './mensagens';
 import { avisoSemConteudo, ROTULO_DO_ROBO, type MensagemDoFio } from './tipos';
 import { AvaliacaoDaIa, IA_QUE_ATENDE } from '@/components/ia-que-atende/na-conversa';
+import { ResumoNaMensagem } from '@/components/ia-que-atende/resumo-da-passagem';
 import { RabichoDoBalao, Tiques, type Tique } from './wpp';
 
 /**
@@ -332,6 +333,11 @@ export function Mensagem({
             ) : null}
             {avaliaIa && fio ? <AvaliacaoDaIa fioId={fio.fioId} mensagemId={mensagem.id} /> : null}
           </p>
+        ) : null}
+        {/* O resumo para o corretor, no ponto em que a IA passou a conversa (11/11/2026):
+            embaixo do aviso dela, ou da última mensagem quando o aviso não saiu. */}
+        {IA_QUE_ATENDE && fio ? (
+          <ResumoNaMensagem fioId={fio.fioId} mensagemId={mensagem.id} />
         ) : null}
       </div>
     </div>

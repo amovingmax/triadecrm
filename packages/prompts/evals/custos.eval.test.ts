@@ -332,6 +332,20 @@ describe('preços e conta por chamada', () => {
         semCache: 0.00017,
         comCache: 0.00007,
       },
+      {
+        // O resumo da passagem da Imova (11/11/2026): uma chamada por passagem da IA que
+        // atende para a equipe. A conta é do primeiro exemplo (sete mensagens); conversa
+        // real chega a 60, e na fatura entram ainda o esquema da saída e o raciocínio.
+        // Mesmo a US$ 0,002 por passagem, 30 passagens por dia ficam perto de US$ 2 no mês.
+        id: 'resumo-da-passagem',
+        modelo: 'claude-haiku-5-5',
+        // 1.340 desde a revisão de 11/11/2026: o trecho literal de cada campo dito.
+        tokensDeSistema: 1340,
+        tokensDaMensagem: 290,
+        tokensDeSaida: 241,
+        semCache: 0.00028,
+        comCache: 0.00016,
+      },
     ]);
   });
 });

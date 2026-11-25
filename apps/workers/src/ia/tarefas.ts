@@ -98,6 +98,11 @@ import {
 import { ErroDeterministico } from './erros';
 import { adiarTrabalho, enfileirarTrabalho } from './fila';
 import { avaliarAtendimento, payloadDaJuiza } from './juiza';
+import {
+  payloadDoResumoDaPassagem,
+  registrarFimSemResumo,
+  resumirPassagem,
+} from './resumo-da-passagem';
 
 import { ErroDaEsteira, type ClienteDoBanco } from '../fila/esteira';
 
@@ -225,6 +230,8 @@ const PAYLOADS = {
   // A IA que atende retoma o contato com quem parou de responder (11/11/2026): o texto
   // do dia 1, `ia/retomar.ts`.
   retomar_conversa: payloadDaRetomada,
+  // O resumo da passagem para o corretor (Imova, 11/11/2026): `ia/resumo-da-passagem.ts`.
+  resumir_passagem: payloadDoResumoDaPassagem,
 } as const;
 
 export type PropositoConhecido = keyof typeof PAYLOADS;
@@ -246,10 +253,7 @@ export interface ResultadoDoTrabalho {
 // 1. Transcrever o áudio recebido (R13, RF-CON-27)
 // ---------------------------------------------------------------------------
 
-async function transcrever(
-  contexto: ContextoDaIa,
-  bruto: unknown,
-): Promise<ResultadoDoTrabalho> {
+async function transcrever(contexto: ContextoDaIa, bruto: unknown): Promise<ResultadoDoTrabalho> {
   const payload = interpretarPayload(payloadDaTranscricao, bruto);
   const mensagem = await buscarMensagem(contexto.cliente, payload.message_id);
   if (mensagem === null) {
@@ -290,7 +294,11 @@ async function transcrever(
       contexto: payload.contexto ?? null,
     },
     contatoDoPrompt(ficha),
-    { organizationId: ficha.organizationId, contactId: ficha.contactId, conversationId: conversa.id },
+    {
+      organizationId: ficha.organizationId,
+      contactId: ficha.contactId,
+      conversationId: conversa.id,
+    },
   );
 
   // Reidratar aqui é correto: `messages.transcript` é lido por gente.
@@ -309,9 +317,14 @@ async function transcrever(
     // hoje. Ele existe escrito e tratado porque é a Fase 4 que vira a chave, e
     // o dia de virá-la não é o dia de descobrir que a recusa da fila cai no
     // silêncio.
-    const fila = await enfileirarTrabalho(contexto.cliente, 'classify_inbound', `msg:${mensagem.id}`, {
-      message_id: mensagem.id,
-    });
+    const fila = await enfileirarTrabalho(
+      contexto.cliente,
+      'classify_inbound',
+      `msg:${mensagem.id}`,
+      {
+        message_id: mensagem.id,
+      },
+    );
     if (!fila.enfileirado) {
       // O trabalho está anotado em `ia_trabalho_adiado` e volta pelo cron. O que
       // NÃO pode esperar o cron é a pessoa: alguém mandou um áudio e está
@@ -378,7 +391,11 @@ async function ouvirOAudio(
   const bytes = new Uint8Array(await data.arrayBuffer());
   try {
     return await transcreverAudio(
-      { bytes, nome: caminho.split('/').pop() ?? 'audio.ogg', mime: mime ?? data.type ?? 'audio/ogg' },
+      {
+        bytes,
+        nome: caminho.split('/').pop() ?? 'audio.ogg',
+        mime: mime ?? data.type ?? 'audio/ogg',
+      },
       transcritor.config,
       transcritor.chave,
     );
@@ -434,7 +451,11 @@ async function resumirLigacao(
       desfecho: tentativa.desfecho,
     },
     contatoDoPrompt(ficha),
-    { organizationId: tentativa.organizationId, contactId: tentativa.contactId, activityId: tentativa.activityId },
+    {
+      organizationId: tentativa.organizationId,
+      contactId: tentativa.contactId,
+      activityId: tentativa.activityId,
+    },
   );
 
   const saida = executada.saida;
@@ -532,7 +553,11 @@ async function redigirFollowUp(
       gancho: payload.gancho ?? null,
     },
     contatoDoPrompt(ficha),
-    { organizationId: tentativa.organizationId, contactId: tentativa.contactId, activityId: tentativa.activityId },
+    {
+      organizationId: tentativa.organizationId,
+      contactId: tentativa.contactId,
+      activityId: tentativa.activityId,
+    },
   );
 
   // RF-CON-24: o validador roda DEPOIS do modelo e ANTES de qualquer pessoa ver.
@@ -541,8 +566,7 @@ async function redigirFollowUp(
     claims: executada.saida.claims,
   });
 
-  const corpo =
-    veredito.situacao === 'bloqueado' ? executada.saida.mensagem : veredito.texto;
+  const corpo = veredito.situacao === 'bloqueado' ? executada.saida.mensagem : veredito.texto;
   const validador: Record<string, unknown> = {
     situacao: veredito.situacao,
     motivos: veredito.situacao === 'aprovado' ? [] : veredito.motivos,
@@ -656,7 +680,11 @@ async function classificarEntrada(
         jaRecebeuAudio: await jaRecebeuAudio(contexto.cliente, conversa.id),
       },
       contatoDoPrompt(ficha),
-      { organizationId: ficha.organizationId, contactId: ficha.contactId, conversationId: conversa.id },
+      {
+        organizationId: ficha.organizationId,
+        contactId: ficha.contactId,
+        conversationId: conversa.id,
+      },
     );
   } catch (erro) {
     if (!(erro instanceof OrcamentoEsgotadoError)) throw erro;
@@ -1199,12 +1227,12 @@ async function triarCandidatos(
     const numero = String(i + 1);
     porNumero.set(numero, String(c.id ?? ''));
     return {
-    id: numero,
-    nome: String(c.nome ?? ''),
-    categoriaDaFonte: typeof c.categoriaDaFonte === 'string' ? c.categoriaDaFonte : null,
-    categoriaDoCrm: typeof c.categoriaDoCrm === 'string' ? c.categoriaDoCrm : null,
-    cidade: typeof c.cidade === 'string' ? c.cidade : null,
-    bairro: typeof c.bairro === 'string' ? c.bairro : null,
+      id: numero,
+      nome: String(c.nome ?? ''),
+      categoriaDaFonte: typeof c.categoriaDaFonte === 'string' ? c.categoriaDaFonte : null,
+      categoriaDoCrm: typeof c.categoriaDoCrm === 'string' ? c.categoriaDoCrm : null,
+      cidade: typeof c.cidade === 'string' ? c.cidade : null,
+      bairro: typeof c.bairro === 'string' ? c.bairro : null,
     };
   });
 
@@ -1262,7 +1290,10 @@ async function lerOCanal(contexto: ContextoDaIa, bruto: unknown): Promise<Result
 }
 
 const TRABALHOS: Readonly<
-  Record<PropositoConhecido, (contexto: ContextoDaIa, bruto: unknown) => Promise<ResultadoDoTrabalho>>
+  Record<
+    PropositoConhecido,
+    (contexto: ContextoDaIa, bruto: unknown) => Promise<ResultadoDoTrabalho>
+  >
 > = {
   transcribe_audio: transcrever,
   summarize_call: resumirLigacao,
@@ -1271,7 +1302,10 @@ const TRABALHOS: Readonly<
   analisar_conversa: analisarConversa,
   pulso_do_dia: escreverOPulso,
   triar_candidato: triarCandidatos,
-  draft_reply: async (contexto, bruto) => ({ proposito: 'draft_reply', ...(await atenderCliente(contexto, bruto)) }),
+  draft_reply: async (contexto, bruto) => ({
+    proposito: 'draft_reply',
+    ...(await atenderCliente(contexto, bruto)),
+  }),
   avaliar_atendimento: async (contexto, bruto) => ({
     proposito: 'avaliar_atendimento',
     ...(await avaliarAtendimento(contexto, bruto)),
@@ -1284,6 +1318,10 @@ const TRABALHOS: Readonly<
   retomar_conversa: async (contexto, bruto) => ({
     proposito: 'retomar_conversa',
     ...(await retomarConversa(contexto, bruto)),
+  }),
+  resumir_passagem: async (contexto, bruto) => ({
+    proposito: 'resumir_passagem',
+    ...(await resumirPassagem(contexto, bruto)),
   }),
 };
 
@@ -1304,12 +1342,15 @@ const TRABALHOS_DA_IMOVA: ReadonlySet<PropositoConhecido> = new Set<PropositoCon
   'identificar_canal',
   // A IA que atende retoma o contato com quem parou de responder (11/11/2026).
   'retomar_conversa',
+  // O resumo da passagem para o corretor (11/11/2026).
+  'resumir_passagem',
 ]);
 
 /** Os que só existem na Imova. Fora dela, saem da fila sem chamar o modelo. */
 const SO_DA_IMOVA: ReadonlySet<PropositoConhecido> = new Set<PropositoConhecido>([
   'identificar_canal',
   'retomar_conversa',
+  'resumir_passagem',
 ]);
 
 export async function tratarTrabalho(
@@ -1374,6 +1415,9 @@ export async function tratarTrabalho(
       // Sem telefone e sem nome no log, como em todo o resto do worker.
       guardrail: 'RF-CON-18',
     });
+    // O resumo da passagem que não vai sair fica registrado, para a tela não esperar.
+    if (proposito === 'resumir_passagem')
+      await registrarFimSemResumo(contexto, payload, 'suprimido');
     return { proposito, feito: false, motivo: 'alvo_suprimido' };
   }
 
@@ -1571,10 +1615,7 @@ async function conversaDaFicha(
   return (data as { id: string } | null)?.id ?? null;
 }
 
-async function audioQueExiste(
-  contexto: ContextoDaIa,
-  slug: string | null,
-): Promise<string | null> {
+async function audioQueExiste(contexto: ContextoDaIa, slug: string | null): Promise<string | null> {
   if (slug === null || slug.trim() === '') return null;
   const { data } = await contexto.cliente
     .from('audio_assets')

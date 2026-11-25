@@ -247,6 +247,17 @@ export {
 export { type EntradaDoPulso, type SaidaDoPulso, pulsoDoDiaV1 } from './prompts/pulso-do-dia/v1';
 
 export {
+  REGRA_DO_QUE_FOI_DITO,
+  TEMPERATURAS_DA_PASSAGEM,
+  type EntradaDoResumoDaPassagem,
+  type ResumoConferido,
+  type SaidaDoResumoDaPassagem,
+  type TemperaturaDaPassagem,
+  conferirResumoDaPassagem,
+  resumoDaPassagemV1,
+} from './prompts/resumo-da-passagem/v1';
+
+export {
   type EntradaDaTriagem,
   type SaidaDaTriagem,
   triagemDoRadarV1,

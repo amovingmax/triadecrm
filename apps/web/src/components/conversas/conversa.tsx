@@ -68,6 +68,7 @@ import { LeituraDaIa } from './leitura-da-ia';
 import { ControleDaIa, SeloDaIa } from '@/components/ia-que-atende/na-conversa';
 import { SeloDaRetomada } from '@/components/ia-que-atende/retomada';
 import { ClienteDeTeste } from '@/components/ia-que-atende/cliente-de-teste';
+import { FaixaDoResumoDaPassagem } from '@/components/ia-que-atende/resumo-da-passagem';
 import { useLeituraDoFio } from './leitura-do-fio';
 import { LinhaDoTempo } from './linha-do-tempo';
 import { JANELA_APERTADA_MIN, montarFio, podeEscreverLivre } from './mensagens';
@@ -700,6 +701,8 @@ export function Conversa({
           <div className="flex shrink-0 flex-col">
             <FaixaDaLigacao conversaId={fio.id} className={CLASSE_DA_FAIXA_DA_LIGACAO} />
             <AvisoDaJanela estado={janela} />
+            {/* A IA passou este cliente e ninguém respondeu ainda: o resumo no topo (11/11/2026). */}
+            <FaixaDoResumoDaPassagem fioId={fio.id} />
           </div>
         ) : null}
         {/* Clientes e Parceiros (Imova, 23/11/2026): o perfil e a troca dele. */}
