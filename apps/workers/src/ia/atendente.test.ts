@@ -758,7 +758,13 @@ describe('o pedido de visita (v9, 24/11/2026)', () => {
   const uso = { entrada: 100, saida: 20, escritaDeCache: 0, leituraDeCache: 0 };
   const FRASE = 'Perfeito! Vou consultar um horário em que entre na minha agenda e te retorno pra combinarmos.';
   const pedido = { imovelCodigo: 'TE0004', data: '2026-11-26', periodo: 'manha', comoDisse: 'quinta de manhã' } as const;
-  const saidaDaVisita = (visita: typeof pedido | null) => ({
+  interface Pedido {
+    readonly imovelCodigo: string;
+    readonly data: string | null;
+    readonly periodo: 'manha' | 'tarde' | 'noite' | null;
+    readonly comoDisse: string;
+  }
+  const saidaDaVisita = (visita: Pedido | null) => ({
     ...saidaDoModelo({ acao: 'passar_para_corretor', mensagem: FRASE, agenda: null, motivo: 'Visita na quinta de manhã.' }),
     fotoParaConfirmar: null,
     visita,
@@ -799,6 +805,22 @@ describe('o pedido de visita (v9, 24/11/2026)', () => {
       p_periodo: 'manha',
       p_como_disse: 'quinta de manhã',
       p_prompt_version: 'atendente-imova@v9',
+    });
+    // Sem hora nas palavras do cliente, a chamada é a de antes (sem `p_hora`).
+    expect(m.chamadas('ia_atendente_pedir_visita')[0]).not.toHaveProperty('p_hora');
+  });
+
+  it('a hora que o cliente pediu vai junto (25/11/2026): "sábado às 10h"', async () => {
+    const m = comMapa(
+      saidaDaVisita({ imovelCodigo: 'PT0001', data: '2026-11-28', periodo: null, comoDisse: 'sábado às 10h' }),
+      { rpcs: { ia_atendente_pedir_visita: () => ({ ok: true, pedido_id: 'p2' }) } },
+    );
+    await atenderCliente(m.contexto, PAYLOAD);
+    expect(m.chamadas('ia_atendente_pedir_visita')[0]).toMatchObject({
+      p_data: '2026-11-28',
+      p_periodo: null,
+      p_como_disse: 'sábado às 10h',
+      p_hora: '10:00',
     });
   });
 

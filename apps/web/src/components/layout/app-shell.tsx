@@ -128,6 +128,7 @@ export function AppShell({
               {/* 24/11/2026: o pedido de visita que a IA combinou, para todos os admins. */}
               <VigiaDeVisitas
                 usuarioId={sessao.id}
+                usuarioNome={sessao.nome}
                 ligado={EMPRESA.modulos.visitaPedida && sessao.papel === 'admin'}
               />
               {/* O aviso no WhatsApp de quem não atendeu sai até um minuto depois do

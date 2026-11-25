@@ -158,8 +158,8 @@ select is(public.visita_pedido_decidir(pg_temp.id('p_silvia'), 'aprovada', now()
           'quando_invalido', 'e no futuro');
 create temp table r204 as
   select public.visita_pedido_decidir(pg_temp.id('p_silvia'), 'aprovada',
-                                      date_trunc('day', now() at time zone 'America/Fortaleza') at time zone 'America/Fortaleza'
-                                        + interval '2 days 9 hours') as r;
+                                      (app.next_business_day((now() at time zone 'America/Fortaleza')::date, 2) + time '09:00')
+                                        at time zone 'America/Fortaleza') as r;
 select is((select r ->> 'ok' from r204), 'true', 'a Ana aprova');
 select is((select r ->> 'mensagem_saiu' from r204), 'true', 'a confirmação sai');
 select matches((select r ->> 'mensagem' from r204),
@@ -186,11 +186,15 @@ select is(jsonb_array_length(public.visita_pedidos_abertos()), 2, 'o pedido apro
 -- ---------------------------------------------------------------------
 -- 4. Outro dia e recusar
 -- ---------------------------------------------------------------------
-select is(public.visita_pedido_decidir(pg_temp.id('p_caio'), 'outro_dia', now() + interval '3 days') ->> 'mensagem_saiu',
+-- 25/11/2026: a Agenda só aceita dia útil (20261125180000), e o Caio não disse um dia
+-- que valha (o dele estava no passado): a proposta não diz "Nesse dia não vamos conseguir".
+select is(public.visita_pedido_decidir(pg_temp.id('p_caio'), 'outro_dia',
+            (app.next_business_day((now() at time zone 'America/Fortaleza')::date, 3) + time '10:00')
+              at time zone 'America/Fortaleza') ->> 'mensagem_saiu',
           'true', 'outro dia: a proposta sai');
 select matches((select body from public.messages
                  where conversation_id = pg_temp.id('conversa_caio') and direction = 'out'::app.msg_direction),
-               'Nesse dia não vamos conseguir\. Pode ser [a-záéíóúâêôãõç-]+, \d{2}/\d{2}, às \d{1,2}h(\d{2})?\?$',
+               '(^|\n)Pode ser [a-záéíóúâêôãõç-]+, \d{2}/\d{2}, às \d{1,2}h(\d{2})?\?$',
                'com o dia e a hora propostos');
 select is((select r ->> 'mensagem_saiu' from (select public.visita_pedido_decidir(pg_temp.id('p_rita'), 'recusada', null, 'sem horário') as r) x),
           'false', 'recusar não manda nada ao cliente');

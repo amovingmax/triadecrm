@@ -59,6 +59,7 @@ import { buscarContatoDaFicha } from './banco';
 import { ferramentaBuscarNoMapa } from './busca-no-mapa';
 import { ErroDoModelo, RespostaIlegivelError } from './cliente';
 import { type FotoPreparada, prepararFotoDoImovel, textoComALegenda } from './foto-do-imovel';
+import { horaDoQueDisse } from './hora-da-visita';
 import {
   aplicarReconhecimentos,
   ensinarFotos,
@@ -624,15 +625,20 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
       // desfaz a passagem: a equipe já tem a conversa e o motivo.
       const visita = 'visita' in saida ? saida.visita : null;
       if (resultado.ok === true && visita !== null) {
+        const comoDisse = limparTexto(reidratar(visita.comoDisse, executada.mapa)) || null;
+        // A hora exata que o cliente pediu ("sábado às 10h"), das palavras dele (25/11/2026).
+        // Só vai quando existe: a porta antiga, sem `p_hora`, continua aceitando a chamada.
+        const hora = horaDoQueDisse(comoDisse);
         const r = await rpc(contexto, 'ia_atendente_pedir_visita', {
           p_conversation_id: payload.conversation_id,
           p_em_resposta_a: payload.message_id,
           p_imovel_codigo: visita.imovelCodigo,
           p_data: visita.data,
           p_periodo: visita.periodo,
-          p_como_disse: limparTexto(reidratar(visita.comoDisse, executada.mapa)) || null,
+          p_como_disse: comoDisse,
           p_ai_run_id: executada.aiRunId,
           p_prompt_version: executada.promptVersion,
+          ...(hora === null ? {} : { p_hora: hora }),
         }).catch((erro: unknown) => ({ ok: false, motivo: erro instanceof Error ? erro.message : String(erro) }));
         pedidoDeVisita = {
           codigo: visita.imovelCodigo,
