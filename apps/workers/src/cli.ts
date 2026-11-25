@@ -64,6 +64,10 @@ Opções de "ai":
                          Dez conversas (com anúncios reais) pelo retomar-conversa@v2 de
                          verdade, cada texto pela rede de segurança do worker. Imprime o
                          relatório e o JSON. Nenhuma mensagem sai; grava só ai_runs.
+  --ensaio=resumo [--repeticoes=1] [--teto=0.5]
+                         Cinco passagens (visita, preço, "quero uma pessoa", procura que não
+                         temos, FGTS) pelo resumo-da-passagem@v1 de verdade e pela conferência
+                         do worker. Imprime o relatório e o JSON. Não grava resumo.
 
 Opções de "rotas":
   --geocodificar         Faz UMA passada de geocodificação no Nominatim (1 req/s) e sai.

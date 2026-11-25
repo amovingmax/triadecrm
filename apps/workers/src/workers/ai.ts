@@ -50,6 +50,7 @@ import {
 } from '../ia/bateria-do-atendente';
 import { ENSAIOS, eEnsaio, ensaiarAtendente, relatorioDoEnsaio } from '../ia/ensaio-do-atendente';
 import { ensaiarRetomada, relatorioDaRetomada } from '../ia/ensaio-da-retomada';
+import { ensaiarResumo, relatorioDoResumo } from '../ia/ensaio-do-resumo';
 import type { ContextoDaIa } from '../ia/execucao';
 import { criarBuscaNoMapa, nominatimDaIa } from '../ia/mapa';
 
@@ -213,6 +214,25 @@ export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
 
   // `--ensaio=retomada` (25/11/2026): dez conversas pelo retomar-conversa@v2 de verdade,
   // com a rede de segurança do worker. Nunca manda mensagem; grava só ai_runs.
+  // `--ensaio=resumo` (25/11/2026): cinco passagens pelo resumo-da-passagem@v1 de verdade,
+  // com a conferência do worker. Não grava resumo nem toca conversa; grava só ai_runs.
+  if (pedidoDeEnsaio === 'resumo') {
+    const repeticoes = Math.min(5, Math.max(1, Math.trunc(Number(opcoes.repeticoes) || 1)));
+    const tetoUsd = Math.min(2, Math.max(0.05, Number(opcoes.teto) || 0.5));
+    const r = await ensaiarResumo(contexto, { repeticoes, tetoUsd });
+    logger.info('ensaio do resumo concluído', {
+      prompt: r.promptVersion,
+      respostas: r.respostas.length,
+      certas: r.respostas.filter((x) => x.certo).length,
+      custo_usd: r.custoUsd,
+    });
+    process.stdout.write(relatorioDoResumo(r));
+    process.stdout.write(
+      `\n=====RESUMO-JSON=====\n${JSON.stringify(r)}\n=====FIM-RESUMO-JSON=====\n`,
+    );
+    return 0;
+  }
+
   if (pedidoDeEnsaio === 'retomada') {
     const repeticoes = Math.min(5, Math.max(1, Math.trunc(Number(opcoes.repeticoes) || 1)));
     const tetoUsd = Math.min(2, Math.max(0.05, Number(opcoes.teto) || 0.5));

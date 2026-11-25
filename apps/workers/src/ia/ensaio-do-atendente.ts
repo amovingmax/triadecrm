@@ -38,7 +38,7 @@ import { type ContextoDaIa, executar } from './execucao';
  * `bateria`: os 40 casos reais com a base de produção e a avaliadora (23/11/2026, em
  * `bateria-do-atendente.ts`).
  */
-export const ENSAIOS = ['atendente-imova', 'bateria', 'retomada'] as const;
+export const ENSAIOS = ['atendente-imova', 'bateria', 'retomada', 'resumo'] as const;
 export type Ensaio = (typeof ENSAIOS)[number];
 
 export function eEnsaio(valor: unknown): valor is Ensaio {
