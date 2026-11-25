@@ -258,6 +258,8 @@ as $$
 $$;
 
 -- O código como palavra inteira: "AP003" não está em "AP0031_IMOVA", nem "CASA" em "casarão".
+-- 25/11/2026: o código da Imova também vale sem o "_IMOVA" do fim ("Vi o TE0004 no ZAP"),
+-- como o cliente costuma escrever; o resto continua palavra inteira.
 create or replace function app.ia_resumo_tem_codigo(p_texto text, p_codigo text)
 returns boolean
 language sql
@@ -265,9 +267,55 @@ immutable
 set search_path = ''
 as $$
   select coalesce(p_codigo ~ '^[A-Z0-9][A-Z0-9_.-]{1,39}$'
-                  and upper(coalesce(p_texto, '')) ~ ('(^|[^A-Z0-9_])' || replace(p_codigo, '.', '\.')
-                                                      || '($|[^A-Z0-9_])'), false)
+                  and (upper(coalesce(p_texto, '')) ~ ('(^|[^A-Z0-9_])' || replace(p_codigo, '.', '\.')
+                                                       || '($|[^A-Z0-9_])')
+                       or (p_codigo ~ '_IMOVA$'
+                           and upper(coalesce(p_texto, '')) ~ ('(^|[^A-Z0-9_])'
+                                                               || replace(regexp_replace(p_codigo, '_IMOVA$', ''), '.', '\.')
+                                                               || '($|[^A-Z0-9_])'))), false)
 $$;
+
+-- O imóvel de interesse que a IA já registrou na conversa (`interesse_no_imovel`, o mesmo
+-- que os relatórios e a retomada leem), em palavras: "terreno em Praia de Tabatinga
+-- (TE0004_IMOVA)". O cartão mostra quando o cliente não escreveu código nenhum (a IA da
+-- Imova não escreve código desde a v6), com "lido pela IA" ao lado. Até 3.
+create or replace function app.ia_resumo_interesse(p_conversation_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v jsonb;
+begin
+  if to_regclass('public.interesse_no_imovel') is null then
+    return '[]'::jsonb;
+  end if;
+  execute $q$
+    with i as (
+      select x.codigo, case x.nivel when 'muito' then 0 when 'interessado' then 1 else 2 end as g,
+             x.atualizado_em
+        from public.interesse_no_imovel x
+       where x.conversation_id = $1
+    ), cat as (
+      select upper(e ->> 'codigo') as codigo, e ->> 'tipo' as tipo, e ->> 'bairro' as bairro
+        from jsonb_array_elements(app.ia_atendente_imoveis()) e
+    )
+    select coalesce(jsonb_agg(t.frase order by t.g, t.atualizado_em desc), '[]'::jsonb)
+      from (select i.g, i.atualizado_em,
+                   concat_ws(' ', coalesce(nullif(replace(lower(c.tipo), '_', ' '), ''), 'imóvel'),
+                             'em ' || nullif(btrim(c.bairro), ''))
+                     || ' (' || i.codigo || ')' as frase
+              from i left join cat c on c.codigo = upper(i.codigo)
+             order by i.g, i.atualizado_em desc
+             limit 3) t
+  $q$ into v using p_conversation_id;
+  return coalesce(v, '[]'::jsonb);
+exception when others then
+  return '[]'::jsonb;
+end $$;
+revoke all on function app.ia_resumo_interesse(uuid) from public, anon, authenticated;
 
 -- Comprar ou alugar, e cada forma de pagamento, escritos no trecho ("misto": duas formas).
 create or replace function app.ia_resumo_enum_no_trecho(p_campo text, p_valor text, p_trecho text)
@@ -1076,6 +1124,10 @@ begin
              'tipo', s.tipo,
              'regiao', s.regiao,
              'imoveis', to_jsonb(s.imoveis),
+             -- 25/11/2026: o imóvel de interesse que a IA registrou, para quando o cliente
+             -- não escreveu código (o cartão mostra com "lido pela IA").
+             'interesse', case when coalesce(cardinality(s.imoveis), 0) = 0
+                               then app.ia_resumo_interesse(c.id) else '[]'::jsonb end,
              'orcamento', s.orcamento,
              'pagamento', s.pagamento,
              'objecao', s.objecao,

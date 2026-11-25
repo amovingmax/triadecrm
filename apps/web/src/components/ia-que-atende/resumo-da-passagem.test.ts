@@ -12,6 +12,7 @@ import {
   linhaDaObjecao,
   linhaDaProcura,
   linhaDoOrcamento,
+  linhaDosImoveis,
   manchete,
   type ResumoDaPassagem,
 } from './resumo-da-passagem-formatos';
@@ -75,6 +76,7 @@ const VAZIO: ResumoDaPassagem = {
   tipo: null,
   regiao: null,
   imoveis: [],
+  interesse: [],
   orcamento: null,
   pagamento: null,
   objecao: null,
@@ -256,5 +258,40 @@ describe('fraseDaSituacao', () => {
       fraseDaSituacao({ situacao: 'falhou', resumo: { ...VAZIO, motivoSemResumo: 'suprimido' } }),
     ).toBe('Sem resumo: o cliente pediu para não ser mais contatado. Leia a conversa.');
     expect(fraseDaSituacao({ situacao: 'pronto', resumo: VAZIO })).toBeNull();
+  });
+});
+
+describe('o imóvel de interesse lido pela IA (25/11/2026)', () => {
+  it('sem código escrito pelo cliente, o cartão mostra o imóvel que a IA registrou, marcado', () => {
+    const r: ResumoDaPassagem = {
+      ...VAZIO,
+      interesse: ['terreno em Praia de Tabatinga (TE0004_IMOVA)'],
+    };
+    expect(linhaDosImoveis(r)).toBe('terreno em Praia de Tabatinga (TE0004_IMOVA) (lido pela IA)');
+    expect(camposDoResumo(r).find((c) => c.rotulo === 'Imóveis')).toMatchObject({ disse: true });
+  });
+
+  it('com código escrito pelo cliente, vale o código; sem nenhum dos dois, "não disse"', () => {
+    expect(linhaDosImoveis({ ...VAZIO, imoveis: ['TE0007'], interesse: ['x (Y)'] })).toBe('TE0007');
+    expect(linhaDosImoveis(VAZIO)).toBeNull();
+  });
+
+  it('o banco manda `interesse` e a leitura aceita', () => {
+    const p = lerPassagens(
+      doBanco({
+        passagens: [
+          {
+            resposta_id: 'r-9',
+            message_id: 'm-9',
+            criada_em: '2026-11-25T18:00:00Z',
+            motivo: 'visita presencial pedida',
+            aviso_saiu: true,
+            situacao: 'pronto',
+            resumo: { ...RESUMO_DO_BANCO, imoveis: [], interesse: ['terreno em Pipa (TE0007)'] },
+          },
+        ],
+      }),
+    );
+    expect(p?.passagens[0]?.resumo?.interesse).toEqual(['terreno em Pipa (TE0007)']);
   });
 });

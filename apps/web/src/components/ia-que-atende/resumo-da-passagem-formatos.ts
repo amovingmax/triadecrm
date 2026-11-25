@@ -23,6 +23,11 @@ export interface ResumoDaPassagem {
   readonly tipo: string | null;
   readonly regiao: string | null;
   readonly imoveis: readonly string[];
+  /**
+   * O imóvel de interesse que a IA registrou, em palavras ("terreno em Praia de Tabatinga
+   * (TE0004_IMOVA)"), só quando o cliente não escreveu código (25/11/2026).
+   */
+  readonly interesse: readonly string[];
   readonly orcamento: string | null;
   readonly pagamento: string | null;
   readonly objecao: string | null;
@@ -89,6 +94,9 @@ function lerResumo(bruto: unknown): ResumoDaPassagem | null {
     regiao: texto(r.regiao),
     imoveis: Array.isArray(r.imoveis)
       ? r.imoveis.map(texto).filter((c): c is string => c !== null)
+      : [],
+    interesse: Array.isArray(r.interesse)
+      ? r.interesse.map(texto).filter((c): c is string => c !== null)
       : [],
     orcamento: texto(r.orcamento),
     pagamento: texto(r.pagamento),
@@ -172,13 +180,20 @@ export function linhaDaObjecao(r: ResumoDaPassagem): string | null {
   return r.objecaoComoDisse === null ? nome : `${nome} — ${r.objecaoComoDisse}`;
 }
 
+/**
+ * Os imóveis: os que o cliente escreveu; sem nenhum, o de interesse que a IA registrou,
+ * com "lido pela IA" para não parecer dito pelo cliente (25/11/2026).
+ */
+export function linhaDosImoveis(r: ResumoDaPassagem): string | null {
+  if (r.imoveis.length > 0) return r.imoveis.join(', ');
+  return r.interesse.length > 0 ? `${r.interesse.join(', ')} (lido pela IA)` : null;
+}
+
 /** O resumo em uma linha (sem a temperatura, que tem o próprio selo): o que procura, imóveis e orçamento. */
 export function manchete(r: ResumoDaPassagem): string | null {
-  const partes = [
-    linhaDaProcura(r),
-    r.imoveis.length === 0 ? null : r.imoveis.join(', '),
-    linhaDoOrcamento(r),
-  ].filter((p): p is string => p !== null);
+  const partes = [linhaDaProcura(r), linhaDosImoveis(r), linhaDoOrcamento(r)].filter(
+    (p): p is string => p !== null,
+  );
   return partes.length === 0 ? null : partes.join(' · ');
 }
 
@@ -216,7 +231,7 @@ export function camposDoResumo(
   });
   return [
     campo('Procura', linhaDaProcura(r)),
-    campo('Imóveis', r.imoveis.length === 0 ? null : r.imoveis.join(', ')),
+    campo('Imóveis', linhaDosImoveis(r)),
     campo('Orçamento', linhaDoOrcamento(r)),
     campo('Objeção', linhaDaObjecao(r)),
   ];

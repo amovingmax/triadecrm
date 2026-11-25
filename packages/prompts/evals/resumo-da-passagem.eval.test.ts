@@ -580,3 +580,13 @@ rodarEvals(
   (saida) => conferirResumoDaPassagem(base(), saida),
   { conhecidosEsperados: 0 },
 );
+
+describe('resumo-da-passagem@v1: o código sem o "_IMOVA" (25/11/2026)', () => {
+  it('vale sem o final, como o cliente escreve, e continua palavra inteira', () => {
+    expect(codigoEstaNoTexto('Vi o TE0004 no ZAP', 'TE0004_IMOVA')).toBe(true);
+    expect(codigoEstaNoTexto('Código da oferta: TE0004_IMOVA', 'TE0004_IMOVA')).toBe(true);
+    expect(codigoEstaNoTexto('Vi o TE00041 no ZAP', 'TE0004_IMOVA')).toBe(false);
+    expect(codigoEstaNoTexto('Vi o AP003', 'AP0031_IMOVA')).toBe(false);
+    expect(codigoEstaNoTexto('Vi o TE0004 no ZAP', 'TE0004')).toBe(true);
+  });
+});

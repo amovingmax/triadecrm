@@ -427,8 +427,16 @@ export function trechoEstaNoTexto(texto: string, trecho: string): boolean {
 
 /** O código como palavra inteira: "AP003" não está em "AP0031_IMOVA", nem "CASA" em "casarão". */
 export function codigoEstaNoTexto(texto: string, codigo: string): boolean {
-  const escapado = codigo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(^|[^A-Z0-9_])${escapado}($|[^A-Z0-9_])`).test(texto.toUpperCase());
+  const palavraInteira = (c: string): boolean => {
+    const escapado = c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^A-Z0-9_])${escapado}($|[^A-Z0-9_])`).test(texto.toUpperCase());
+  };
+  // 25/11/2026: o código da Imova também vale sem o "_IMOVA" do fim ("Vi o TE0004 no ZAP"),
+  // como o cliente costuma escrever (espelho de `app.ia_resumo_tem_codigo`).
+  return (
+    palavraInteira(codigo) ||
+    (/_IMOVA$/.test(codigo) && palavraInteira(codigo.replace(/_IMOVA$/, '')))
+  );
 }
 
 /** O valor (texto livre) bate com o trecho: os números todos, e uma palavra de conteúdo. */

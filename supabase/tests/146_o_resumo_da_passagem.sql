@@ -30,7 +30,7 @@
 -- anda: mensagem "depois" da passagem é a de `now()` para frente.
 -- =====================================================================
 begin;
-select plan(88);
+select plan(94);
 
 insert into public.allowed_users (email, role, note) values
   ('h146.g@teste.local', 'gestor', 'pgTAP 146'),
@@ -569,6 +569,23 @@ select is(pg_temp.tela(pg_temp.id('desligado')) -> 'passagens' -> 0 ->> 'situaca
 select is((select a.estado from public.ia_atendimento a where a.conversation_id = pg_temp.id('desligado')),
           'parada', 'a passagem acontece do mesmo jeito');
 select is(public.ia_resumos_reenfileirar(48), 0, 'desligado, reenfileirar não põe nada');
+
+
+-- 25/11/2026: o código sem o "_IMOVA" do fim, e o imóvel de interesse lido pela IA.
+select ok(app.ia_resumo_tem_codigo('Vi o TE0004 no ZAP', 'TE0004_IMOVA'),
+          'o código vale sem o "_IMOVA" do fim, como o cliente escreve');
+select ok(app.ia_resumo_tem_codigo('Código da oferta: TE0004_IMOVA', 'TE0004_IMOVA'),
+          'e continua valendo inteiro');
+select ok(not app.ia_resumo_tem_codigo('Vi o TE00041 no ZAP', 'TE0004_IMOVA'),
+          'sem o "_IMOVA", continua palavra inteira: TE00041 não é TE0004');
+select ok(app.ia_resumo_tem_codigo('Vi o TE0007 no ZAP', 'TE0007'),
+          'código sem "_IMOVA" no catálogo continua valendo como antes');
+select is(app.ia_resumo_interesse(gen_random_uuid()), '[]'::jsonb,
+          'conversa sem interesse registrado: lista vazia');
+insert into public.interesse_no_imovel (conversation_id, codigo, nivel)
+values (pg_temp.id('desligado'), 'ZZ9146_IMOVA', 'muito');
+select is(app.ia_resumo_interesse(pg_temp.id('desligado')) ->> 0, 'imóvel (ZZ9146_IMOVA)',
+          'o interesse registrado vira frase, com o código entre parênteses');
 
 select * from finish();
 rollback;
