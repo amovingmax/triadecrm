@@ -60,6 +60,10 @@ Opções de "ai":
                          base de PRODUÇÃO, pelo caminho da IA que atende; cada resposta passa
                          pela régua e pela IA avaliadora. Para no teto (US$, até 20). Imprime
                          o relatório e o resultado em JSON. Nenhuma mensagem sai.
+  --ensaio=retomada [--repeticoes=1] [--teto=0.5]
+                         Dez conversas (com anúncios reais) pelo retomar-conversa@v2 de
+                         verdade, cada texto pela rede de segurança do worker. Imprime o
+                         relatório e o JSON. Nenhuma mensagem sai; grava só ai_runs.
 
 Opções de "rotas":
   --geocodificar         Faz UMA passada de geocodificação no Nominatim (1 req/s) e sai.

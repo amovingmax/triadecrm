@@ -159,6 +159,8 @@ export function textoDoAnuncio(i: NonNullable<EntradaDoBancoDaRetomada['imovel']
       /(?:valor|pre[çc]o|aluguel|condom[íi]nio|iptu)[^.\n|:]{0,30}:?\s*R\$\s*[\d.,]*\d(?:\s*(?:mil|milh[õo]es|mi|k)(?!\p{L}))?\.?/giu,
       '',
     )
+    // O preço do metro: "(R$ 250,00 o m²)".
+    .replace(/\(?\s*R\$\s*[\d.,]*\d\s*(?:o|por)\s*m²\s*\)?/giu, '')
     .replace(/R\$\s*[\d.,]*\d(?:\s*(?:mil|milh[õo]es|mi|k)(?!\p{L}))?/giu, '')
     // O código (com o "Código" antes, quando houver).
     .replace(/c[óo]digo:?\s*(?=[A-Z]{2}\d{3,4})/giu, '')

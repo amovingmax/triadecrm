@@ -49,6 +49,7 @@ import {
   trocasDoCadernoDoAmbiente,
 } from '../ia/bateria-do-atendente';
 import { ENSAIOS, eEnsaio, ensaiarAtendente, relatorioDoEnsaio } from '../ia/ensaio-do-atendente';
+import { ensaiarRetomada, relatorioDaRetomada } from '../ia/ensaio-da-retomada';
 import type { ContextoDaIa } from '../ia/execucao';
 import { criarBuscaNoMapa, nominatimDaIa } from '../ia/mapa';
 
@@ -206,6 +207,25 @@ export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
     process.stdout.write(relatorioDaBateria(r));
     process.stdout.write(
       `\n=====BATERIA-JSON=====\n${JSON.stringify(r)}\n=====FIM-BATERIA-JSON=====\n`,
+    );
+    return 0;
+  }
+
+  // `--ensaio=retomada` (25/11/2026): dez conversas pelo retomar-conversa@v2 de verdade,
+  // com a rede de segurança do worker. Nunca manda mensagem; grava só ai_runs.
+  if (pedidoDeEnsaio === 'retomada') {
+    const repeticoes = Math.min(5, Math.max(1, Math.trunc(Number(opcoes.repeticoes) || 1)));
+    const tetoUsd = Math.min(2, Math.max(0.05, Number(opcoes.teto) || 0.5));
+    const r = await ensaiarRetomada(contexto, { repeticoes, tetoUsd });
+    logger.info('ensaio da retomada concluído', {
+      prompt: r.promptVersion,
+      respostas: r.respostas.length,
+      certas: r.respostas.filter((x) => x.certo).length,
+      custo_usd: r.custoUsd,
+    });
+    process.stdout.write(relatorioDaRetomada(r));
+    process.stdout.write(
+      `\n=====RETOMADA-JSON=====\n${JSON.stringify(r)}\n=====FIM-RETOMADA-JSON=====\n`,
     );
     return 0;
   }
