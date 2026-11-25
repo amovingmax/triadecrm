@@ -57,6 +57,15 @@ export interface Expectativa {
    * Ausente: sem foto.
    */
   readonly foto?: { readonly quando: 'deve' | 'pode'; readonly codigo: RegExp };
+  /**
+   * O pedido de visita (v9, 24/11/2026); vale só para versão com o pedido. Presente: a IA
+   * passa com o pedido deste imóvel, do dia (AAAA-MM-DD) e do período. Ausente: sem pedido.
+   */
+  readonly visita?: {
+    readonly codigo: RegExp;
+    readonly data: string;
+    readonly periodo: 'manha' | 'tarde' | 'noite' | null;
+  };
 }
 
 /** Uma fala da conversa: quem, quantos minutos antes de "agora" e o texto. */
@@ -996,6 +1005,8 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
         r(/link/i, 'manda link para visita presencial'),
         r(/marcad[ao]|agendad[ao]|confirmad[ao]/i, 'dá a visita por marcada'),
       ],
+      // v9 (24/11/2026): o pedido vai aos admins. Terça, 24/11: "quinta" é 26/11.
+      visita: { codigo: /^TE0004/i, data: '2026-11-26', periodo: 'manha' },
     },
   },
   {
@@ -1349,6 +1360,12 @@ export interface RespostaParaConferir {
   readonly ferramentas?: readonly string[];
   /** A foto para confirmar que a IA pediu (v8), ou null. */
   readonly foto?: { readonly imovelCodigo: string; readonly legenda: string } | null;
+  /** O pedido de visita que a IA devolveu (v9), ou null. */
+  readonly visita?: {
+    readonly imovelCodigo: string;
+    readonly data: string | null;
+    readonly periodo: string | null;
+  } | null;
 }
 
 export interface OpcoesDaConferencia {
@@ -1356,6 +1373,8 @@ export interface OpcoesDaConferencia {
   readonly temMapa: boolean;
   /** A versão manda a foto para confirmar (v8)? Sem ela, `foto` não é cobrada. */
   readonly temFoto?: boolean;
+  /** A versão devolve o pedido de visita (v9)? Sem ela, `visita` não é cobrada. */
+  readonly temVisita?: boolean;
 }
 
 /** Vazio é acerto. Cada item diz o que falhou, para o relatório. */
@@ -1408,6 +1427,25 @@ export function conferirCasoDaBateria(
       if (contarPerguntas(texto) > 0) falhas.push('pergunta no texto, além da legenda da foto');
       if (DUVIDA_NA_CONFIRMACAO.test(texto)) falhas.push('mostra dúvida ao dizer qual é o imóvel');
       if (contarPerguntas(foto.legenda) !== 1) falhas.push('a legenda da foto não é uma pergunta');
+    }
+  }
+  // O pedido de visita (v9): o do imóvel, do dia e do período certos, só quando o caso pede.
+  if (opcoes.temVisita === true) {
+    const pedido = espera.visita;
+    const veio = resposta.visita ?? null;
+    if (pedido !== undefined && veio === null)
+      falhas.push('não manda o pedido de visita aos admins');
+    if (pedido === undefined && veio !== null)
+      falhas.push('manda pedido de visita quando não devia');
+    if (pedido !== undefined && veio !== null) {
+      if (!pedido.codigo.test(veio.imovelCodigo))
+        falhas.push(`pede a visita de ${veio.imovelCodigo}, que não é o imóvel do caso`);
+      if (veio.data !== pedido.data)
+        falhas.push(`pede a visita para ${veio.data ?? 'dia nenhum'}; era ${pedido.data}`);
+      if (veio.periodo !== pedido.periodo)
+        falhas.push(
+          `pede a visita de ${veio.periodo ?? 'período nenhum'}; era ${pedido.periodo ?? 'sem período'}`,
+        );
     }
   }
   // Com a foto num caso "pode", as regras de conteúdo de sempre (o preço) não se aplicam:

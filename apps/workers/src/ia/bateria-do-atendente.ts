@@ -27,11 +27,13 @@ import {
   type SaidaDaAvaliacaoV2,
   type SaidaDoAtendenteV6,
   type SaidaDoAtendenteV8,
+  type SaidaDoAtendenteV9,
   MAX_BUSCAS_NO_MAPA,
   MAX_VOLTAS_DO_ATENDENTE,
   atendenteImovaV6,
   atendenteImovaV7,
   atendenteImovaV8,
+  atendenteImovaV9,
   avaliacaoDoAtendimentoV2,
   casosDaBateria,
   conferirCasoDaBateria,
@@ -41,6 +43,7 @@ import {
   sistemaComBaseV6,
   sistemaComBaseV7,
   sistemaComBaseV8,
+  sistemaComBaseV9,
 } from '@komune/prompts';
 
 import { ErroDaEsteira } from '../fila/esteira';
@@ -65,7 +68,7 @@ const AVISO_PADRAO = 'Vou verificar isso direitinho e já te retorno por aqui.';
 
 export interface OpcoesDaBateria {
   /** 8 (vigente: mapa e foto para confirmar), 7 (mapa) ou 6 (sem mapa). */
-  readonly versao: 6 | 7 | 8;
+  readonly versao: 6 | 7 | 8 | 9;
   /** Quantas vezes cada caso roda (a IA não responde sempre igual). */
   readonly repeticoes: number;
   /** Teto da rodada inteira, em US$, conferido antes de cada caso. */
@@ -125,6 +128,13 @@ export interface RespostaDaBateria {
     readonly imovelCodigo: string;
     readonly legenda: string;
     readonly existe: boolean | null;
+  } | null;
+  /** O pedido de visita que a IA devolveu (v9). */
+  readonly visita?: {
+    readonly imovelCodigo: string;
+    readonly data: string | null;
+    readonly periodo: string | null;
+    readonly comoDisse: string;
   } | null;
   readonly motivo: string;
   readonly confianca: number | null;
@@ -224,6 +234,7 @@ export async function rodarBateria(
     throw new Error('a bateria é da IA que atende, que só existe na Imova');
   const comMapa = opcoes.versao >= 7;
   const comFoto = opcoes.versao >= 8;
+  const comVisita = opcoes.versao >= 9;
   const mapa = contexto.mapa;
   if (
     comMapa &&
@@ -246,8 +257,12 @@ export async function rodarBateria(
     })),
   };
   const modelo = (await modeloEscolhido(contexto)) as typeof atendenteImovaV6.modelo;
-  const prompt: PromptVersionado<EntradaDoAtendenteV6, SaidaDoAtendenteV6 | SaidaDoAtendenteV8> =
-    comFoto
+  const prompt: PromptVersionado<
+    EntradaDoAtendenteV6,
+    SaidaDoAtendenteV6 | SaidaDoAtendenteV8 | SaidaDoAtendenteV9
+  > = comVisita
+    ? { ...atendenteImovaV9, modelo, sistema: sistemaComBaseV9(base) }
+    : comFoto
       ? { ...atendenteImovaV8, modelo, sistema: sistemaComBaseV8(base) }
       : comMapa
         ? { ...atendenteImovaV7, modelo, sistema: sistemaComBaseV7(base) }
@@ -320,6 +335,17 @@ export async function rodarBateria(
                   () => null,
                 ),
               };
+        // O pedido de visita (v9): só registrado; a bateria nunca grava pedido.
+        const pedidoDeVisita = 'visita' in saida ? saida.visita : null;
+        const visita =
+          pedidoDeVisita === null
+            ? null
+            : {
+                imovelCodigo: pedidoDeVisita.imovelCodigo,
+                data: pedidoDeVisita.data,
+                periodo: pedidoDeVisita.periodo,
+                comoDisse: limparTexto(reidratar(pedidoDeVisita.comoDisse, executada.mapa)),
+              };
         const falhas = conferirCasoDaBateria(
           caso,
           {
@@ -328,8 +354,9 @@ export async function rodarBateria(
             agenda: saida.agenda,
             ferramentas: buscas.map(() => 'buscar_no_mapa'),
             foto,
+            visita,
           },
-          { temMapa: comMapa, temFoto: comFoto },
+          { temMapa: comMapa, temFoto: comFoto, temVisita: comVisita },
         );
         if (foto !== null && foto.existe === false) {
           falhas.push(
@@ -379,6 +406,7 @@ export async function rodarBateria(
           agenda: saida.agenda,
           buscas,
           foto,
+          visita,
           motivo: limparTexto(reidratar(saida.motivo, executada.mapa)),
           confianca: saida.confianca,
           falhas,
@@ -457,8 +485,12 @@ export function relatorioDaBateria(r: ResultadoDaBateria): string {
     for (const x of lista) {
       const busca = x.buscas.length > 0 ? ` [mapa: ${x.buscas.join('; ')}]` : '';
       const foto = x.foto === null ? '' : ` [foto ${x.foto.imovelCodigo}: ${x.foto.legenda}]`;
+      const visita =
+        x.visita === undefined || x.visita === null
+          ? ''
+          : ` [pedido de visita ${x.visita.imovelCodigo} · ${x.visita.data ?? 'sem data'} · ${x.visita.periodo ?? 'sem período'} · "${x.visita.comoDisse}"]`;
       linhas.push(
-        `    ${x.rodada}. ${x.acao ?? 'falhou'}${busca}: ${x.mensagem.replace(/\s+/g, ' ')}${foto}`,
+        `    ${x.rodada}. ${x.acao ?? 'falhou'}${busca}: ${x.mensagem.replace(/\s+/g, ' ')}${foto}${visita}`,
       );
       for (const falha of x.falhas) linhas.push(`       → ${falha}`);
     }

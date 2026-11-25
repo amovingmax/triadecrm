@@ -38,6 +38,7 @@ import {
   type PromptVersionado,
   type SaidaDoAtendenteV6,
   type SaidaDoAtendenteV8,
+  type SaidaDoAtendenteV9,
   type TipoDaAgenda,
   CANAIS_DE_CHEGADA,
   MODELOS,
@@ -47,10 +48,10 @@ import {
   MAX_BUSCAS_NO_MAPA,
   MAX_VOLTAS_DO_ATENDENTE,
   atendenteImovaV6,
-  atendenteImovaV8,
+  atendenteImovaV9,
   reidratar,
   sistemaComBaseV6,
-  sistemaComBaseV8,
+  sistemaComBaseV9,
 } from '@komune/prompts';
 
 import { ErroDaEsteira } from '../fila/esteira';
@@ -472,8 +473,12 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   const mapa = contexto.mapa;
   const comMapa = mapa !== undefined && typeof contexto.modelo.conversarComFerramentas === 'function';
   const modelo = (await modeloEscolhido(contexto)) as typeof atendenteImovaV6.modelo;
-  const prompt: PromptVersionado<EntradaDoAtendenteV6, SaidaDoAtendenteV6 | SaidaDoAtendenteV8> = comMapa
-    ? { ...atendenteImovaV8, modelo, sistema: sistemaComBaseV8(base) }
+  // Desde 24/11/2026 (noite), a v9: a v8 com o pedido de visita que vai aos admins.
+  const prompt: PromptVersionado<
+    EntradaDoAtendenteV6,
+    SaidaDoAtendenteV6 | SaidaDoAtendenteV8 | SaidaDoAtendenteV9
+  > = comMapa
+    ? { ...atendenteImovaV9, modelo, sistema: sistemaComBaseV9(base) }
     : { ...atendenteImovaV6, modelo, sistema: sistemaComBaseV6(base) };
 
   let executada;
@@ -595,6 +600,8 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   // A foto para confirmar o imóvel (v8): preparada no "responder", e se saiu.
   let foto: FotoPreparada | null = null;
   let fotoSaiu = false;
+  // O pedido de visita (v9): gravado depois da passagem, para os admins aprovarem.
+  let pedidoDeVisita: { codigo: string; gravado: boolean; motivo: string | null } | null = null;
   switch (saida.acao) {
     case 'nao_responder': {
       await rpc(contexto, 'ia_atendente_registrar_silencio', {
@@ -611,6 +618,36 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
         p_texto: texto === '' ? null : texto,
         p_motivo: detalhes.motivo,
       });
+      // O pedido de visita (v9, 24/11/2026): o cliente disse o dia da visita presencial.
+      // A mensagem já saiu e a conversa já é da equipe; o pedido vai aos admins (aviso no
+      // CRM e no celular), e um deles aprova, propõe outro dia ou recusa. Falha aqui não
+      // desfaz a passagem: a equipe já tem a conversa e o motivo.
+      const visita = 'visita' in saida ? saida.visita : null;
+      if (resultado.ok === true && visita !== null) {
+        const r = await rpc(contexto, 'ia_atendente_pedir_visita', {
+          p_conversation_id: payload.conversation_id,
+          p_em_resposta_a: payload.message_id,
+          p_imovel_codigo: visita.imovelCodigo,
+          p_data: visita.data,
+          p_periodo: visita.periodo,
+          p_como_disse: limparTexto(reidratar(visita.comoDisse, executada.mapa)) || null,
+          p_ai_run_id: executada.aiRunId,
+          p_prompt_version: executada.promptVersion,
+        }).catch((erro: unknown) => ({ ok: false, motivo: erro instanceof Error ? erro.message : String(erro) }));
+        pedidoDeVisita = {
+          codigo: visita.imovelCodigo,
+          gravado: r.ok === true,
+          motivo: r.ok === true ? null : String(r.motivo ?? 'recusado'),
+        };
+        if (r.ok === true) feita = 'pediu_a_visita';
+        else {
+          contexto.logger.warn('o pedido de visita não foi gravado (a conversa já passou para a equipe)', {
+            conversa: payload.conversation_id,
+            codigo: visita.imovelCodigo,
+            motivo: pedidoDeVisita.motivo,
+          });
+        }
+      }
       break;
     }
     case 'enviar_link_da_agenda': {
@@ -764,6 +801,7 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
     anotadas,
     fotos_ensinadas: fotosEnsinadas,
     foto: foto === null ? null : { codigo: foto.codigo, saiu: fotoSaiu, motivo: foto.pronta ? null : foto.motivo },
+    visita: pedidoDeVisita,
     confianca: saida.confianca,
     custo_usd: executada.custoUsd,
   });
@@ -778,6 +816,7 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
       fotosEnsinadas,
       ...(saida.agenda === null ? {} : { agenda: saida.agenda }),
       ...(foto === null ? {} : { foto: { codigo: foto.codigo, saiu: fotoSaiu } }),
+      ...(pedidoDeVisita === null ? {} : { visita: pedidoDeVisita }),
     },
   };
 }

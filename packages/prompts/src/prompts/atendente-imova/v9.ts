@@ -42,7 +42,9 @@ const visita = z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
       .nullable()
-      .describe('O dia da visita, AAAA-MM-DD, contado a partir de agora. Null se não souber contar.'),
+      .describe(
+        'O dia da visita, AAAA-MM-DD, contado a partir de agora. Null se não souber contar.',
+      ),
     periodo: z
       .enum(PERIODOS_DA_VISITA)
       .nullable()
@@ -136,7 +138,8 @@ const exemplos = [
       mensagem:
         'Perfeito! Vou consultar um horário em que entre na minha agenda e te retorno pra combinarmos.',
       agenda: null,
-      motivo: 'Visita presencial ao terreno de Tabatinga na quinta de manhã: pedido para a equipe aprovar.',
+      motivo:
+        'Visita presencial ao terreno de Tabatinga na quinta de manhã: pedido para a equipe aprovar.',
       anotacoes: [],
       fotosEnsinadas: [],
       confianca: 0.9,

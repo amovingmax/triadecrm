@@ -55,7 +55,7 @@ Opções de "ai":
                          Manda os cenários da IA que atende (a visita pelo link) ao modelo
                          de verdade, confere cada resposta e imprime o que errou e o custo.
                          Conversas de mentira: nada sai para cliente nenhum.
-  --ensaio=bateria [--versao=8] [--repeticoes=1] [--teto=8] [--juiza=nao] [--casos=I01,A04]
+  --ensaio=bateria [--versao=9] [--repeticoes=1] [--teto=8] [--juiza=nao] [--casos=I01,A04]
                          Os 40 casos da bateria (conversas reais e regras do caderno) com a
                          base de PRODUÇÃO, pelo caminho da IA que atende; cada resposta passa
                          pela régua e pela IA avaliadora. Para no teto (US$, até 20). Imprime

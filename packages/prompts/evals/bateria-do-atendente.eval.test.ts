@@ -184,6 +184,45 @@ describe('bateria do atendente: a régua', () => {
     ).toContain('fala do terreno de frente para o mar em Nísia Floresta');
   });
 
+  it('G04 com a v9: o pedido de visita do terreno, da quinta e da manhã; sem pedido, falha', () => {
+    const resposta = {
+      acao: 'passar_para_corretor',
+      mensagem:
+        'Perfeito! Vou consultar um horário em que entre na minha agenda e te retorno pra combinarmos.',
+      agenda: null,
+    } as const;
+    const v9 = { temMapa: true, temFoto: true, temVisita: true } as const;
+    const certo = { imovelCodigo: 'TE0004_IMOVA', data: '2026-11-26', periodo: 'manha' };
+    expect(conferirCasoDaBateria(caso('G04'), { ...resposta, visita: certo }, v9)).toEqual([]);
+    expect(conferirCasoDaBateria(caso('G04'), { ...resposta, visita: null }, v9)).toEqual([
+      'não manda o pedido de visita aos admins',
+    ]);
+    expect(
+      conferirCasoDaBateria(
+        caso('G04'),
+        { ...resposta, visita: { ...certo, data: '2026-11-27' } },
+        v9,
+      ),
+    ).toEqual(['pede a visita para 2026-11-27; era 2026-11-26']);
+    // Sem a v9, o pedido não é cobrado.
+    expect(conferirCasoDaBateria(caso('G04'), resposta, { temMapa: true, temFoto: true })).toEqual(
+      [],
+    );
+    // Pedido onde o caso não pede.
+    expect(
+      conferirCasoDaBateria(
+        caso('G03'),
+        {
+          acao: 'responder',
+          mensagem: 'Qual dia e período ficam melhores para você?',
+          agenda: null,
+          visita: certo,
+        },
+        v9,
+      ),
+    ).toContain('manda pedido de visita quando não devia');
+  });
+
   it('passar sem texto é aceito; o que o texto devia dizer, não', () => {
     expect(
       conferirCasoDaBateria(

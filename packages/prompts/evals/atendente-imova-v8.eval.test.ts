@@ -34,9 +34,10 @@ const CONTATO = {
 };
 
 describe('atendente-imova@v8', () => {
-  it('é a vigente; a v7 continua no catálogo', () => {
-    expect(VIGENTES['atendente-imova']).toBe(8);
-    expect(promptVigente('atendente-imova')).toBe(v8);
+  it('deu lugar à v9 (24/11/2026, o pedido de visita) e continua no catálogo; a v7 também', () => {
+    expect(VIGENTES['atendente-imova']).toBe(9);
+    expect(obterPrompt('atendente-imova', 8)).toBe(v8);
+    expect(promptVigente('atendente-imova')).not.toBe(v8);
     expect(obterPrompt('atendente-imova', 7)).toBe(v7);
     expect(v7.sistema).not.toMatch(/fotoParaConfirmar/);
   });

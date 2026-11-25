@@ -585,7 +585,7 @@ describe('a busca no mapa (v7, 23/11/2026): só com o mapa no worker', () => {
       },
       {
         tipo: 'final',
-        json: { ...saidaDoModelo(), fotoParaConfirmar: null },
+        json: { ...saidaDoModelo(), fotoParaConfirmar: null, visita: null },
         uso,
         modelo: 'claude-haiku-5-5',
         paradaPor: 'end_turn',
@@ -599,10 +599,10 @@ describe('a busca no mapa (v7, 23/11/2026): só com o mapa no worker', () => {
     expect(pedidos[0]?.ferramentas.map((f) => f.nome)).toEqual(['buscar_no_mapa']);
     expect(pedidos[0]?.sistema).toContain('A BUSCA NO MAPA:');
     const runs = montado.banco.tabelas.ai_runs as Record<string, unknown>[];
-    expect(runs.map((x) => x.prompt_version)).toEqual(['atendente-imova@v8', 'atendente-imova@v8']);
+    expect(runs.map((x) => x.prompt_version)).toEqual(['atendente-imova@v9', 'atendente-imova@v9']);
     expect(montado.chamadas('ia_atendente_enviar_link')[0]).toMatchObject({
       p_ai_run_id: runs[1]?.id,
-      p_prompt_version: 'atendente-imova@v8',
+      p_prompt_version: 'atendente-imova@v9',
     });
     expect(montado.pedidos).toHaveLength(0);
   });
@@ -623,6 +623,7 @@ describe('a foto para confirmar o imóvel (v8, 24/11/2026)', () => {
   const saidaComFoto = (legenda = 'É este aqui que você viu?') => ({
     ...saidaDoModelo({ acao: 'responder', mensagem: TEXTO, agenda: null }),
     fotoParaConfirmar: { imovelCodigo: 'TE0004', legenda },
+    visita: null,
   });
 
   function comMapa(saida: Record<string, unknown>, opcoes: Parameters<typeof montar>[2] = {}) {
@@ -661,7 +662,7 @@ describe('a foto para confirmar o imóvel (v8, 24/11/2026)', () => {
       p_imovel_codigo: 'TE0004_IMOVA',
       p_media_path: m.banco.uploads[0]?.caminho,
       p_legenda: 'É este aqui que você viu?',
-      p_prompt_version: 'atendente-imova@v8',
+      p_prompt_version: 'atendente-imova@v9',
     });
   });
 
@@ -742,7 +743,7 @@ describe('a foto para confirmar o imóvel (v8, 24/11/2026)', () => {
   });
 
   it('sem foto pedida, nada muda: nem capa, nem cópia', async () => {
-    const m = comMapa({ ...saidaDoModelo({ acao: 'responder', mensagem: TEXTO, agenda: null }), fotoParaConfirmar: null }, {
+    const m = comMapa({ ...saidaDoModelo({ acao: 'responder', mensagem: TEXTO, agenda: null }), fotoParaConfirmar: null, visita: null }, {
       rpcs: capaExiste,
       arquivos: fotoNoBalde,
     });
@@ -750,5 +751,85 @@ describe('a foto para confirmar o imóvel (v8, 24/11/2026)', () => {
     expect(r).toMatchObject({ feito: true, motivo: 'responder' });
     expect(m.chamadas('ia_atendente_capa_do_imovel')).toEqual([]);
     expect(m.banco.downloads).toEqual([]);
+  });
+});
+
+describe('o pedido de visita (v9, 24/11/2026)', () => {
+  const uso = { entrada: 100, saida: 20, escritaDeCache: 0, leituraDeCache: 0 };
+  const FRASE = 'Perfeito! Vou consultar um horário em que entre na minha agenda e te retorno pra combinarmos.';
+  const pedido = { imovelCodigo: 'TE0004', data: '2026-11-26', periodo: 'manha', comoDisse: 'quinta de manhã' } as const;
+  const saidaDaVisita = (visita: typeof pedido | null) => ({
+    ...saidaDoModelo({ acao: 'passar_para_corretor', mensagem: FRASE, agenda: null, motivo: 'Visita na quinta de manhã.' }),
+    fotoParaConfirmar: null,
+    visita,
+  });
+
+  function comMapa(saida: Record<string, unknown>, opcoes: Parameters<typeof montar>[2] = {}) {
+    const montado = montar(saidaDoModelo(), undefined, opcoes);
+    const contexto: ContextoDaIa = {
+      ...montado.contexto,
+      mapa: { buscar: () => Promise.resolve({ lugares: [], doCache: false }) },
+      modelo: {
+        ...montado.contexto.modelo,
+        conversarComFerramentas: () =>
+          Promise.resolve({ tipo: 'final', json: saida, uso, modelo: 'claude-haiku-5-5', paradaPor: 'end_turn' }),
+      },
+    };
+    return { ...montado, contexto };
+  }
+
+  it('passa a conversa com a frase do caderno e, depois, grava o pedido para os admins', async () => {
+    const m = comMapa(saidaDaVisita(pedido), {
+      rpcs: { ia_atendente_pedir_visita: () => ({ ok: true, pedido_id: 'p1' }) },
+    });
+    const r = await atenderCliente(m.contexto, PAYLOAD);
+    expect(r).toMatchObject({
+      feito: true,
+      motivo: 'pediu_a_visita',
+      detalhes: { visita: { codigo: 'TE0004', gravado: true, motivo: null } },
+    });
+    expect(m.chamadas('ia_atendente_passar')[0]).toMatchObject({ p_texto: FRASE });
+    const nomes = m.banco.chamadasDeRpc.map((c) => c.nome);
+    expect(nomes.indexOf('ia_atendente_pedir_visita')).toBeGreaterThan(nomes.indexOf('ia_atendente_passar'));
+    expect(m.chamadas('ia_atendente_pedir_visita')[0]).toMatchObject({
+      p_conversation_id: CONVERSA,
+      p_em_resposta_a: ULTIMA,
+      p_imovel_codigo: 'TE0004',
+      p_data: '2026-11-26',
+      p_periodo: 'manha',
+      p_como_disse: 'quinta de manhã',
+      p_prompt_version: 'atendente-imova@v9',
+    });
+  });
+
+  it('o banco recusou o pedido (ou a porta não existe): a passagem vale, e fica o aviso no log', async () => {
+    const m = comMapa(saidaDaVisita(pedido), {
+      rpcs: {
+        ia_atendente_pedir_visita: () => {
+          throw new Error('function public.ia_atendente_pedir_visita does not exist');
+        },
+      },
+    });
+    const r = await atenderCliente(m.contexto, PAYLOAD);
+    expect(r).toMatchObject({ feito: true, motivo: 'passar_para_corretor', detalhes: { visita: { gravado: false } } });
+    expect(m.chamadas('ia_atendente_passar')).toHaveLength(1);
+  });
+
+  it('passagem sem visita: nenhum pedido', async () => {
+    const m = comMapa(saidaDaVisita(null), { rpcs: { ia_atendente_pedir_visita: () => ({ ok: true }) } });
+    const r = await atenderCliente(m.contexto, PAYLOAD);
+    expect(r).toMatchObject({ feito: true, motivo: 'passar_para_corretor' });
+    expect(m.chamadas('ia_atendente_pedir_visita')).toEqual([]);
+  });
+
+  it('a passagem recusada pelo banco não grava pedido', async () => {
+    const m = comMapa(saidaDaVisita(pedido), {
+      rpcs: {
+        ia_atendente_passar: () => ({ ok: false, motivo: 'chegou_mensagem_nova' }),
+        ia_atendente_pedir_visita: () => ({ ok: true }),
+      },
+    });
+    await atenderCliente(m.contexto, PAYLOAD);
+    expect(m.chamadas('ia_atendente_pedir_visita')).toEqual([]);
   });
 });
