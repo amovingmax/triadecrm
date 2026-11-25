@@ -22,8 +22,8 @@ import { atendenteImovaV7 as v7, sistemaComBaseV7 } from '../src/prompts/atenden
  */
 
 describe('bateria do atendente: os casos', () => {
-  it('são 46 (o A14, o I16, o I17 e os G06 a G08 entraram em 24/11), com id único, e cobrem os quatro grupos', () => {
-    expect(CASOS_DA_BATERIA).toHaveLength(46);
+  it('são 50 (o A14, o I16, o I17 e os G06 a G08 entraram em 24/11; os D01 a D04 em 25/11), com id único, e cobrem os quatro grupos', () => {
+    expect(CASOS_DA_BATERIA).toHaveLength(50);
     const ids = CASOS_DA_BATERIA.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const grupo of GRUPOS_DA_BATERIA) {
@@ -401,5 +401,74 @@ describe('bateria do atendente: a régua', () => {
   it('o "tudo bem?" do cumprimento não conta como pergunta', () => {
     expect(contarPerguntas('Olá, tudo bem? Como posso te ajudar?')).toBe(1);
     expect(contarPerguntas('Qual dia? E qual período?')).toBe(2);
+  });
+});
+
+describe('bateria do atendente: o aviso de decisão (v10, 25/11/2026)', () => {
+  const caso = (id: string) => {
+    const achado = CASOS_DA_BATERIA.find((c) => c.id === id);
+    if (achado === undefined) throw new Error(`caso ${id} não existe`);
+    return achado;
+  };
+  const resposta = (extra: Record<string, unknown>) => ({
+    acao: 'responder' as const,
+    mensagem: 'Entendi. Vou repassar sua proposta ao diretor e te retorno.',
+    agenda: null,
+    ...extra,
+  });
+  const v10 = { temMapa: true, temFoto: true, temVisita: true, temDecisao: true };
+
+  it('na v10, a proposta com o valor dele é acerto; sem decisão, ou com outro valor, é falha', () => {
+    const d01 = caso('D01');
+    expect(
+      conferirCasoDaBateria(
+        d01,
+        resposta({ decisao: { tipo: 'proposta', valorProposto: 450000, sugestoes: 0 } }),
+        v10,
+      ),
+    ).toEqual([]);
+    expect(conferirCasoDaBateria(d01, resposta({ decisao: null }), v10)).toContain(
+      'responde sem pedir a decisão aos admins',
+    );
+    expect(
+      conferirCasoDaBateria(
+        d01,
+        resposta({ decisao: { tipo: 'proposta', valorProposto: 400000, sugestoes: 0 } }),
+        v10,
+      ),
+    ).toContain('o valor da proposta veio 400000; era 450000');
+  });
+
+  it('"equipe" na fala é falha; decisão onde o caso não pede, também', () => {
+    expect(
+      conferirCasoDaBateria(
+        caso('D01'),
+        resposta({
+          mensagem: 'Vou levar sua proposta para a equipe e te retorno.',
+          decisao: { tipo: 'proposta', valorProposto: 450000, sugestoes: 0 },
+        }),
+        v10,
+      ),
+    ).toContain('fala em equipe ao dizer que vai verificar');
+    expect(
+      conferirCasoDaBateria(
+        caso('D04'),
+        resposta({
+          mensagem: 'Ainda estou verificando e te retorno.',
+          decisao: { tipo: 'pergunta', valorProposto: null, sugestoes: 0 },
+        }),
+        v10,
+      ),
+    ).toContain('pede decisão quando não devia');
+  });
+
+  it('antes da v10, o caso de sempre: a proposta passa a conversa', () => {
+    expect(
+      conferirCasoDaBateria(caso('D01'), resposta({ acao: 'passar_para_corretor' }), {
+        temMapa: true,
+        temFoto: true,
+        temVisita: true,
+      }),
+    ).toEqual([]);
   });
 });

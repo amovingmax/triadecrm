@@ -19,7 +19,8 @@ import { createClient } from '@/lib/supabase/client';
 
 export type TipoDeDecisao = 'proposta' | 'pergunta';
 export type SituacaoDaDecisao = 'aberta' | 'consultando';
-export type Escolha = 'aceitar' | 'recusar' | 'contraproposta' | 'consultar' | 'sugestao' | 'escrita';
+export type Escolha =
+  'aceitar' | 'recusar' | 'contraproposta' | 'consultar' | 'sugestao' | 'escrita';
 
 export interface Sugestao {
   readonly rotulo: string;
@@ -90,7 +91,8 @@ export function lerDecisao(valor: unknown): DecisaoDaIa | null {
   if (id === null || conversaId === null || criadoEm === null || pergunta === null) return null;
   const valorProposto = inteiro(v.valor_proposto);
   // Proposta sem valor não tem o que aceitar: o cartão a mostra como pergunta.
-  const tipo: TipoDeDecisao = v.tipo === 'proposta' && valorProposto !== null ? 'proposta' : 'pergunta';
+  const tipo: TipoDeDecisao =
+    v.tipo === 'proposta' && valorProposto !== null ? 'proposta' : 'pergunta';
   return {
     id,
     conversaId,
@@ -191,7 +193,9 @@ export function textoDaProposta(
       return `Boa notícia${nome === null ? '' : `, ${nome}`}: o proprietário aceitou sua proposta de ${prop} ${pelo(d.imovel)}. Para seguirmos, é só escolher o melhor dia e horário para conversarmos pelo link abaixo.`;
     case 'recusar':
       return `${nome === null ? 'O' : `${nome}, o`} proprietário não aceitou a proposta de ${prop}.${
-        d.valorAnunciado === null ? '' : ` ${sujeito(d.imovel)} segue por ${reais(d.valorAnunciado)}.`
+        d.valorAnunciado === null
+          ? ''
+          : ` ${sujeito(d.imovel)} segue por ${reais(d.valorAnunciado)}.`
       } Se quiser fazer outra proposta, é só me dizer.`;
     case 'contraproposta':
       return `${nome === null ? 'O' : `${nome}, o`} proprietário não chegou aos ${prop}, mas aceita ${

@@ -60,7 +60,11 @@ describe('a decisão lida do banco', () => {
     const d = lerDecisao({
       ...DO_BANCO,
       valor_proposto: null,
-      sugestoes: [{ rotulo: 'Sim', resposta: 'Ajudamos sim.' }, { rotulo: '', resposta: 'x' }, { rotulo: 'Não' }],
+      sugestoes: [
+        { rotulo: 'Sim', resposta: 'Ajudamos sim.' },
+        { rotulo: '', resposta: 'x' },
+        { rotulo: 'Não' },
+      ],
     });
     expect(d?.tipo).toBe('pergunta');
     expect(d?.sugestoes).toEqual([{ rotulo: 'Sim', resposta: 'Ajudamos sim.' }]);
@@ -124,20 +128,30 @@ describe('as prévias dizem o que o banco manda', () => {
 
 describe('depois do toque', () => {
   it('a IA respondeu, a consulta, a escrita e o que não saiu', () => {
-    expect(avisoDoResultado('aceitar', lerResultado({ ok: true, mensagem_saiu: true, como: 'ia' }))).toMatchObject({
+    expect(
+      avisoDoResultado('aceitar', lerResultado({ ok: true, mensagem_saiu: true, como: 'ia' })),
+    ).toMatchObject({
       titulo: 'A IA respondeu o cliente',
       tom: 'sucesso',
     });
-    expect(avisoDoResultado('consultar', lerResultado({ ok: true, mensagem_saiu: true }))).toMatchObject({
+    expect(
+      avisoDoResultado('consultar', lerResultado({ ok: true, mensagem_saiu: true })),
+    ).toMatchObject({
       titulo: 'O cliente sabe que a proposta está com o proprietário',
     });
-    expect(avisoDoResultado('escrita', lerResultado({ ok: true, ia_escreve: true }))).toMatchObject({
-      titulo: 'A IA vai responder o cliente',
-    });
-    expect(avisoDoResultado('recusar', lerResultado({ ok: true, mensagem_saiu: false }))).toMatchObject({
+    expect(avisoDoResultado('escrita', lerResultado({ ok: true, ia_escreve: true }))).toMatchObject(
+      {
+        titulo: 'A IA vai responder o cliente',
+      },
+    );
+    expect(
+      avisoDoResultado('recusar', lerResultado({ ok: true, mensagem_saiu: false })),
+    ).toMatchObject({
       tom: 'aviso',
     });
-    expect(avisoDoResultado('recusar', lerResultado({ ok: true, mensagem_saiu: true, como: 'admin' }))).toMatchObject({
+    expect(
+      avisoDoResultado('recusar', lerResultado({ ok: true, mensagem_saiu: true, como: 'admin' })),
+    ).toMatchObject({
       titulo: 'A mensagem saiu em seu nome',
     });
   });
@@ -145,7 +159,11 @@ describe('depois do toque', () => {
   it('outro admin já respondeu', () => {
     expect(
       avisoDoResultado('aceitar', lerResultado({ ok: false, motivo: 'ja_decidido', por: 'Janio' })),
-    ).toEqual({ titulo: 'Outro admin já respondeu', descricao: 'Quem respondeu: Janio.', tom: 'aviso' });
+    ).toEqual({
+      titulo: 'Outro admin já respondeu',
+      descricao: 'Quem respondeu: Janio.',
+      tom: 'aviso',
+    });
   });
 });
 
@@ -155,7 +173,9 @@ describe('o toque e a notificação', () => {
     if (d === null) throw new Error('decisão do teste não leu');
     expect(decisoesNaoVistas([d], new Set(['d1']))).toEqual([]);
     expect(decisoesNaoVistas([d], new Set())).toEqual([d]);
-    expect(linhaDaDecisao(d)).toBe('Paula Freitas oferece R$ 4.000.000 pelo terreno em Capim Macio');
+    expect(linhaDaDecisao(d)).toBe(
+      'Paula Freitas oferece R$ 4.000.000 pelo terreno em Capim Macio',
+    );
     expect(linhaDaDecisao({ ...d, tipo: 'pergunta' })).toBe(
       'Paula Freitas perguntou: “Achei caro. O proprietário aceita 4 milhões?”',
     );

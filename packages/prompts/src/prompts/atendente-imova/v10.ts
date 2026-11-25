@@ -254,7 +254,8 @@ const exemplos = [
       acao: 'responder' as const,
       mensagem: 'Boa pergunta. Vou verificar e te retorno.',
       agenda: null,
-      motivo: 'Pergunta sobre ajuda com a documentação do financiamento e do FGTS: decisão dos admins.',
+      motivo:
+        'Pergunta sobre ajuda com a documentação do financiamento e do FGTS: decisão dos admins.',
       anotacoes: [],
       fotosEnsinadas: [],
       confianca: 0.85,

@@ -51,7 +51,9 @@ describe('a fala antes da decisão', () => {
       texto: 'Vou repassar sua proposta ao diretor e te retorno.',
       trocada: true,
     });
-    expect(falaDaDecisao('Vou ver com o corretor.', 'pergunta').texto).toBe('Vou verificar e te retorno.');
+    expect(falaDaDecisao('Vou ver com o corretor.', 'pergunta').texto).toBe(
+      'Vou verificar e te retorno.',
+    );
     expect(falaDaDecisao('  ', 'pergunta').trocada).toBe(true);
   });
 });
@@ -61,18 +63,40 @@ describe('a decisão conferida', () => {
 
   it('a proposta com o valor que ele escreveu fica proposta', () => {
     const d = prepararDecisao(
-      { tipo: 'proposta', imovelCodigo: ' TE0004_IMOVA ', valorProposto: 4_000_000, pergunta: 'Aceita 4 milhões?', sugestoes: [] },
+      {
+        tipo: 'proposta',
+        imovelCodigo: ' TE0004_IMOVA ',
+        valorProposto: 4_000_000,
+        pergunta: 'Aceita 4 milhões?',
+        sugestoes: [],
+      },
       { limpar, falasDoCliente: ['Qual o valor?', 'Achei caro. Aceita 4 milhões?'], contexto: [] },
     );
-    expect(d).toMatchObject({ tipo: 'proposta', valorProposto: 4_000_000, imovelCodigo: 'TE0004_IMOVA', ajustes: [] });
+    expect(d).toMatchObject({
+      tipo: 'proposta',
+      valorProposto: 4_000_000,
+      imovelCodigo: 'TE0004_IMOVA',
+      ajustes: [],
+    });
   });
 
   it('valor que ele não escreveu: vira pergunta, sem valor e sem sugestão', () => {
     const d = prepararDecisao(
-      { tipo: 'proposta', imovelCodigo: null, valorProposto: 4_200_000, pergunta: 'Aceita 4 milhões?', sugestoes: [] },
+      {
+        tipo: 'proposta',
+        imovelCodigo: null,
+        valorProposto: 4_200_000,
+        pergunta: 'Aceita 4 milhões?',
+        sugestoes: [],
+      },
       { limpar, falasDoCliente: ['Aceita 4 milhões?'], contexto: [] },
     );
-    expect(d).toMatchObject({ tipo: 'pergunta', valorProposto: null, sugestoes: [], ajustes: ['valor_nao_conferido'] });
+    expect(d).toMatchObject({
+      tipo: 'pergunta',
+      valorProposto: null,
+      sugestoes: [],
+      ajustes: ['valor_nao_conferido'],
+    });
   });
 
   it('sugestão com número que ninguém disse, código ou "equipe" sai da lista; repetida também', () => {
@@ -112,13 +136,20 @@ const CONTATO = '22222222-2222-4222-8222-222222222222';
 const CONVERSA = '33333333-3333-4333-8333-333333333333';
 const DECISAO = '44444444-4444-4444-8444-444444444444';
 const PERFIL = '99999999-9999-4999-8999-999999999999';
-const PAYLOAD = { purpose: 'responder_decisao', decisao_id: DECISAO, conversation_id: CONVERSA, chave: 'x' };
+const PAYLOAD = {
+  purpose: 'responder_decisao',
+  decisao_id: DECISAO,
+  conversation_id: CONVERSA,
+  chave: 'x',
+};
 
 function tabelas(): TabelasFalsas {
   return {
     ai_runs: [],
     tasks: [],
-    organizations: [{ id: ORG, owner_id: PERFIL, name: 'Marina Costa', phone_e164: '+5584988776655' }],
+    organizations: [
+      { id: ORG, owner_id: PERFIL, name: 'Marina Costa', phone_e164: '+5584988776655' },
+    ],
     contacts: [
       {
         id: CONTATO,
@@ -150,7 +181,10 @@ function entradaNoBanco(extras: Record<string, unknown> = {}): Record<string, un
   };
 }
 
-function montar(entrada: Record<string, unknown> = entradaNoBanco(), opcoesDoDuble: OpcoesDoDuble = {}) {
+function montar(
+  entrada: Record<string, unknown> = entradaNoBanco(),
+  opcoesDoDuble: OpcoesDoDuble = {},
+) {
   const ditas: Record<string, unknown>[] = [];
   const banco = bancoFalso(tabelas(), {
     rpcs: {
@@ -164,13 +198,20 @@ function montar(entrada: Record<string, unknown> = entradaNoBanco(), opcoesDoDub
   const nada = (_msg: string, _campos?: LogFields): void => {};
   const logger: Logger = { debug: nada, info: nada, warn: nada, error: nada };
   const duble = clienteDuble(opcoesDoDuble);
-  const contexto: ContextoDaIa = { cliente: banco.cliente, modelo: duble, logger, empresa: 'imova' };
+  const contexto: ContextoDaIa = {
+    cliente: banco.cliente,
+    modelo: duble,
+    logger,
+    empresa: 'imova',
+  };
   return { banco, contexto, duble, ditas };
 }
 
 describe('"Escrever outra resposta": a IA diz o que o admin escreveu', () => {
   it('o dublê reconhece o prompt pelo esquema', () => {
-    expect(fluxoDoEsquema(esquemaDeSaida(promptVigente('resposta-da-decisao')))).toBe('resposta_decisao');
+    expect(fluxoDoEsquema(esquemaDeSaida(promptVigente('resposta-da-decisao')))).toBe(
+      'resposta_decisao',
+    );
   });
 
   it('chama o modelo uma vez e manda o texto dele, com o ai_run que o pagou', async () => {

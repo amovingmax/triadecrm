@@ -60,7 +60,9 @@ export function valoresDoTexto(texto: string): number[] {
     let valor: number;
     if (unidade !== undefined) {
       // "3,8 mi" e "3.8 mi": a vírgula ou o ponto são decimais.
-      valor = Number(numero.replace(/\.(?=\d{3}(?:\D|$))/g, '').replace(',', '.')) * (MULTIPLICADOR[unidade] ?? 1);
+      valor =
+        Number(numero.replace(/\.(?=\d{3}(?:\D|$))/g, '').replace(',', '.')) *
+        (MULTIPLICADOR[unidade] ?? 1);
     } else if (/^\d{1,3}(?:\.\d{3})+/.test(numero)) {
       // "450.000" e "4.000.000,00": ponto de milhar, vírgula de centavos.
       valor = Number(numero.replace(/\./g, '').replace(/,\d{1,2}$/, ''));
@@ -73,7 +75,10 @@ export function valoresDoTexto(texto: string): number[] {
 }
 
 /** A fala que sai antes da decisão: a da IA, ou a frase segura quando ela fala em equipe. */
-export function falaDaDecisao(texto: string, tipo: TipoDeDecisao): { texto: string; trocada: boolean } {
+export function falaDaDecisao(
+  texto: string,
+  tipo: TipoDeDecisao,
+): { texto: string; trocada: boolean } {
   const limpo = texto.trim();
   if (limpo === '' || /(?<!\p{L})(?:equipe|corretor(?:a|es|as)?)(?!\p{L})/iu.test(limpo)) {
     return { texto: FRASE_DA_DECISAO[tipo], trocada: true };

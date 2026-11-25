@@ -28,12 +28,14 @@ import {
   type SaidaDoAtendenteV6,
   type SaidaDoAtendenteV8,
   type SaidaDoAtendenteV9,
+  type SaidaDoAtendenteV10,
   MAX_BUSCAS_NO_MAPA,
   MAX_VOLTAS_DO_ATENDENTE,
   atendenteImovaV6,
   atendenteImovaV7,
   atendenteImovaV8,
   atendenteImovaV9,
+  atendenteImovaV10,
   avaliacaoDoAtendimentoV2,
   casosDaBateria,
   conferirCasoDaBateria,
@@ -44,6 +46,7 @@ import {
   sistemaComBaseV7,
   sistemaComBaseV8,
   sistemaComBaseV9,
+  sistemaComBaseV10,
 } from '@komune/prompts';
 
 import { ErroDaEsteira } from '../fila/esteira';
@@ -67,8 +70,8 @@ import {
 const AVISO_PADRAO = 'Vou verificar isso direitinho e já te retorno por aqui.';
 
 export interface OpcoesDaBateria {
-  /** 8 (vigente: mapa e foto para confirmar), 7 (mapa) ou 6 (sem mapa). */
-  readonly versao: 6 | 7 | 8 | 9;
+  /** 10 (vigente: o aviso de decisão), 9 (pedido de visita), 8 (foto), 7 (mapa) ou 6 (sem mapa). */
+  readonly versao: 6 | 7 | 8 | 9 | 10;
   /** Quantas vezes cada caso roda (a IA não responde sempre igual). */
   readonly repeticoes: number;
   /** Teto da rodada inteira, em US$, conferido antes de cada caso. */
@@ -135,6 +138,13 @@ export interface RespostaDaBateria {
     readonly data: string | null;
     readonly periodo: string | null;
     readonly comoDisse: string;
+  } | null;
+  /** A decisão que a IA pediu aos admins (v10). */
+  readonly decisao?: {
+    readonly tipo: 'proposta' | 'pergunta';
+    readonly valorProposto: number | null;
+    readonly pergunta: string;
+    readonly sugestoes: readonly string[];
   } | null;
   readonly motivo: string;
   readonly confianca: number | null;
@@ -235,6 +245,7 @@ export async function rodarBateria(
   const comMapa = opcoes.versao >= 7;
   const comFoto = opcoes.versao >= 8;
   const comVisita = opcoes.versao >= 9;
+  const comDecisao = opcoes.versao >= 10;
   const mapa = contexto.mapa;
   if (
     comMapa &&
@@ -259,14 +270,16 @@ export async function rodarBateria(
   const modelo = (await modeloEscolhido(contexto)) as typeof atendenteImovaV6.modelo;
   const prompt: PromptVersionado<
     EntradaDoAtendenteV6,
-    SaidaDoAtendenteV6 | SaidaDoAtendenteV8 | SaidaDoAtendenteV9
-  > = comVisita
-    ? { ...atendenteImovaV9, modelo, sistema: sistemaComBaseV9(base) }
-    : comFoto
-      ? { ...atendenteImovaV8, modelo, sistema: sistemaComBaseV8(base) }
-      : comMapa
-        ? { ...atendenteImovaV7, modelo, sistema: sistemaComBaseV7(base) }
-        : { ...atendenteImovaV6, modelo, sistema: sistemaComBaseV6(base) };
+    SaidaDoAtendenteV6 | SaidaDoAtendenteV8 | SaidaDoAtendenteV9 | SaidaDoAtendenteV10
+  > = comDecisao
+    ? { ...atendenteImovaV10, modelo, sistema: sistemaComBaseV10(base) }
+    : comVisita
+      ? { ...atendenteImovaV9, modelo, sistema: sistemaComBaseV9(base) }
+      : comFoto
+        ? { ...atendenteImovaV8, modelo, sistema: sistemaComBaseV8(base) }
+        : comMapa
+          ? { ...atendenteImovaV7, modelo, sistema: sistemaComBaseV7(base) }
+          : { ...atendenteImovaV6, modelo, sistema: sistemaComBaseV6(base) };
   const promptVersion = `${prompt.id}@v${prompt.versao}`;
 
   // Só existe com a v7 (conferido acima): é o que decide entre o laço e a chamada única.
@@ -346,6 +359,19 @@ export async function rodarBateria(
                 periodo: pedidoDeVisita.periodo,
                 comoDisse: limparTexto(reidratar(pedidoDeVisita.comoDisse, executada.mapa)),
               };
+        // A decisão (v10): só registrada; a bateria nunca grava decisão.
+        const pedidaDecisao = 'decisao' in saida ? saida.decisao : null;
+        const decisao =
+          pedidaDecisao === null
+            ? null
+            : {
+                tipo: pedidaDecisao.tipo,
+                valorProposto: pedidaDecisao.valorProposto,
+                pergunta: limparTexto(reidratar(pedidaDecisao.pergunta, executada.mapa)),
+                sugestoes: pedidaDecisao.sugestoes.map((x) =>
+                  limparTexto(reidratar(`${x.rotulo} → ${x.resposta}`, executada.mapa)),
+                ),
+              };
         const falhas = conferirCasoDaBateria(
           caso,
           {
@@ -355,8 +381,16 @@ export async function rodarBateria(
             ferramentas: buscas.map(() => 'buscar_no_mapa'),
             foto,
             visita,
+            decisao:
+              decisao === null
+                ? null
+                : {
+                    tipo: decisao.tipo,
+                    valorProposto: decisao.valorProposto,
+                    sugestoes: decisao.sugestoes.length,
+                  },
           },
-          { temMapa: comMapa, temFoto: comFoto, temVisita: comVisita },
+          { temMapa: comMapa, temFoto: comFoto, temVisita: comVisita, temDecisao: comDecisao },
         );
         if (foto !== null && foto.existe === false) {
           falhas.push(
@@ -407,6 +441,7 @@ export async function rodarBateria(
           buscas,
           foto,
           visita,
+          decisao,
           motivo: limparTexto(reidratar(saida.motivo, executada.mapa)),
           confianca: saida.confianca,
           falhas,
@@ -490,7 +525,13 @@ export function relatorioDaBateria(r: ResultadoDaBateria): string {
           ? ''
           : ` [pedido de visita ${x.visita.imovelCodigo} · ${x.visita.data ?? 'sem data'} · ${x.visita.periodo ?? 'sem período'} · "${x.visita.comoDisse}"]`;
       linhas.push(
-        `    ${x.rodada}. ${x.acao ?? 'falhou'}${busca}: ${x.mensagem.replace(/\s+/g, ' ')}${foto}${visita}`,
+        `    ${x.rodada}. ${x.acao ?? 'falhou'}${busca}: ${x.mensagem.replace(/\s+/g, ' ')}${foto}${visita}${
+          x.decisao === undefined || x.decisao === null
+            ? ''
+            : ` [decisão ${x.decisao.tipo}${x.decisao.valorProposto === null ? '' : ` ${x.decisao.valorProposto}`} · "${x.decisao.pergunta}"${
+                x.decisao.sugestoes.length === 0 ? '' : ` · ${x.decisao.sugestoes.join(' | ')}`
+              }]`
+        }`,
       );
       for (const falha of x.falhas) linhas.push(`       → ${falha}`);
     }

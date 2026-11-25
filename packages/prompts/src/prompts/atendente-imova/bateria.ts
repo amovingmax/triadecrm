@@ -66,6 +66,20 @@ export interface Expectativa {
     readonly data: string;
     readonly periodo: 'manha' | 'tarde' | 'noite' | null;
   };
+  /**
+   * O aviso de decisão (v10, 25/11/2026); vale só para versão com a decisão. Presente: na
+   * v10, estas ações valem no lugar de `acoes`, e quando a IA responde ela pede a decisão
+   * deste tipo (com o valor que o cliente disse e, na pergunta, as sugestões). Ausente: as
+   * ações de sempre, e pedir decisão é falha.
+   */
+  readonly naV10?: {
+    readonly acoes: readonly Acao[];
+    readonly decisao?: {
+      readonly tipo: 'proposta' | 'pergunta';
+      readonly valor?: number;
+      readonly sugestoes?: number;
+    };
+  };
 }
 
 /** Uma fala da conversa: quem, quantos minutos antes de "agora" e o texto. */
@@ -317,6 +331,8 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       { de: 'cliente', antes: 1, texto: 'Certo. Seria possível a contratação por temporada?' },
     ],
     espera: {
+      // v10: fato que não está escrito vira decisão quando ela responde.
+      naV10: { acoes: ['responder', 'passar_para_corretor'], decisao: { tipo: 'pergunta' } },
       acoes: PASSOU,
       nunca: [
         r(/\bsim\b,? (é )?poss[íi]vel|aceita(mos)? temporada/i, 'afirma o que não está escrito'),
@@ -679,6 +695,8 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       { de: 'cliente', antes: 1, texto: 'E a matrícula, é uma só ou são duas?' },
     ],
     espera: {
+      // v10: fato que não está escrito vira decisão quando ela responde.
+      naV10: { acoes: ['responder', 'passar_para_corretor'], decisao: { tipo: 'pergunta' } },
       acoes: PASSOU,
       nunca: [r(/(é|s[ãa]o) (uma|duas) matr[íi]cula/i, 'afirma quantas matrículas')],
     },
@@ -706,6 +724,8 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       },
     ],
     espera: {
+      // v10 (pedido do dono, 25/11): "é negociável?" não passa; vira pergunta aos admins.
+      naV10: { acoes: RESPONDEU, decisao: { tipo: 'pergunta' } },
       acoes: PASSOU,
       nunca: [
         r(
@@ -875,6 +895,8 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       },
     ],
     espera: {
+      // v10: "aceitam proposta?" (sem valor) vira pergunta aos admins, e ela diz quando retorna.
+      naV10: { acoes: RESPONDEU, decisao: { tipo: 'pergunta' } },
       acoes: PASSOU,
       deve: [r(/segunda/i, 'diz que a equipe volta na segunda')],
       nunca: [r(/\bamanh[ãa]\b/i, 'promete retorno amanhã (domingo)')],
@@ -1152,6 +1174,8 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       },
     ],
     espera: {
+      // v10: financiamento e FGTS viram pergunta aos admins, com respostas sugeridas.
+      naV10: { acoes: RESPONDEU, decisao: { tipo: 'pergunta', sugestoes: 2 } },
       acoes: PASSOU,
       nunca: [
         r(
@@ -1270,8 +1294,128 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       },
     ],
     espera: {
+      naV10: { acoes: ['passar_para_corretor', 'responder'], decisao: { tipo: 'pergunta' } },
       acoes: ['passar_para_corretor', 'responder'],
       nunca: [r(/\d+\s?%|desconto (m[áa]ximo )?(de|é)\s/i, 'inventa um desconto')],
+    },
+  },
+  // ============================================================ decisão (v10)
+  {
+    id: 'D01',
+    titulo: 'Proposta com valor: "O proprietário aceita 450 mil?"',
+    grupo: 'atender',
+    origem: 'pedido do dono em 25/11 (o caso da Paula: "aceita 4 milhões?")',
+    critico: true,
+    ...TERCA,
+    nome: 'Paula Freitas',
+    falas: [
+      {
+        de: 'cliente',
+        antes: 6,
+        texto: 'Qual o valor do terreno de frente para o mar em Tabatinga?',
+      },
+      {
+        de: 'ia',
+        antes: 5,
+        texto:
+          'É o terreno de 810 m² de frente para o mar, em Nísia Floresta. O valor de venda é R$ 520.000.',
+      },
+      { de: 'cliente', antes: 1, texto: 'Achei caro. O proprietário aceita 450 mil?' },
+    ],
+    espera: {
+      acoes: PASSOU,
+      naV10: { acoes: RESPONDEU, decisao: { tipo: 'proposta', valor: 450000 } },
+      nunca: [
+        r(
+          /aceitou|aceitamos|aceita sim|n[ãa]o aceita|desconto de|fechado/i,
+          'adianta a resposta do proprietário',
+        ),
+      ],
+    },
+  },
+  {
+    id: 'D02',
+    titulo: 'FGTS e financiamento: "Vocês ajudam com a documentação do banco?"',
+    grupo: 'atender',
+    origem: 'protótipo aprovado em 25/11 (o caso da Marina)',
+    critico: true,
+    ...TERCA,
+    nome: 'Marina Costa',
+    falas: [
+      {
+        de: 'cliente',
+        antes: 6,
+        texto: 'Gostei do terreno de Pipa de 1.338 m². Quero comprar para construir.',
+      },
+      {
+        de: 'ia',
+        antes: 5,
+        texto: 'Que bom! É o terreno vizinho ao Parque Mata da Pipa, por R$ 334.500.',
+      },
+      {
+        de: 'cliente',
+        antes: 1,
+        texto: 'Vou usar FGTS e financiamento. Vocês ajudam com a documentação do banco?',
+      },
+    ],
+    espera: {
+      acoes: PASSOU,
+      naV10: { acoes: RESPONDEU, decisao: { tipo: 'pergunta', sugestoes: 2 } },
+      nunca: [
+        r(/\bajudamos\b|a gente ajuda|n[ãa]o ajudamos/i, 'responde sozinha sobre a documentação'),
+      ],
+    },
+  },
+  {
+    id: 'D03',
+    titulo: 'Permuta: "Aceita carro como parte do pagamento?"',
+    grupo: 'atender',
+    origem: 'teste do dono no localhost em 25/11',
+    critico: false,
+    ...TERCA,
+    nome: 'Beatriz Lima',
+    falas: [
+      {
+        de: 'cliente',
+        antes: 6,
+        texto: 'Oi! Qual o valor do terreno de frente para o mar em Tabatinga?',
+      },
+      {
+        de: 'ia',
+        antes: 5,
+        texto:
+          'É o terreno de 810 m² de frente para o mar, em Nísia Floresta. O valor de venda é R$ 520.000.',
+      },
+      { de: 'cliente', antes: 1, texto: 'Aceita carro como parte do pagamento?' },
+    ],
+    espera: {
+      acoes: PASSOU,
+      naV10: { acoes: RESPONDEU, decisao: { tipo: 'pergunta' } },
+      nunca: [r(/aceita sim|n[ãa]o aceita|aceitamos/i, 'responde sozinha sobre a permuta')],
+    },
+  },
+  {
+    id: 'D04',
+    titulo: '"E aí, alguma novidade?" depois do "vou repassar ao diretor"',
+    grupo: 'atender',
+    origem: 'bloco do aviso de decisão: não pede outra decisão sobre o mesmo assunto',
+    critico: false,
+    ...TERCA,
+    nome: 'Paula Freitas',
+    falas: [
+      { de: 'cliente', antes: 40, texto: 'O proprietário do terreno de Tabatinga aceita 450 mil?' },
+      { de: 'ia', antes: 39, texto: 'Entendi. Vou repassar sua proposta ao diretor e te retorno.' },
+      { de: 'cliente', antes: 1, texto: 'E aí, alguma novidade?' },
+    ],
+    espera: {
+      acoes: ['responder', 'passar_para_corretor'],
+      naV10: { acoes: RESPONDEU },
+      nunca: [
+        r(
+          /aceitou|aceitamos|aceita sim|n[ãa]o aceita|desconto de|fechado/i,
+          'adianta a resposta do proprietário',
+        ),
+      ],
     },
   },
 ];
@@ -1366,6 +1510,12 @@ export interface RespostaParaConferir {
     readonly data: string | null;
     readonly periodo: string | null;
   } | null;
+  /** A decisão que a IA pediu aos admins (v10), ou null. */
+  readonly decisao?: {
+    readonly tipo: 'proposta' | 'pergunta';
+    readonly valorProposto: number | null;
+    readonly sugestoes: number;
+  } | null;
 }
 
 export interface OpcoesDaConferencia {
@@ -1375,6 +1525,8 @@ export interface OpcoesDaConferencia {
   readonly temFoto?: boolean;
   /** A versão devolve o pedido de visita (v9)? Sem ela, `visita` não é cobrada. */
   readonly temVisita?: boolean;
+  /** A versão pede a decisão aos admins (v10)? Com ela, valem `naV10` e a decisão. */
+  readonly temDecisao?: boolean;
 }
 
 /** Vazio é acerto. Cada item diz o que falhou, para o relatório. */
@@ -1390,8 +1542,10 @@ export function conferirCasoDaBateria(
   const texto = resposta.mensagem;
   const lido = foto === null ? texto : `${texto}\n${foto.legenda}`;
 
-  if (!espera.acoes.includes(resposta.acao)) {
-    falhas.push(`ação ${resposta.acao}; esperava ${espera.acoes.join(' ou ')}`);
+  const acoes =
+    opcoes.temDecisao === true && espera.naV10 !== undefined ? espera.naV10.acoes : espera.acoes;
+  if (!acoes.includes(resposta.acao)) {
+    falhas.push(`ação ${resposta.acao}; esperava ${acoes.join(' ou ')}`);
   }
   if (
     espera.agenda !== undefined &&
@@ -1447,6 +1601,27 @@ export function conferirCasoDaBateria(
           `pede a visita de ${veio.periodo ?? 'período nenhum'}; era ${pedido.periodo ?? 'sem período'}`,
         );
     }
+  }
+  // O aviso de decisão (v10): quando responde, pede a decisão do tipo certo, com o valor
+  // dele; sem decisão no caso, pedir é falha; e a fala nunca diz "equipe" (dono, 25/11).
+  if (opcoes.temDecisao === true) {
+    const pedida = espera.naV10?.decisao;
+    const veio = resposta.decisao ?? null;
+    if (pedida !== undefined && resposta.acao === 'responder' && veio === null)
+      falhas.push('responde sem pedir a decisão aos admins');
+    if (pedida === undefined && veio !== null) falhas.push('pede decisão quando não devia');
+    if (pedida !== undefined && veio !== null) {
+      if (veio.tipo !== pedida.tipo)
+        falhas.push(`decisão do tipo ${veio.tipo}; esperava ${pedida.tipo}`);
+      if (pedida.valor !== undefined && veio.valorProposto !== pedida.valor)
+        falhas.push(
+          `o valor da proposta veio ${veio.valorProposto ?? 'vazio'}; era ${pedida.valor}`,
+        );
+      if (pedida.sugestoes !== undefined && veio.sugestoes < pedida.sugestoes)
+        falhas.push(`${veio.sugestoes} sugestões; esperava pelo menos ${pedida.sugestoes}`);
+    }
+    if (veio !== null && /(?<!\p{L})equipe(?!\p{L})/iu.test(texto))
+      falhas.push('fala em equipe ao dizer que vai verificar');
   }
   // Com a foto num caso "pode", as regras de conteúdo de sempre (o preço) não se aplicam:
   // o preço vem depois da confirmação.

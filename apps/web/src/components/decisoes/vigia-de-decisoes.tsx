@@ -57,7 +57,10 @@ function lerVistas(usuarioId: string): Set<string> | null {
 
 function gravarVistas(usuarioId: string, ids: readonly string[]): void {
   try {
-    window.localStorage.setItem(`${CHAVE_DAS_VISTAS}:${usuarioId}`, JSON.stringify(ids.slice(-200)));
+    window.localStorage.setItem(
+      `${CHAVE_DAS_VISTAS}:${usuarioId}`,
+      JSON.stringify(ids.slice(-200)),
+    );
   } catch {
     // Sem armazenamento, as vistas ficam só na memória desta aba.
   }
@@ -122,7 +125,8 @@ export function VigiaDeDecisoes({ usuarioId, ligado }: { usuarioId: string; liga
 
     const marca = `decisao:${novas.map((d) => d.id).join(',')}`;
     const comSom = somEstaLigado(usuarioId);
-    const somResolvido = comSom && somDestravado() && (outraAbaJaTocou(usuarioId, marca) || tocarSom());
+    const somResolvido =
+      comSom && somDestravado() && (outraAbaJaTocou(usuarioId, marca) || tocarSom());
     if (document.hidden || !document.hasFocus()) {
       const primeira = novas[0];
       if (primeira === undefined) return;
@@ -150,7 +154,8 @@ export function VigiaDeDecisoes({ usuarioId, ligado }: { usuarioId: string; liga
 
   // O relógio do cartão é a última leitura (a cada 30 s): "há 3 min" sem relógio próprio.
   const agora = decisoes.dataUpdatedAt;
-  const titulo = lista.length === 1 ? 'A IA precisa da sua decisão' : `${lista.length} decisões para a IA`;
+  const titulo =
+    lista.length === 1 ? 'A IA precisa da sua decisão' : `${lista.length} decisões para a IA`;
 
   return (
     <aside aria-label="Decisões para a IA" className="pointer-events-auto">
@@ -286,7 +291,9 @@ function CartaoDaDecisao({
           {proposta ? 'Proposta de valor' : 'Pergunta do cliente'}
         </span>
         <span className="ml-auto text-muted-foreground">
-          {d.situacao === 'consultando' ? 'consultando o proprietário' : haQuanto(d.criadoEm, agora)}
+          {d.situacao === 'consultando'
+            ? 'consultando o proprietário'
+            : haQuanto(d.criadoEm, agora)}
         </span>
       </div>
 
@@ -325,7 +332,8 @@ function CartaoDaDecisao({
 
       {d.respostaDaIa !== null && (
         <p className="text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">A IA já respondeu:</span> “{d.respostaDaIa}”
+          <span className="font-semibold text-foreground">A IA já respondeu:</span> “
+          {d.respostaDaIa}”
         </p>
       )}
 
@@ -453,7 +461,9 @@ function CartaoDaDecisao({
       {modo?.tipo === 'escrita' && (
         <div className="space-y-3 rounded-xl bg-muted p-3">
           <div className="space-y-1.5">
-            <Label htmlFor={`decisao-texto-${d.id}`}>O que a IA deve dizer, em poucas palavras</Label>
+            <Label htmlFor={`decisao-texto-${d.id}`}>
+              O que a IA deve dizer, em poucas palavras
+            </Label>
             <textarea
               id={`decisao-texto-${d.id}`}
               rows={3}
