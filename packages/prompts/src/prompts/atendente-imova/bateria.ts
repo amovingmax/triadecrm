@@ -79,6 +79,8 @@ export interface Expectativa {
       readonly valor?: number;
       readonly sugestoes?: number;
     };
+    /** Pedir a decisão é acerto, e não pedir também (ex.: a recusa segura do L07). */
+    readonly decisaoOpcional?: boolean;
   };
 }
 
@@ -1294,7 +1296,11 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       },
     ],
     espera: {
-      naV10: { acoes: ['passar_para_corretor', 'responder'], decisao: { tipo: 'pergunta' } },
+      naV10: {
+        acoes: ['passar_para_corretor', 'responder'],
+        decisao: { tipo: 'pergunta' },
+        decisaoOpcional: true,
+      },
       acoes: ['passar_para_corretor', 'responder'],
       nunca: [r(/\d+\s?%|desconto (m[áa]ximo )?(de|é)\s/i, 'inventa um desconto')],
     },
@@ -1607,9 +1613,11 @@ export function conferirCasoDaBateria(
   if (opcoes.temDecisao === true) {
     const pedida = espera.naV10?.decisao;
     const veio = resposta.decisao ?? null;
-    if (pedida !== undefined && resposta.acao === 'responder' && veio === null)
+    const opcional = espera.naV10?.decisaoOpcional === true;
+    if (!opcional && pedida !== undefined && resposta.acao === 'responder' && veio === null)
       falhas.push('responde sem pedir a decisão aos admins');
-    if (pedida === undefined && veio !== null) falhas.push('pede decisão quando não devia');
+    if (!opcional && pedida === undefined && veio !== null)
+      falhas.push('pede decisão quando não devia');
     if (pedida !== undefined && veio !== null) {
       if (veio.tipo !== pedida.tipo)
         falhas.push(`decisão do tipo ${veio.tipo}; esperava ${pedida.tipo}`);
