@@ -15,7 +15,9 @@
 --    Posso te passar mais informações?"
 --
 -- (`IMV-LEAD-PORTAL`, `imv_lead_portal_v1`, pedido à Meta como UTILITY em
--- 27/11/2026 com o exemplo "no terreno de 3.000 m² em Capim Macio".) O nome e o
+-- 27/11/2026 com o exemplo "no terreno de 3.000 m² em Capim Macio"; a Meta
+-- aprovou no mesmo dia como MARKETING, ~R$ 0,32 por envio, e é assim que ele
+-- nasce num banco novo.) O nome e o
 -- trecho do imóvel vêm sugeridos e a pessoa confere antes de mandar. Só sai com
 -- o clique. Se o cliente responder, a IA assume sozinha: o modelo sai como
 -- mensagem automática (`bot_fixed`), e `app.ia_atende` só deixa a conversa com
@@ -54,7 +56,7 @@ begin
   insert into public.message_templates (template_code, name, channel, category, segment, kind,
                                         language, body, variables, botoes, is_active, version)
   values ('IMV-LEAD-PORTAL', 'Chamar com a IA: lead do portal sem conversa', 'whatsapp'::app.channel,
-          'utility', 'GEN', 'lead_portal', 'pt_BR',
+          'marketing', 'GEN', 'lead_portal', 'pt_BR',
           'Olá, {{nome}}! Aqui é da Imova. Vimos seu interesse {{imovel_visto}}. Posso te passar mais informações?',
           '["imovel_visto", "nome"]'::jsonb, '[]'::jsonb, true, 1)
   on conflict (template_code) do update set is_active = true, updated_at = now();
@@ -180,6 +182,17 @@ begin
   if l.contato_apagado_em is not null then
     return 'contato_apagado';
   end if;
+  -- Clicou em "WhatsApp" no portal e, em até 30 min, chegou pelo WhatsApp um lead do
+  -- mesmo anúncio que já tem conversa: é quase certo que é a mesma pessoa, com outro
+  -- número no perfil do portal (caso real de 27/11/2026, a sala do Brisa Mall).
+  if 'CLICK_WHATSAPP' = any (coalesce(l.tipos, '{}')) and exists (
+       select 1 from public.portal_leads w
+        where w.id <> l.id and w.conversation_id is not null and w.escondido_em is null
+          and w.anuncio_id is not distinct from l.anuncio_id
+          and abs(extract(epoch from (coalesce(w.recebido_no_portal_em, w.recebido_em)
+                                      - coalesce(l.recebido_no_portal_em, l.recebido_em)))) <= 1800) then
+    return 'provavel_mesmo_contato';
+  end if;
   select nullif(btrim(k.telefone_e164), '') into v_tel from public.portal_lead_contatos k where k.lead_id = l.id;
   if v_tel is null and l.organization_id is not null then
     select d.telefone into v_tel from app.wa_destino_da_ficha(l.organization_id) d;
@@ -190,7 +203,7 @@ begin
   return null;
 end $$;
 comment on function app.chamado_impedimento(uuid) is
-  'Por que o lead do portal não pode ser chamado com a IA (nulo = pode): não existe ou foi escondido, suprimido, descartado, já tem conversa, contato apagado, sem telefone.';
+  'Por que o lead do portal não pode ser chamado com a IA (nulo = pode): não existe ou foi escondido, suprimido, descartado, já tem conversa, contato apagado, provável mesmo contato (clique em WhatsApp com lead do WhatsApp do mesmo anúncio em até 30 min), sem telefone.';
 revoke all on function app.chamado_impedimento(uuid) from public, anon, authenticated;
 grant execute on function app.chamado_impedimento(uuid) to service_role;
 

@@ -25,7 +25,7 @@ begin
   end if;
 end $$;
 
-select plan(31);
+select plan(32);
 
 insert into public.allowed_users (email, role, note) values
   ('a209@teste.local', 'admin', 'pgTAP 209'),
@@ -115,6 +115,14 @@ select pg_temp.lead('semanuncio', '{PHONE_VIEW}', null, null, 'Pedro', '+5584988
 select pg_temp.lead('semtel', '{PHONE_VIEW}', null, pg_temp.id('terreno'), 'Rui', null);
 select pg_temp.lead('descartado', '{PHONE_VIEW}', null, pg_temp.id('terreno'), 'Davi', '+5584988209005', 'descartado');
 select pg_temp.lead('suprimido', '{PHONE_VIEW}', null, pg_temp.id('terreno'), 'Sofia', '+5584988209006');
+-- O clique em "WhatsApp" seguido, no mesmo minuto, de um lead do WhatsApp com conversa
+-- (outro número): provável mesmo contato.
+select pg_temp.lead('clique', '{CLICK_WHATSAPP}', null, pg_temp.id('sala'), 'Iara', '+5584988209007');
+insert into public.conversations (channel, business_number, peer_phone_e164, status)
+values ('whatsapp'::app.channel, '+5584999920900', '+5584988209008', 'aguardando_parceiro');
+insert into public.portal_leads (origem, origin_lead_id, tipos, anuncio_id, situacao, recebido_em, conversation_id)
+values ('whatsapp', 'pgtap-209-par', '{WHATSAPP_DO_PORTAL}', pg_temp.id('sala'), 'novo', now(),
+        (select c.id from public.conversations c where c.peer_phone_e164 = '+5584988209008'));
 insert into public.suppression_list (hash, kind, reason)
 values (app.sha256_hex(app.normalize_phone_br('+5584988209006')), 'phone', 'pgTAP 209');
 
@@ -150,7 +158,7 @@ select is((select r ->> 'texto' from r209),
           'o texto sai como o cliente vai ler');
 select is((select (r ->> 'pode')::boolean from r209), false, 'sem a aprovação da Meta, não pode');
 select is((select r ->> 'motivo' from r209), 'modelo_nao_enviado', 'e diz por quê');
-select is((select r ->> 'categoria' from r209), 'utility', 'a categoria vai junto (o custo)');
+select is((select r ->> 'categoria' from r209), 'marketing', 'a categoria vai junto (o custo: a Meta aprovou como marketing)');
 select is(public.portal_lead_chamar_previa(pg_temp.id('zap')) ->> 'imovel_visto',
           'no terreno de 3.000 m² em Capim Macio, no ZAP Imóveis',
           'o terreno com a área em milhar e o portal do aviso');
@@ -236,6 +244,8 @@ select is(public.portal_lead_chamar(pg_temp.id('descartado'), 'Davi', 'no terren
           'descartado', 'lead descartado não é chamado');
 select is(public.portal_lead_chamar(pg_temp.id('suprimido'), 'Sofia', 'no terreno de Capim Macio') ->> 'motivo',
           'suprimido', 'quem pediu para não ser contatado não é chamado');
+select is(public.portal_lead_chamar(pg_temp.id('clique'), 'Iara', 'na sala comercial') ->> 'motivo',
+          'provavel_mesmo_contato', 'o clique em WhatsApp com o par do WhatsApp no mesmo minuto não é chamado');
 select is(public.portal_lead_chamar(pg_temp.id('zap'), 'Maria', 'no terreno de 3.000 m² em Capim Macio') ->> 'ok',
           'true', 'quem só viu o telefone ganha ficha e é chamado');
 select pg_temp.sair();

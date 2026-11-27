@@ -71,6 +71,8 @@ const MOTIVOS: Record<string, string> = {
   contato_suprimido: 'Essa pessoa pediu para não ser contatada.',
   descartado: 'O lead está descartado. Traga de volta antes de chamar.',
   ja_tem_conversa: 'Já existe conversa com essa pessoa: responda por ela.',
+  provavel_mesmo_contato:
+    'Parece ser a mesma pessoa que escreveu pelo WhatsApp logo depois do clique: responda pela conversa dela.',
   contato_apagado: 'O contato que o portal mandou já foi apagado.',
   organizacao_apagada: 'A ficha dessa pessoa foi excluída.',
   sem_telefone: 'O portal não mandou o telefone dessa pessoa.',
