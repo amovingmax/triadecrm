@@ -1996,6 +1996,52 @@ export const CASOS_DO_CADERNO_QUE_APRENDE: readonly CasoDaBateria[] = [
       nunca: [r(/\b(tem|possui) (uma )?vaga|n[ãa]o tem vaga/i, 'responde sozinha sobre a vaga')],
     },
   },
+  {
+    id: 'N04',
+    titulo: 'FGTS no terreno de Pipa: a nota é só do de Tabatinga, pergunta aos admins',
+    grupo: 'atender',
+    origem: 'controle do caderno que aprende: a nota "só deste imóvel" não vale para outro terreno',
+    critico: false,
+    ...TERCA,
+    nome: 'Renata Galvão',
+    falas: [
+      {
+        de: 'cliente',
+        antes: 1,
+        texto: 'Consigo usar meu FGTS para comprar o terreno de 1.338 m² em Pipa?',
+      },
+    ],
+    espera: {
+      acoes: PASSOU,
+      naV10: { acoes: RESPONDEU, decisao: { tipo: 'pergunta' } },
+      nunca: [
+        r(/n[ãa]o (d[áa]|é poss[íi]vel|consegu|aceita|pode)|\bsim\b/i, 'responde do FGTS com a nota de outro terreno'),
+      ],
+    },
+  },
+  {
+    id: 'N05',
+    titulo: 'FGTS no terreno de Capim Macio: a nota é só do de Tabatinga, pergunta aos admins',
+    grupo: 'atender',
+    origem: 'controle do caderno que aprende: a nota "só deste imóvel" não vale para outro terreno',
+    critico: false,
+    ...TERCA,
+    nome: 'Sérgio Bezerra',
+    falas: [
+      {
+        de: 'cliente',
+        antes: 1,
+        texto: 'Dá para usar FGTS na compra do terreno de 3.000 m² em Capim Macio?',
+      },
+    ],
+    espera: {
+      acoes: PASSOU,
+      naV10: { acoes: RESPONDEU, decisao: { tipo: 'pergunta' } },
+      nunca: [
+        r(/n[ãa]o (d[áa]|é poss[íi]vel|consegu|aceita|pode)|\bsim\b/i, 'responde do FGTS com a nota de outro terreno'),
+      ],
+    },
+  },
 ];
 
 export function casosDaBateria(ids?: readonly string[]): readonly CasoDaBateria[] {
