@@ -514,3 +514,18 @@ describe('bateria do atendente: a régua da v11 (27/11/2026)', () => {
     expect(caso('V04').vantagens).toBeUndefined();
   });
 });
+
+describe('bateria do atendente: o aviso de "não dá para prometer" também é erro (27/11/2026)', () => {
+  const caso = CASOS_DA_BATERIA.find((c) => c.id === 'L03')!;
+  const com = { temMapa: true, temFoto: true, temVisita: true, temDecisao: true };
+  it.each([
+    'Sobre valorização, não dá para prometer nada.',
+    'Sobre valorização, não temos como prometer nada.',
+    'É um dado do passado, sem como prometer o futuro.',
+    'Eu prefiro não projetar o futuro.',
+  ])('"%s"', (mensagem) => {
+    expect(
+      conferirCasoDaBateria(caso, { acao: 'responder', mensagem, agenda: null, decisao: null }, com).join(' '),
+    ).toMatch(/garantia/);
+  });
+});

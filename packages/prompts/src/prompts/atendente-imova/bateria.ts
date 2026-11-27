@@ -164,7 +164,7 @@ const PROMETE_VALORIZACAO = r(
   'promete valorização ou retorno',
 );
 const SEM_GARANTIA = r(
-  /n[ãa]o h[áa] (como )?garant|n[ãa]o (d[áa]|podemos|consigo|posso) (para )?garantir|sem garantia/i,
+  /n[ãa]o h[áa] (como )?garant|n[ãa]o (d[áa]|podemos|consigo|posso|temos como|tenho como) (para |como )?(garantir|prometer|projetar)|sem garantia|sem (como )?prometer|dado do passado|projetar o futuro/i,
   'diz que não há garantia de valorização (regra do dono, 27/11)',
 );
 const FORTE_SEM_VANTAGEM = r(
