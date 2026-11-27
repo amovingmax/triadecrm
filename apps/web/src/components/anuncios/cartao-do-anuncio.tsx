@@ -56,6 +56,12 @@ import {
   type TomDoEstado,
 } from './aba-dos-anuncios';
 import {
+  CarrosselDeFotos,
+  contagemDasFotos,
+  SeloDasFotos,
+  SeloDoDestaque,
+} from './carrossel-de-fotos';
+import {
   CHAVE_DOS_ANUNCIOS,
   escolherDestaque,
   excluirAnuncio,
@@ -156,18 +162,24 @@ function Preco({ texto, className }: { texto: string; className?: string }) {
 export function CartaoDoAnuncio({
   anuncio: a,
   doCanalPro,
+  caminhosDasFotos,
   podePublicar,
   plano,
   modo,
   aoAbrir,
+  aoAbrirNaFoto,
   aoSincronizar,
 }: {
   anuncio: AnuncioNaLista;
   doCanalPro: DoCanalPro | undefined;
+  /** As fotos para o carrossel da grade (`undefined` carregando, `null` sem leitura). */
+  caminhosDasFotos: string[] | null | undefined;
   podePublicar: boolean;
   plano: SituacaoDoCanalPro['plano'] | null;
   modo: ModoDaLista;
   aoAbrir: () => void;
+  /** Abre a ficha com o carrossel na foto que estava à vista no cartão. */
+  aoAbrirNaFoto: (foto: number) => void;
   aoSincronizar: () => void;
 }) {
   const cliente = useQueryClient();
@@ -440,16 +452,29 @@ export function CartaoDoAnuncio({
           aria-label={`Anúncio ${a.codigo}`}
           className="sombra-base flex h-full min-w-0 flex-col overflow-hidden rounded-xl bg-card"
         >
-          <Foto
-            modo="grade"
-            caminho={a.capa}
-            fotos={a.fotos}
-            noCanalPro={propria?.fotos ?? null}
-            apagada={excluido || estado.tom === 'fora'}
-            destaque={destaque}
-            aoAbrir={aoAbrir}
-            codigo={a.codigo}
-          />
+          {a.fotos > 1 ? (
+            <CarrosselDeFotos
+              codigo={a.codigo}
+              capa={a.capa}
+              caminhos={caminhosDasFotos}
+              fotos={a.fotos}
+              noCanalPro={propria?.fotos ?? null}
+              apagada={excluido || estado.tom === 'fora'}
+              destaque={destaque}
+              aoAbrir={aoAbrirNaFoto}
+            />
+          ) : (
+            <Foto
+              modo="grade"
+              caminho={a.capa}
+              fotos={a.fotos}
+              noCanalPro={propria?.fotos ?? null}
+              apagada={excluido || estado.tom === 'fora'}
+              destaque={destaque}
+              aoAbrir={aoAbrir}
+              codigo={a.codigo}
+            />
+          )}
 
           <div className="flex min-w-0 flex-1 flex-col gap-1.5 px-3.5 pt-3 pb-3.5">
             <div className="flex items-start gap-1.5">
@@ -648,27 +673,9 @@ function Foto({
         </span>
       )}
       {fotos > 0 ? (
-        <span
-          className={cn(
-            'absolute inline-flex items-center rounded-full bg-foreground/70 font-semibold text-background backdrop-blur-sm',
-            grade
-              ? 'bottom-2.5 left-2.5 h-[26px] gap-1.5 px-2.5 text-xs'
-              : 'bottom-1.5 left-1.5 h-5 gap-1 px-1.5 text-[11px]',
-          )}
-        >
-          <Camera className={grade ? 'size-3.5' : 'size-3'} aria-hidden="true" />
-          <span className="numerico">
-            {fotos}
-            {noCanalPro !== null && noCanalPro > fotos ? ` de ${noCanalPro}` : ''}
-          </span>
-        </span>
+        <SeloDasFotos grade={grade}>{contagemDasFotos(fotos, noCanalPro)}</SeloDasFotos>
       ) : null}
-      {grade && destaque ? (
-        <span className="absolute top-2.5 left-2.5 inline-flex h-6 items-center gap-1 rounded-full bg-menta-fundo px-2.5 text-xs font-semibold text-menta-texto">
-          <Flame className="size-3.5" aria-hidden="true" />
-          {destaque}
-        </span>
-      ) : null}
+      {grade && destaque ? <SeloDoDestaque>{destaque}</SeloDoDestaque> : null}
     </button>
   );
 }

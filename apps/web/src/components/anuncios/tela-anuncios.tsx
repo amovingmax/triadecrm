@@ -38,6 +38,7 @@ import {
   carregarAnuncios,
   carregarCaminhoDoLead,
   carregarCanalPro,
+  carregarFotosDaLista,
   carregarListaDoCanalPro,
   carregarManuais,
   CHAVE_DA_LISTA_DO_CANAL_PRO,
@@ -115,6 +116,8 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
   const [filtro, setFiltro] = useState<Filtro | null>(null);
   const [busca, setBusca] = useState('');
   const [fichaDe, setFichaDe] = useState<string | null>(null);
+  // A foto em que o carrossel da ficha abre (a que estava à vista no cartão).
+  const [fotoDaFicha, setFotoDaFicha] = useState(0);
   const [painelAberto, setPainelAberto] = useState(false);
   const [planilhaAberta, setPlanilhaAberta] = useState(false);
   const [sincronizarAberto, setSincronizarAberto] = useState(false);
@@ -161,6 +164,26 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
   const canalPro = useQuery({ queryKey: CHAVE_DO_CANAL_PRO, queryFn: carregarCanalPro });
 
   const todos = useMemo(() => consulta.data ?? [], [consulta.data]);
+  // As fotos de cada anúncio, para o carrossel do cartão (27/11/2026): uma
+  // leitura para a lista inteira, só dos que têm mais de uma foto (a capa já
+  // vem na lista).
+  const comVariasFotos = useMemo(
+    () =>
+      todos
+        .filter((a) => a.fotos > 1)
+        .map((a) => ({ id: a.id, fotos: a.fotos }))
+        .sort((x, y) => x.id.localeCompare(y.id)),
+    [todos],
+  );
+  const fotosDaLista = useQuery({
+    queryKey: [...CHAVE_DOS_ANUNCIOS, 'fotos-da-lista', comVariasFotos],
+    queryFn: () => carregarFotosDaLista(comVariasFotos),
+    enabled: modo === 'grade' && comVariasFotos.length > 0,
+  });
+  function caminhosDasFotos(id: string): string[] | null | undefined {
+    if (fotosDaLista.data) return fotosDaLista.data[id] ?? null;
+    return fotosDaLista.isError ? null : undefined;
+  }
   const ativos = useMemo(
     () => (excluidos ? (doCrm.data ?? []) : todos),
     [excluidos, doCrm.data, todos],
@@ -457,10 +480,15 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
                     key={a.id}
                     anuncio={a}
                     doCanalPro={porAnuncio.get(a.id)}
+                    caminhosDasFotos={caminhosDasFotos(a.id)}
                     podePublicar={podePublicar}
                     plano={plano}
                     modo={modo}
                     aoAbrir={() => setFichaDe(a.id)}
+                    aoAbrirNaFoto={(foto) => {
+                      setFotoDaFicha(foto);
+                      setFichaDe(a.id);
+                    }}
                     aoSincronizar={() => setSincronizarAberto(true)}
                   />
                 ))}
@@ -506,12 +534,17 @@ export function TelaAnuncios({ podePublicar }: { podePublicar: boolean }) {
       <FichaDoAnuncio
         anuncio={ficha}
         doCanalPro={ficha ? porAnuncio.get(ficha.id) : undefined}
+        fotoInicial={fotoDaFicha}
         podePublicar={podePublicar}
         aoMudar={(aberto) => {
-          if (!aberto) setFichaDe(null);
+          if (!aberto) {
+            setFichaDe(null);
+            setFotoDaFicha(0);
+          }
         }}
         aoSincronizar={() => {
           setFichaDe(null);
+          setFotoDaFicha(0);
           setSincronizarAberto(true);
         }}
       />

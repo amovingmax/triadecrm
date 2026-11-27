@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client';
 import { supabaseUrl } from '@/lib/env';
 
 import { inteiroDaLinha, type LinhaDoCanalPro } from './aba-dos-anuncios';
+import { gruposDeLeitura } from './carrossel';
 import type { Contagem, EstadoDoCaminho } from './passos-do-caminho';
 import { ocupaVagaPeloRelatorio } from './regras-do-cartao';
 import type { AnuncioDoRelatorio } from './relatorio-canal-pro';
@@ -50,6 +51,35 @@ export async function carregarAnuncios(excluidos: boolean): Promise<AnuncioNaLis
     : consulta.is('excluido_em', null).order('updated_at', { ascending: false }));
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as AnuncioNaLista[];
+}
+
+/**
+ * Os caminhos das fotos dos anúncios da lista, na ordem do portal (a primeira é
+ * a capa, como `anuncios_na_lista.capa`), para o carrossel do cartão
+ * (27/11/2026). Só os que têm mais de uma foto; em grupos que cabem no teto de
+ * linhas do PostgREST.
+ */
+export async function carregarFotosDaLista(
+  anuncios: { id: string; fotos: number }[],
+): Promise<Record<string, string[]>> {
+  const grupos = gruposDeLeitura(anuncios.filter((a) => a.fotos > 1));
+  const supabase = createClient();
+  const leituras = await Promise.all(
+    grupos.map((ids) =>
+      supabase
+        .from('anuncio_fotos')
+        .select('anuncio_id, caminho')
+        .in('anuncio_id', ids)
+        .order('posicao')
+        .order('criada_em'),
+    ),
+  );
+  const porAnuncio: Record<string, string[]> = {};
+  for (const { data, error } of leituras) {
+    if (error) throw new Error(error.message);
+    for (const f of data ?? []) (porAnuncio[f.anuncio_id] ??= []).push(f.caminho);
+  }
+  return porAnuncio;
 }
 
 export async function carregarAnuncio(id: string): Promise<{

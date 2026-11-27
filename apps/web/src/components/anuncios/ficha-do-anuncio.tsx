@@ -14,17 +14,14 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
 
 import { copiaAtiva, type DoCanalPro, estadoDoCartao, fotosQueFaltam } from './aba-dos-anuncios';
 import { BotaoDaNota, DialogoDaNota, EtiquetaDaSituacao } from './cartao-do-anuncio';
-import { carregarAnuncio, CHAVE_DOS_ANUNCIOS, urlDaFoto } from './dados';
+import { CarrosselDaFicha } from './carrossel-de-fotos';
+import { carregarAnuncio, CHAVE_DOS_ANUNCIOS } from './dados';
 import { formatarQuando } from './no-portal';
 import { formatarDia, qualidadeDoAnuncio } from './regras-do-cartao';
 import { type AnuncioNaLista, formatarPreco, precoDoAnuncio, tipoDeImovel } from './tipos';
-
-/** Quantas fotos a ficha mostra; o resto vira "+N" (todas estão no editor). */
-const FOTOS_NA_FICHA = 9;
 
 /**
  * A ficha do anúncio (18/11/2026): abre por cima da lista ao clicar no cartão.
@@ -35,12 +32,15 @@ const FOTOS_NA_FICHA = 9;
 export function FichaDoAnuncio({
   anuncio: a,
   doCanalPro,
+  fotoInicial = 0,
   podePublicar,
   aoMudar,
   aoSincronizar,
 }: {
   anuncio: AnuncioNaLista | null;
   doCanalPro: DoCanalPro | undefined;
+  /** A foto em que o carrossel abre (a que estava à vista no cartão). */
+  fotoInicial?: number;
   podePublicar: boolean;
   aoMudar: (aberto: boolean) => void;
   aoSincronizar: () => void;
@@ -55,6 +55,7 @@ export function FichaDoAnuncio({
           <Conteudo
             anuncio={a}
             doCanalPro={doCanalPro}
+            fotoInicial={fotoInicial}
             podePublicar={podePublicar}
             aoSincronizar={aoSincronizar}
           />
@@ -67,11 +68,13 @@ export function FichaDoAnuncio({
 function Conteudo({
   anuncio: a,
   doCanalPro,
+  fotoInicial,
   podePublicar,
   aoSincronizar,
 }: {
   anuncio: AnuncioNaLista;
   doCanalPro: DoCanalPro | undefined;
+  fotoInicial: number;
   podePublicar: boolean;
   aoSincronizar: () => void;
 }) {
@@ -164,33 +167,11 @@ function Conteudo({
         {detalhe.isPending ? (
           <Skeleton className="aspect-video w-full rounded-xl" />
         ) : fotos.length ? (
-          <ul className="grid grid-cols-4 gap-1.5" aria-label={`Fotos de ${a.codigo}`}>
-            {fotos.slice(0, FOTOS_NA_FICHA).map((f, i) => {
-              const resto = fotos.length - FOTOS_NA_FICHA;
-              return (
-                <li
-                  key={f.id}
-                  className={cn(
-                    'relative overflow-hidden rounded-lg bg-muted',
-                    i === 0 ? 'col-span-4 aspect-video' : 'aspect-[4/3]',
-                  )}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element -- foto do balde público */}
-                  <img
-                    src={urlDaFoto(f.caminho)}
-                    alt=""
-                    loading="lazy"
-                    className="size-full object-cover"
-                  />
-                  {i === FOTOS_NA_FICHA - 1 && resto > 0 ? (
-                    <span className="absolute inset-0 grid place-items-center bg-black/55 text-sm font-semibold text-white numerico">
-                      +{resto}
-                    </span>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
+          <CarrosselDaFicha
+            codigo={a.codigo}
+            caminhos={fotos.map((f) => f.caminho)}
+            inicial={fotoInicial}
+          />
         ) : null}
         {faltam > 0 ? (
           <div className="flex items-start gap-2.5 rounded-xl bg-morno-fundo p-3 text-sm text-morno-texto">
