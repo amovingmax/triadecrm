@@ -35,6 +35,8 @@ import { useEhCelular } from '@/components/parceiros/usar-eh-celular';
 
 import { CHAVE_DOS_ANUNCIOS } from '../dados';
 import { fraseDaRecusa } from '../tipos';
+import { BotaoChamarComIA } from './botao-chamar-com-ia';
+import { mostraChamarComIA } from './chamar-com-a-ia';
 import { assumirLead, mudarLead } from './leads-dados';
 import {
   chegouEm,
@@ -79,7 +81,8 @@ import {
  * ações são as do lead — assumir, marcar como respondido (só quem escreveu pelo
  * portal: no WhatsApp a situação muda sozinha), descartar com motivo — e os dois
  * caminhos para responder de fato, que são a conversa e a ficha do cliente.
- * Nada daqui manda mensagem.
+ * A única mensagem que sai daqui é a do "Chamar com a IA" (27/11/2026), para quem
+ * ainda não tem conversa: o modelo aprovado pelo dono, e a IA assume a resposta.
  *
  * Quem só clicou (`grupo = 'clicou'`) não tem ficha nem conversa: a folha diz
  * isso, mostra o contato que o portal mandou (apagado 90 dias depois) e deixa
@@ -241,6 +244,13 @@ function Corpo({ lead, euId, agora }: { lead: LeadDoPortal; euId: string; agora:
 
       <div className="flex flex-col gap-5 px-4 pb-4">
         <Acoes>
+          {mostraChamarComIA(lead) ? (
+            <BotaoChamarComIA
+              lead={lead}
+              nome={semNome ? null : nome}
+              disabled={ocupado !== null}
+            />
+          ) : null}
           {conversa ? (
             <Button asChild className="toque h-11 md:h-9">
               <Link href={conversa}>
@@ -304,6 +314,11 @@ function Corpo({ lead, euId, agora }: { lead: LeadDoPortal; euId: string; agora:
         {pelaConversa && !descartado && lead.situacao !== 'respondido' ? (
           <p className="-mt-3 text-xs text-muted-foreground">
             Quando alguém do time responder na conversa, o lead fica como respondido sozinho.
+          </p>
+        ) : mostraChamarComIA(lead) ? (
+          <p className="-mt-3 text-xs text-muted-foreground">
+            Ainda não há conversa de WhatsApp com essa pessoa. “Chamar com a IA” manda a primeira
+            mensagem; se ela responder, a IA continua.
           </p>
         ) : mandou && lead.organization_id && !lead.conversation_id ? (
           <p className="-mt-3 text-xs text-muted-foreground">

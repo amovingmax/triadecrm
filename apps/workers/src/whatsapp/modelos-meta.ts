@@ -79,6 +79,9 @@ export const EXEMPLOS_POR_VARIAVEL: Readonly<Record<string, string>> = {
   // A retomada da IA que atende (Imova, 11/11/2026): "no imóvel {{imovel}}", preenchido
   // pelo banco (`app.ia_retomada_imovel`).
   imovel: 'de Ponta Negra (código AP0012)',
+  // O "Chamar com a IA" (Imova, 27/11/2026): "Vimos seu interesse {{imovel_visto}}", com o
+  // artigo, preenchido por `app.chamado_imovel_visto` e conferido por quem clica.
+  imovel_visto: 'no terreno de 3.000 m² em Capim Macio',
 };
 
 export const EXEMPLO_PADRAO = 'exemplo';

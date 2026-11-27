@@ -13879,6 +13879,11 @@ export type Database = {
         Returns: Json
       }
       portal_lead_assumir: { Args: { p_id: string }; Returns: Json }
+      portal_lead_chamar: {
+        Args: { p_id: string; p_imovel_visto: string; p_nome: string }
+        Returns: Json
+      }
+      portal_lead_chamar_previa: { Args: { p_id: string }; Returns: Json }
       portal_lead_mudar: {
         Args: { p_id: string; p_motivo?: string; p_situacao: string }
         Returns: Json

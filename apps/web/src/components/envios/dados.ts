@@ -110,7 +110,9 @@ export async function buscarCumprimentos(): Promise<Modelo[]> {
  * Os outros modelos que dá para disparar: ativos, de WhatsApp e aprovados pela
  * Meta. Desde 12/11/2026 a mensagem de um disparo pode ser qualquer um deles
  * (antes, de 22/09 a 12/11, só o cumprimento). Ficam de fora os do sistema
- * (GEN-SYS-*) e os três cumprimentos, que têm a opção deles.
+ * (GEN-SYS-*), os três cumprimentos, que têm a opção deles, e o do "Chamar com a
+ * IA" (IMV-LEAD-*, 27/11/2026): ele leva o imóvel de cada lead e sai só pela
+ * ficha do lead.
  */
 export async function buscarModelos(): Promise<Modelo[]> {
   const supabase = createClient();
@@ -123,6 +125,7 @@ export async function buscarModelos(): Promise<Modelo[]> {
     .not('meta_template_name', 'is', null)
     .not('template_code', 'like', 'GEN-SYS-%')
     .not('template_code', 'like', 'GEN-ABR-OLA-%')
+    .not('template_code', 'like', 'IMV-LEAD-%')
     .order('name');
   if (error) throw new ErroDoEnvio(error.message);
   return z.array(modeloSchema).parse(data ?? []);
