@@ -662,6 +662,9 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
     ],
     espera: {
       acoes: ['responder', 'passar_para_corretor'],
+      // A nota manda passar os detalhes da documentação; com o aviso de decisão (v10), a IA
+      // confirma o que está escrito e pode pedir aos admins o resto (27/11/2026).
+      naV10: { acoes: ['responder', 'passar_para_corretor'], decisaoOpcional: true },
       deve: [r(/escritur/i, 'responde sobre a escritura')],
       nunca: [
         r(
