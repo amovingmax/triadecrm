@@ -24,11 +24,14 @@
  * KOMUNE (onde a migração não cria nada) ele registra o motivo e sai com 0,
  * sem bater ponto, para um serviço com reinício automático não virar laço.
  *
- * As vantagens: o motor que monta a lista de cada imóvel
- * (`mercado_argumentos_propor`) ainda não foi portado do protótipo
- * (`js/55-argumentos.js`). Até lá, nenhuma vantagem é proposta nem renovada
- * pelo worker, e o pós-rodada avisa isso no log. Decidido: quando portado, ele
- * roda aqui, no pós-rodada, DEPOIS da veracidade (pendência no CHANGELOG).
+ * As vantagens (19/11/2026): o motor portado do protótipo (`js/55-argumentos.js`,
+ * em `mercado/motor`) roda aqui, no pós-rodada, DEPOIS da veracidade: lê o
+ * banco de mercado, monta a lista COMPLETA de vantagens de cada imóvel e a
+ * entrega a `mercado_argumentos_propor`, que decide o que nasce proposto, o que
+ * renova sozinho (até 10%) e o que volta para aprovação. Uma falha do motor não
+ * derruba a coleta: fica no log e a próxima rodada tenta de novo.
+ *   --vantagens            roda só o motor agora (a rodada de coleta atual) e sai.
+ *   --vantagens --ensaio   o mesmo, sem gravar: imprime o que entregaria.
  */
 import { criarPulso } from '../lib/pulso';
 import {
@@ -48,9 +51,11 @@ import {
   lerRotulosBloqueados,
   motivoDoBancoErrado,
   posRodada,
+  esperarAVerificacao,
   proximosPedidos,
   type ClienteDoBanco,
 } from '../mercado/banco';
+import { rodarMotorDeVantagens } from '../mercado/motor';
 import { executarFonte, type DependenciasDaRodada, type DesfechoDaRodada } from '../mercado/rodada';
 
 import type { Logger } from '../lib/log';
@@ -58,17 +63,52 @@ import type { WorkerContext } from '../lib/context';
 
 const DESCANSO_MS = 60_000;
 
-/** O motor de vantagens ainda não roda no worker (ver o cabeçalho). */
-export const MOTOR_DE_VANTAGENS_NO_WORKER = false;
+/** O motor de vantagens roda no pós-rodada, depois da veracidade (ver o cabeçalho). */
+export const MOTOR_DE_VANTAGENS_NO_WORKER = true;
 
-/** Pós-rodada: veracidade e amostra (banco); depois, o motor de vantagens, quando existir. */
+/** O motor das vantagens, com o resumo no log. Uma falha fica no log e não derruba a coleta. */
+async function motorDasVantagens(cliente: ClienteDoBanco, logger: Logger): Promise<boolean> {
+  try {
+    const r = await rodarMotorDeVantagens(cliente, logger);
+    if (!r.ok) {
+      logger.warn('vantagens: o motor não rodou', { motivo: r.motivo ?? null });
+      return false;
+    }
+    logger.info('vantagens: o motor entregou as listas', {
+      rodada: r.rodada ?? null,
+      anuncios: r.anuncios ?? 0,
+      imoveis: r.imoveis ?? 0,
+      vantagens: r.vantagens ?? 0,
+      novos: r.novos ?? 0,
+      renovados: r.renovados ?? 0,
+      voltaram_para_aprovacao: r.voltaram_para_aprovacao ?? 0,
+      vencidos: r.vencidos ?? 0,
+      recusados: r.recusados?.length ?? 0,
+      fora: r.fora?.length ?? 0,
+    });
+    for (const x of r.recusados ?? [])
+      logger.warn('vantagens: o banco recusou uma vantagem', { ...x });
+    for (const a of r.avisos ?? []) logger.warn('vantagens: aviso da carteira', { aviso: a });
+    return true;
+  } catch (e) {
+    logger.error('vantagens: o motor falhou (a coleta da rodada continua valendo)', {
+      erro: e instanceof Error ? e.message : String(e),
+    });
+    return false;
+  }
+}
+
+/** Pós-rodada: veracidade e amostra (banco); depois, o motor de vantagens. */
 async function depoisDaRodada(cliente: ClienteDoBanco, logger: Logger): Promise<void> {
   logger.info('pós-rodada', { ...(await posRodada(cliente)) });
-  if (!MOTOR_DE_VANTAGENS_NO_WORKER) {
-    logger.warn(
-      'vantagens: o motor ainda não foi portado para o worker; nenhuma vantagem foi proposta nem renovada nesta rodada (as aprovadas vencem pela validade e voltam para aprovação)',
-    );
+  if (!MOTOR_DE_VANTAGENS_NO_WORKER) return;
+  // A veracidade roda pelo pg_cron, fora do teto de 8 s do pedido (20261125120000): o motor
+  // espera por ela, para propor só com o que a veracidade aceitou.
+  if (!(await esperarAVerificacao(cliente))) {
+    logger.warn('vantagens: a veracidade ainda não terminou depois de 20 minutos; o motor fica para a próxima rodada (ou rode --vantagens)');
+    return;
   }
+  await motorDasVantagens(cliente, logger);
 }
 
 function dormir(ms: number): Promise<void> {
@@ -108,8 +148,13 @@ export async function runMercado(ctx: WorkerContext<'mercado'>): Promise<number>
   const contato = env.COLETOR_CONTATO;
 
   const fonteAvulsa = typeof opcoes.fonte === 'string' ? opcoes.fonte : null;
-  if (opcoes.ensaio === true && !fonteAvulsa) {
-    logger.error('--ensaio precisa de --fonte=<id>: o ensaio é de uma fonte só');
+  const soVantagens = opcoes.vantagens === true;
+  if (soVantagens && fonteAvulsa) {
+    logger.error('--vantagens não se junta com --fonte: o motor roda sobre a rodada inteira');
+    return 2;
+  }
+  if (opcoes.ensaio === true && !fonteAvulsa && !soVantagens) {
+    logger.error('--ensaio precisa de --fonte=<id> ou --vantagens');
     return 2;
   }
 
@@ -118,6 +163,15 @@ export async function runMercado(ctx: WorkerContext<'mercado'>): Promise<number>
   if (bancoErrado) {
     logger.warn('worker-mercado não sobe neste banco', { motivo: bancoErrado });
     return 0;
+  }
+
+  if (soVantagens) {
+    if (opcoes.ensaio === true) {
+      const r = await rodarMotorDeVantagens(cliente, logger, { ensaio: true });
+      process.stdout.write(`${JSON.stringify(r, null, 2)}\n`);
+      return r.ok ? 0 : 1;
+    }
+    return (await motorDasVantagens(cliente, logger)) ? 0 : 1;
   }
 
   if (fonteAvulsa) {

@@ -599,10 +599,10 @@ describe('a busca no mapa (v7, 23/11/2026): só com o mapa no worker', () => {
     expect(pedidos[0]?.ferramentas.map((f) => f.nome)).toEqual(['buscar_no_mapa']);
     expect(pedidos[0]?.sistema).toContain('A BUSCA NO MAPA:');
     const runs = montado.banco.tabelas.ai_runs as Record<string, unknown>[];
-    expect(runs.map((x) => x.prompt_version)).toEqual(['atendente-imova@v10', 'atendente-imova@v10']);
+    expect(runs.map((x) => x.prompt_version)).toEqual(['atendente-imova@v11', 'atendente-imova@v11']);
     expect(montado.chamadas('ia_atendente_enviar_link')[0]).toMatchObject({
       p_ai_run_id: runs[1]?.id,
-      p_prompt_version: 'atendente-imova@v10',
+      p_prompt_version: 'atendente-imova@v11',
     });
     expect(montado.pedidos).toHaveLength(0);
   });
@@ -663,7 +663,7 @@ describe('a foto para confirmar o imóvel (v8, 24/11/2026)', () => {
       p_imovel_codigo: 'TE0004_IMOVA',
       p_media_path: m.banco.uploads[0]?.caminho,
       p_legenda: 'É este aqui que você viu?',
-      p_prompt_version: 'atendente-imova@v10',
+      p_prompt_version: 'atendente-imova@v11',
     });
   });
 
@@ -806,7 +806,7 @@ describe('o pedido de visita (v9, 24/11/2026)', () => {
       p_data: '2026-11-26',
       p_periodo: 'manha',
       p_como_disse: 'quinta de manhã',
-      p_prompt_version: 'atendente-imova@v10',
+      p_prompt_version: 'atendente-imova@v11',
     });
     // Sem hora nas palavras do cliente, a chamada é a de antes (sem `p_hora`).
     expect(m.chamadas('ia_atendente_pedir_visita')[0]).not.toHaveProperty('p_hora');
@@ -917,7 +917,7 @@ describe('o aviso de decisão (v10, 25/11/2026)', () => {
       p_valor_proposto: 450000,
       p_sugestoes: [],
       p_resposta_da_ia: FALA,
-      p_prompt_version: 'atendente-imova@v10',
+      p_prompt_version: 'atendente-imova@v11',
     });
   });
 

@@ -30,7 +30,7 @@ const CONTATO = {
 
 describe('atendente-imova@v9', () => {
   it('deu lugar à v10 (25/11/2026, o aviso de decisão) e continua no catálogo; a v8 também', () => {
-    expect(VIGENTES['atendente-imova']).toBe(10);
+    expect(VIGENTES['atendente-imova']).toBe(11);
     expect(promptVigente('atendente-imova')).not.toBe(v9);
     expect(obterPrompt('atendente-imova', 9)).toBe(v9);
     expect(obterPrompt('atendente-imova', 8)).toBe(v8);

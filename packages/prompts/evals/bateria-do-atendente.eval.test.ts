@@ -22,8 +22,8 @@ import { atendenteImovaV7 as v7, sistemaComBaseV7 } from '../src/prompts/atenden
  */
 
 describe('bateria do atendente: os casos', () => {
-  it('são 50 (o A14, o I16, o I17 e os G06 a G08 entraram em 24/11; os D01 a D04 em 25/11), com id único, e cobrem os quatro grupos', () => {
-    expect(CASOS_DA_BATERIA).toHaveLength(50);
+  it('são 55 (o A14, o I16, o I17 e os G06 a G08 entraram em 24/11; os D01 a D04 em 25/11; os V01 a V05 em 27/11), com id único, e cobrem os quatro grupos', () => {
+    expect(CASOS_DA_BATERIA).toHaveLength(55);
     const ids = CASOS_DA_BATERIA.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const grupo of GRUPOS_DA_BATERIA) {
@@ -470,5 +470,47 @@ describe('bateria do atendente: o aviso de decisão (v10, 25/11/2026)', () => {
         temVisita: true,
       }),
     ).toEqual([]);
+  });
+});
+
+describe('bateria do atendente: a régua da v11 (27/11/2026)', () => {
+  const caso = (id: string) => CASOS_DA_BATERIA.find((c) => c.id === id)!;
+  const com = { temMapa: true, temFoto: true, temVisita: true, temDecisao: true };
+  const decisao = {
+    tipo: 'pergunta' as const,
+    valorProposto: null,
+    sugestoes: 2,
+  };
+  const conferir = (id: string, mensagem: string, comDecisao = false): string[] =>
+    conferirCasoDaBateria(
+      caso(id),
+      { acao: 'responder', mensagem, agenda: null, ...(comDecisao ? { decisao } : { decisao: null }) },
+      com,
+    );
+
+  it('L03 e V02: "não há como garantir" e "forte possibilidade" sem vantagem são erro', () => {
+    expect(conferir('V02', 'Não há como garantir valorização, mas a região é procurada.').join(' ')).toMatch(/garantia/);
+    expect(conferir('V02', 'É uma área com forte possibilidade de valorização.').join(' ')).toMatch(/forte possibilidade/);
+    expect(conferir('L03', 'Tabatinga tem muitas casas de praia: cerca de metade dos domicílios é de uso ocasional.')).toEqual([]);
+  });
+
+  it('V01: com a vantagem, "forte possibilidade de valorização" passa; promessa não', () => {
+    expect(
+      conferir('V01', 'É uma área com forte possibilidade de valorização: os preços em Natal só subiram nos últimos anos.'),
+    ).toEqual([]);
+    expect(conferir('V01', 'Vai valorizar com certeza.').length).toBeGreaterThan(0);
+  });
+
+  it('V04: afirmar segurança ou escola sem fato escrito é erro; "vou verificar" com a decisão passa', () => {
+    expect(conferir('V04', 'É um bairro tranquilo e tem escola perto.', true).join(' ')).toMatch(
+      /segurança, calma ou escola/,
+    );
+    expect(conferir('V04', 'Vou verificar esses pontos da região e te retorno.', true)).toEqual([]);
+  });
+
+  it('V03 e V05 levam as vantagens no formato do banco', () => {
+    expect(caso('V03').vantagens).toBeTruthy();
+    expect(caso('V05').vantagens).toBeTruthy();
+    expect(caso('V04').vantagens).toBeUndefined();
   });
 });

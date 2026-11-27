@@ -21,6 +21,7 @@ import {
   type ColunaAdmin,
 } from './estados';
 import { CHAVE_DO_MERCADO, carregarMercado, liberarFonte, ligarColeta } from './mercado-dados';
+import { BlocoDasVantagens } from './painel-mercado-vantagens';
 import {
   CONSEQUENCIA_DE_DESLIGAR,
   CONSEQUENCIA_DE_LIGAR,
@@ -56,7 +57,9 @@ import {
  * como todo Ajustes).
  *
  * O dono libera as fontes e liga a coleta com o PRÓPRIO login: até aqui, as duas
- * coisas só mudavam por SQL. Duas partes:
+ * coisas só mudavam por SQL. Entre as duas, desde a etapa 6, as VANTAGENS PARA A IA:
+ * o dono aprova por imóvel o que a IA pode contar aos clientes
+ * (`painel-mercado-vantagens.tsx`). Coleta e fontes:
  *   - COLETA: ligada ou desligada, quem mudou e quando, a última rodada e a próxima,
  *     e o botão que liga ou desliga (`public.mercado_coleta_ligar`);
  *   - FONTES: as 55 da auditoria, por grupo, com o veredito em palavras simples, a
@@ -149,6 +152,7 @@ export function PainelMercado() {
         aoAtualizar={() => void consulta.refetch()}
         aoDecidir={() => abrir({ tipo: 'coleta', ligar: !ligada })}
       />
+      <BlocoDasVantagens dados={dados} ligada={ligada} nomeDe={nomeDe} />
       <BlocoDasFontes
         dados={dados}
         nomeDe={nomeDe}

@@ -149,6 +149,42 @@ export {
 } from './prompts/atendente-imova/v10';
 
 export {
+  BLOCO_DAS_VANTAGENS,
+  BLOCO_DO_QUE_O_CLIENTE_BUSCA,
+  type SistemaDaV11,
+  atendenteImovaV11,
+  montarSistemaV11,
+  sistemaComBaseV11,
+  vantagemDoMotivo,
+} from './prompts/atendente-imova/v11';
+
+export {
+  MOMENTOS_DE_MERCADO,
+  NOMES_DOS_MOMENTOS,
+  NOMES_DOS_PERFIS,
+  NOMES_DOS_SINAIS,
+  PERFIS_DO_CLIENTE,
+  SINAIS_DE_MERCADO,
+  TETO_DE_VANTAGENS_POR_IMOVEL,
+  TETO_DO_NAO_USE,
+  type BlocoDeVantagens,
+  type DescartadaDoBloco,
+  type MomentoDeMercado,
+  type OpcoesDoBloco,
+  type PerfilDoCliente,
+  type SinalDeMercado,
+  type VantagemDeMercado,
+  type VantagemNoBloco,
+  type VantagensDeMercado,
+  type VantagensDoImovel,
+  eValorizacao,
+  lerVantagensDoBanco,
+  mesPorExtenso,
+  montarVantagens,
+  perfisDaVantagem,
+} from './prompts/atendente-imova/vantagens-de-mercado';
+
+export {
   type EntradaDaRespostaDaDecisao,
   type SaidaDaRespostaDaDecisao,
   motivoParaNaoMandarDaDecisao,

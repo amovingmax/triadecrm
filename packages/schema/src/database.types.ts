@@ -645,6 +645,10 @@ export type Database = {
         Returns: Json
       }
       ia_uuid: { Args: { p_texto: string }; Returns: string }
+      ia_vantagens_de_mercado: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
       importacao_canal: {
         Args: { t: string }
         Returns: Database["app"]["Enums"]["channel"]
@@ -802,6 +806,7 @@ export type Database = {
         Returns: string[]
       }
       mercado_hoje: { Args: Record<PropertyKey, never>; Returns: string }
+      mercado_ia_clientes: { Args: Record<PropertyKey, never>; Returns: boolean }
       mercado_ligado: { Args: Record<PropertyKey, never>; Returns: boolean }
       mercado_limpar_texto: { Args: { p_texto: string }; Returns: string }
       mercado_liquidez: {
@@ -13717,6 +13722,10 @@ export type Database = {
       }
       mercado_fonte_liberar: {
         Args: { p_fonte: string; p_liberar: boolean; p_motivo: string }
+        Returns: Json
+      }
+      mercado_ia_clientes_ligar: {
+        Args: { p_ligar: boolean; p_motivo: string }
         Returns: Json
       }
       mercado_liquidez: {

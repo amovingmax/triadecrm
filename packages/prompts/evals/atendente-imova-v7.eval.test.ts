@@ -27,7 +27,7 @@ const CONTATO = { leadId: 'lead-21', nome: 'Alinne Fernandes', empresa: null, te
 
 describe('atendente-imova@v7', () => {
   it('deu lugar à v8 (24/11/2026) e continua no catálogo; a v6 também, sem ferramenta', () => {
-    expect(VIGENTES['atendente-imova']).toBe(10);
+    expect(VIGENTES['atendente-imova']).toBe(11);
     expect(obterPrompt('atendente-imova', 7)).toBe(v7);
     expect(obterPrompt('atendente-imova', 6)).toBe(v6);
     expect(v6.ferramentas).toBeUndefined();

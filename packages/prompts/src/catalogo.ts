@@ -8,6 +8,7 @@ import { atendenteImovaV7 } from './prompts/atendente-imova/v7';
 import { atendenteImovaV8 } from './prompts/atendente-imova/v8';
 import { atendenteImovaV9 } from './prompts/atendente-imova/v9';
 import { atendenteImovaV10 } from './prompts/atendente-imova/v10';
+import { atendenteImovaV11 } from './prompts/atendente-imova/v11';
 import { fotoDoAnuncioV1 } from './prompts/foto-do-anuncio/v1';
 import { avaliacaoDoAtendimentoV1 } from './prompts/avaliacao-do-atendimento/v1';
 import { avaliacaoDoAtendimentoV2 } from './prompts/avaliacao-do-atendimento/v2';
@@ -74,6 +75,7 @@ export const CATALOGO = {
     8: atendenteImovaV8,
     9: atendenteImovaV9,
     10: atendenteImovaV10,
+    11: atendenteImovaV11,
   },
   // Só da Imova (09/11/2026): de qual anúncio é a foto que o cliente mandou.
   'foto-do-anuncio': { 1: fotoDoAnuncioV1 },
@@ -150,7 +152,10 @@ export const VIGENTES = {
   // v10 desde 25/11/2026: a v9 com o aviso de decisão (`decisao`): na proposta de valor e
   // na pergunta que só a Imova responde, a IA diz "vou verificar", não passa a conversa e
   // pede a decisão aos admins. Voltar à v9 é trocar este número e o import do worker.
-  'atendente-imova': 10,
+  // v11 desde 27/11/2026: a v10 com O QUE O CLIENTE BUSCA, A VALORIZAÇÃO (nunca "não há
+  // como garantir valorização") e AS VANTAGENS DE MERCADO aprovadas (só onde a porteira
+  // `mercado.ia_clientes` está aberta). Voltar à v10 é trocar este número.
+  'atendente-imova': 11,
   'foto-do-anuncio': 1,
   // v2 desde 09/11/2026: a juíza diz também a lacuna, onde a IA que atende falhou no
   // dia, para o relatório contar por tema. Voltar é trocar este número.

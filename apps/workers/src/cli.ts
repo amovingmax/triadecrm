@@ -24,7 +24,7 @@ export const OPCOES_POR_COMANDO: Record<WorkerCommand, readonly string[]> = {
     'casos',
   ],
   rotas: ['uma-vez', 'geocodificar'],
-  mercado: ['uma-vez', 'fonte', 'ensaio'],
+  mercado: ['uma-vez', 'fonte', 'ensaio', 'vantagens'],
 };
 
 export const USAGE = `Uso: workers <comando> [opções]
@@ -55,7 +55,7 @@ Opções de "ai":
                          Manda os cenários da IA que atende (a visita pelo link) ao modelo
                          de verdade, confere cada resposta e imprime o que errou e o custo.
                          Conversas de mentira: nada sai para cliente nenhum.
-  --ensaio=bateria [--versao=10] [--repeticoes=1] [--teto=8] [--juiza=nao] [--casos=I01,A04]
+  --ensaio=bateria [--versao=11] [--repeticoes=1] [--teto=8] [--juiza=nao] [--casos=I01,A04]
                          Os 40 casos da bateria (conversas reais e regras do caderno) com a
                          base de PRODUÇÃO, pelo caminho da IA que atende; cada resposta passa
                          pela régua e pela IA avaliadora. Para no teto (US$, até 20). Imprime
@@ -83,6 +83,9 @@ Opções de "mercado":
                          gravaria. Serve para conferir um coletor. Com a chave mercado.ligado
                          desligada, ou com a mesma fonte rodando, não roda (nenhum pedido sai).
                          Num banco que não é o da Imova, o worker sai sem fazer nada.
+  --vantagens            Roda só o motor das vantagens sobre a rodada de coleta atual (o mesmo
+                         do pós-rodada): entrega a lista de cada imóvel ao banco e sai.
+  --vantagens --ensaio   O mesmo, sem gravar nada: imprime o que entregaria a cada imóvel.
 
 Opções gerais:
   -h, --help   Mostra esta ajuda

@@ -240,12 +240,14 @@ describe('preços e conta por chamada', () => {
         // prefixo (regras, caderno e imóveis) lido do cache.
         id: 'atendente-imova',
         modelo: 'claude-haiku-5-5',
-        // 6.219 desde a v10 (25/11/2026): o bloco do aviso de decisão.
-        tokensDeSistema: 6219,
+        // 6.219 desde a v10 (25/11/2026): o bloco do aviso de decisão. 8.150 desde a v11
+        // (27/11/2026), contando as regras das vantagens de mercado, que só vão quando há
+        // vantagem aprovada na conversa; sem elas, o sistema da v11 fica perto de 6.800.
+        tokensDeSistema: 8150,
         tokensDaMensagem: 165,
         tokensDeSaida: 123,
-        semCache: 0.0007,
-        comCache: 0.00014,
+        semCache: 0.00089,
+        comCache: 0.00016,
       },
       {
         // De qual anúncio é a foto do cliente (09/11/2026, Imova). A conta mede só o

@@ -236,6 +236,37 @@ export function posRodada(cliente: ClienteDoBanco): Promise<Record<string, unkno
   return rpc<Record<string, unknown>>(cliente, 'mercado_pos_rodada', {});
 }
 
+/**
+ * A veracidade roda pelo pg_cron, fora do pedido (migração 20261125120000): o fechamento da
+ * coleta e o pós-rodada só a pedem. `pendente` diz se ainda há pedido esperando.
+ */
+export interface EstadoDaVerificacao {
+  pendente: boolean;
+  ultima_fim?: string | null;
+  ultimo_erro?: string | null;
+}
+
+export function estadoDaVerificacao(cliente: ClienteDoBanco): Promise<EstadoDaVerificacao> {
+  return rpc<EstadoDaVerificacao>(cliente, 'mercado_verificacao_estado', {});
+}
+
+/**
+ * Espera a veracidade pedida terminar (o pg_cron passa a cada 5 minutos), conferindo a cada
+ * `intervaloMs`, até `limiteMs`. Devolve true quando não há mais pedido esperando.
+ */
+export async function esperarAVerificacao(
+  cliente: ClienteDoBanco,
+  { intervaloMs = 30_000, limiteMs = 20 * 60_000, dormir = (ms: number) => new Promise<void>((r) => setTimeout(r, ms)) } = {},
+): Promise<boolean> {
+  const fim = Date.now() + limiteMs;
+  for (;;) {
+    const e = await estadoDaVerificacao(cliente);
+    if (!e.pendente) return true;
+    if (Date.now() + intervaloMs > fim) return false;
+    await dormir(intervaloMs);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // O gravador de verdade
 // ---------------------------------------------------------------------------

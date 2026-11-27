@@ -79,7 +79,7 @@ export const ABAS: readonly {
     id: 'mercado',
     rotulo: 'Inteligência de mercado',
     descricao:
-      'De onde vêm os números do mercado: quais fontes o robô pode ler e se a coleta de segunda e quinta está ligada.',
+      'De onde vêm os números do mercado: se a coleta de segunda e quinta está ligada, que vantagens de cada imóvel a IA pode contar e quais fontes o robô pode ler.',
     modulo: 'inteligenciaMercado',
   },
   {

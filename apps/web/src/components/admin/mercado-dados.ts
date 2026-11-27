@@ -86,6 +86,19 @@ function lerResposta(data: unknown, error: { code?: string } | null): ResultadoD
   return { ok: true, mudou: r.mudou !== false };
 }
 
+/**
+ * Liga ou desliga "a IA usa as vantagens com clientes" (`public.mercado_ia_clientes_ligar`,
+ * migração 20261127151000): desligada, a IA só recebe as vantagens nas conversas de treino.
+ */
+export async function ligarIaClientes(ligar: boolean, motivo: string): Promise<ResultadoDoMercado> {
+  const args: Funcoes['mercado_ia_clientes_ligar']['Args'] = {
+    p_ligar: ligar,
+    p_motivo: motivo.trim(),
+  };
+  const { data, error } = await createClient().rpc('mercado_ia_clientes_ligar', args);
+  return lerResposta(data, error);
+}
+
 export async function ligarColeta(ligar: boolean, motivo: string): Promise<ResultadoDoMercado> {
   const args: ArgsDeLigar = { p_ligar: ligar, p_motivo: motivo.trim() };
   const { data, error } = await createClient().rpc('mercado_coleta_ligar', args);

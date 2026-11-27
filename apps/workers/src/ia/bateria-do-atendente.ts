@@ -36,10 +36,12 @@ import {
   atendenteImovaV8,
   atendenteImovaV9,
   atendenteImovaV10,
+  atendenteImovaV11,
   avaliacaoDoAtendimentoV2,
   casosDaBateria,
   conferirCasoDaBateria,
   entradaDoCaso,
+  lerVantagensDoBanco,
   quandoDaFala,
   reidratar,
   sistemaComBaseV6,
@@ -47,6 +49,7 @@ import {
   sistemaComBaseV8,
   sistemaComBaseV9,
   sistemaComBaseV10,
+  sistemaComBaseV11,
 } from '@komune/prompts';
 
 import { ErroDaEsteira } from '../fila/esteira';
@@ -70,8 +73,11 @@ import {
 const AVISO_PADRAO = 'Vou verificar isso direitinho e já te retorno por aqui.';
 
 export interface OpcoesDaBateria {
-  /** 10 (vigente: o aviso de decisão), 9 (pedido de visita), 8 (foto), 7 (mapa) ou 6 (sem mapa). */
-  readonly versao: 6 | 7 | 8 | 9 | 10;
+  /**
+   * 11 (vigente: o que o cliente busca, a valorização e as vantagens de mercado), 10 (o
+   * aviso de decisão), 9 (pedido de visita), 8 (foto), 7 (mapa) ou 6 (sem mapa).
+   */
+  readonly versao: 6 | 7 | 8 | 9 | 10 | 11;
   /** Quantas vezes cada caso roda (a IA não responde sempre igual). */
   readonly repeticoes: number;
   /** Teto da rodada inteira, em US$, conferido antes de cada caso. */
@@ -271,7 +277,9 @@ export async function rodarBateria(
   const prompt: PromptVersionado<
     EntradaDoAtendenteV6,
     SaidaDoAtendenteV6 | SaidaDoAtendenteV8 | SaidaDoAtendenteV9 | SaidaDoAtendenteV10
-  > = comDecisao
+  > = opcoes.versao >= 11
+    ? { ...atendenteImovaV11, modelo, sistema: sistemaComBaseV11(base) }
+    : comDecisao
     ? { ...atendenteImovaV10, modelo, sistema: sistemaComBaseV10(base) }
     : comVisita
       ? { ...atendenteImovaV9, modelo, sistema: sistemaComBaseV9(base) }
@@ -297,6 +305,17 @@ export async function rodarBateria(
         break rodadas;
       }
       const entrada = entradaDoCaso(caso);
+      // As vantagens de mercado do caso (v11, 27/11/2026): o sistema com o bloco, como o
+      // worker monta quando a porteira está aberta. Sem elas, o prompt da rodada.
+      const doCaso =
+        opcoes.versao >= 11 && caso.vantagens !== undefined
+          ? {
+              ...prompt,
+              sistema: sistemaComBaseV11(base, lerVantagensDoBanco(caso.vantagens), {
+                hoje: caso.agora.slice(0, 10),
+              }),
+            }
+          : prompt;
       const contato = { leadId: entrada.leadId, nome: caso.nome, empresa: null };
       let custo = 0;
       // O que a IA procurou no mapa nesta resposta (a própria ferramenta anota).
@@ -306,7 +325,7 @@ export async function rodarBateria(
           busca !== undefined
             ? await executarComFerramentas(
                 contexto,
-                prompt,
+                doCaso,
                 entrada,
                 contato,
                 {},
@@ -325,7 +344,7 @@ export async function rodarBateria(
                 },
                 { maxVoltas: MAX_VOLTAS_DO_ATENDENTE },
               )
-            : await executar(contexto, prompt, entrada, contato, {});
+            : await executar(contexto, doCaso, entrada, contato, {});
         custo += executada.custoUsd;
         const saida = executada.saida;
         const mensagem = semOCalendlyNoTexto(

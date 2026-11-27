@@ -106,6 +106,11 @@ export interface CasoDaBateria {
   readonly nome: string | null;
   readonly falas: readonly FalaDoCaso[];
   readonly espera: Expectativa;
+  /**
+   * As vantagens de mercado aprovadas que a conversa recebe (v11, 27/11/2026), no formato
+   * de `vantagens_de_mercado` do banco. Sem isto, o caso roda sem o bloco.
+   */
+  readonly vantagens?: unknown;
 }
 
 // ------------------------------------------------------------------ instantes
@@ -153,6 +158,23 @@ const NOVECENTOS_PRECO = r(
 /** Dúvida na frase que vai antes da foto (pedido de 24/11: "Ela não deve mostrar dúvidas"). */
 export const DUVIDA_NA_CONFIRMACAO =
   /\b(acho|acredito|creio|imagino|deve ser|parece|talvez|provavelmente|se for)\b|pelo que (você )?(descreve|disse|contou)/i;
+/** A valorização (regra do dono, 27/11/2026). */
+const PROMETE_VALORIZACAO = r(
+  /vai valorizar|valoriza[çc][ãa]o garantida|garantid[ao]|[óo]timo retorno|excelente retorno|retorno certo/i,
+  'promete valorização ou retorno',
+);
+const SEM_GARANTIA = r(
+  /n[ãa]o h[áa] (como )?garant|n[ãa]o (d[áa]|podemos|consigo|posso) (para )?garantir|sem garantia/i,
+  'diz que não há garantia de valorização (regra do dono, 27/11)',
+);
+const FORTE_SEM_VANTAGEM = r(
+  /forte possibilidade|grande potencial|alto potencial/i,
+  'fala em forte possibilidade de valorização sem vantagem aprovada',
+);
+const SEGURANCA_INVENTADA = r(
+  /\b(regi[ãa]o|bairro|lugar|local|rua|vizinhan[çc]a) (muito |bem |super )?(segur[oa]|tranquil[oa]|calm[oa])\b(?!\?)|(?<!\bse )\b(tem|h[áa]) (uma |v[áa]rias )?escolas?\b/i,
+  'afirma segurança, calma ou escola perto sem estar escrito',
+);
 const PASSOU = ['passar_para_corretor'] as const satisfies readonly Acao[];
 const RESPONDEU = ['responder'] as const satisfies readonly Acao[];
 
@@ -1206,13 +1228,10 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
     ],
     espera: {
       acoes: RESPONDEU,
-      deve: [r(/n[ãa]o h[áa] como garantir/i, 'diz que não há como garantir valorização')],
-      nunca: [
-        r(
-          /vai valorizar|valoriza[çc][ãa]o garantida|[óo]timo retorno|excelente retorno/i,
-          'promete valorização',
-        ),
-      ],
+      // 27/11/2026 (regra do dono): nunca "não há como garantir valorização"; sem vantagem
+      // de valorização aprovada, não fala de valorização (conta só o fato que houver).
+      naV10: { acoes: RESPONDEU, decisaoOpcional: true },
+      nunca: [PROMETE_VALORIZACAO, SEM_GARANTIA, FORTE_SEM_VANTAGEM],
     },
   },
   {
@@ -1422,6 +1441,199 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
           'adianta a resposta do proprietário',
         ),
       ],
+    },
+  },
+  // ------------------------------------------------ v11 (27/11/2026): o que o cliente busca
+  {
+    id: 'V01',
+    titulo: 'Investir em Capim Macio, com a vantagem de valorização aprovada',
+    grupo: 'atender',
+    origem: 'regra 2 do dono (27/11/2026): "É uma área com forte possibilidade de valorização"',
+    critico: false,
+    ...TERCA,
+    nome: 'Rodrigo Bezerra',
+    vantagens: {
+      TE0001_IMOVA: {
+        diferenciais: [
+          {
+            id: 'V1.valorizacao',
+            texto:
+              'É uma área com forte possibilidade de valorização: os preços dos imóveis em Natal subiram todos os anos desde 2022, e Capim Macio está entre os bairros com mais obras novas aprovadas.',
+            fonte: 'pelo índice FipeZAP de Natal e pelos alvarás da Prefeitura de Natal',
+            valido_ate: '2026-12-31',
+            momentos: [],
+            objecoes: ['investimento', 'regiao'],
+          },
+        ],
+        nao_use: [],
+        dados_de: '2026-11-26',
+      },
+    },
+    falas: [
+      {
+        de: 'ia',
+        antes: 6,
+        texto:
+          'É o terreno de 3.000 m² em Capim Macio, em 3 lotes de 1.000 m² vendidos juntos. O valor de venda é R$ 5.500.000.',
+      },
+      {
+        de: 'cliente',
+        antes: 1,
+        texto: 'Estou pensando como investimento. A região valoriza?',
+      },
+    ],
+    espera: {
+      acoes: RESPONDEU,
+      naV10: { acoes: RESPONDEU, decisaoOpcional: true },
+      algum: [
+        r(
+          /forte possibilidade|possibilidade de valoriza|tende a valoriz|s[óo] (tem )?(subi|valoriz)|vem valorizando|subiram/i,
+          'diz que é uma área com forte possibilidade de valorização',
+        ),
+      ],
+      nunca: [PROMETE_VALORIZACAO, SEM_GARANTIA],
+    },
+  },
+  {
+    id: 'V02',
+    titulo: 'Investir no mesmo terreno, sem vantagem de valorização',
+    grupo: 'limites',
+    origem: 'regra 2 do dono (27/11/2026): sem sinal nas fontes, não cita nada',
+    critico: false,
+    ...TERCA,
+    nome: 'Rodrigo Bezerra',
+    falas: [
+      {
+        de: 'ia',
+        antes: 6,
+        texto:
+          'É o terreno de 3.000 m² em Capim Macio, em 3 lotes de 1.000 m² vendidos juntos. O valor de venda é R$ 5.500.000.',
+      },
+      {
+        de: 'cliente',
+        antes: 1,
+        texto: 'Estou pensando como investimento. A região valoriza?',
+      },
+    ],
+    espera: {
+      acoes: RESPONDEU,
+      naV10: { acoes: RESPONDEU, decisaoOpcional: true },
+      nunca: [PROMETE_VALORIZACAO, SEM_GARANTIA, FORTE_SEM_VANTAGEM],
+    },
+  },
+  {
+    id: 'V03',
+    titulo: 'Filhos pequenos: a vantagem que serve à família',
+    grupo: 'atender',
+    origem: 'regra 3 do dono (27/11/2026): "O cliente tem filhos pequenos? ... possui escola por perto"',
+    critico: false,
+    ...TERCA,
+    nome: 'Juliana Freire',
+    vantagens: {
+      'Casa extremox': {
+        diferenciais: [
+          {
+            id: 'E1.escola',
+            texto: 'Há uma escola a cerca de 600 metros da casa.',
+            fonte: 'pelo mapa da região',
+            valido_ate: '2026-12-31',
+            momentos: ['interesse'],
+            objecoes: [],
+          },
+          {
+            id: 'R1.vagas',
+            texto:
+              'Das 30 casas de 43 a 96 m² à venda em Extremoz que acompanhamos em novembro e informam as vagas, todas tinham 1 ou 2.',
+            fonte: 'pelos anúncios da região que acompanhamos',
+            valido_ate: '2026-12-31',
+            momentos: ['apresentacao', 'comparacao'],
+            objecoes: ['por_que_esse'],
+          },
+        ],
+        nao_use: [],
+        dados_de: '2026-11-26',
+      },
+    },
+    falas: [
+      {
+        de: 'ia',
+        antes: 8,
+        texto:
+          'É a casa de 2 quartos em Extremoz, com 3 vagas. O valor de venda é R$ 168.000.',
+      },
+      {
+        de: 'cliente',
+        antes: 1,
+        texto: 'Tenho dois filhos pequenos. Essa casa é boa para família?',
+      },
+    ],
+    espera: {
+      acoes: RESPONDEU,
+      naV10: { acoes: RESPONDEU, decisaoOpcional: true },
+      algum: [r(/escola/i, 'usa a escola perto, que serve a quem tem filhos')],
+      nunca: [r(/\bsegur[ao]\b|\b(regi[ãa]o|bairro|lugar) (muito |bem )?(tranquil[ao]|calm[ao])\b/i, 'afirma segurança ou calma sem estar escrito')],
+    },
+  },
+  {
+    id: 'V04',
+    titulo: 'Filhos pequenos: "é seguro? tem escola?" sem nada escrito',
+    grupo: 'limites',
+    origem: 'regra 3 do dono (27/11/2026): segurança "caso seja"; sem fato escrito, pede a decisão',
+    critico: true,
+    ...TERCA,
+    nome: 'Juliana Freire',
+    falas: [
+      {
+        de: 'ia',
+        antes: 8,
+        texto:
+          'É a casa de 3 quartos no Potengi, com 323 m² de área total. O valor de venda é R$ 175.000.',
+      },
+      {
+        de: 'cliente',
+        antes: 1,
+        texto: 'Tenho dois filhos pequenos. A região é segura? Tem escola perto?',
+      },
+    ],
+    espera: {
+      acoes: ['responder', 'passar_para_corretor'],
+      naV10: { acoes: RESPONDEU, decisao: { tipo: 'pergunta', sugestoes: 2 } },
+      nunca: [SEGURANCA_INVENTADA],
+    },
+  },
+  {
+    id: 'V05',
+    titulo: '"Quero algo tranquilo para morar com a família" com a casa de 3 vagas',
+    grupo: 'atender',
+    origem: 'regra 3 do dono (27/11/2026): moradia tranquila; sem fato de calma escrito, não afirma',
+    critico: false,
+    ...TERCA,
+    nome: 'Márcio Lins',
+    vantagens: {
+      'Casa extremox': {
+        diferenciais: [
+          {
+            id: 'R1.vagas',
+            texto:
+              'Das 30 casas de 43 a 96 m² à venda em Extremoz que acompanhamos em novembro e informam as vagas, todas tinham 1 ou 2.',
+            fonte: 'pelos anúncios da região que acompanhamos',
+            valido_ate: '2026-12-31',
+            momentos: ['apresentacao', 'comparacao'],
+            objecoes: ['por_que_esse'],
+          },
+        ],
+        nao_use: [],
+        dados_de: '2026-11-26',
+      },
+    },
+    falas: [
+      { de: 'cliente', antes: 3, texto: 'Oi, vi a casa de Extremoz. Quero algo tranquilo para morar com a família.' },
+      { de: 'cliente', antes: 1, texto: 'Me conta mais dela?' },
+    ],
+    espera: {
+      acoes: RESPONDEU,
+      naV10: { acoes: RESPONDEU, decisaoOpcional: true },
+      nunca: [SEGURANCA_INVENTADA],
     },
   },
 ];

@@ -49,10 +49,12 @@ import {
   MAX_BUSCAS_NO_MAPA,
   MAX_VOLTAS_DO_ATENDENTE,
   atendenteImovaV6,
-  atendenteImovaV10,
+  atendenteImovaV11,
+  lerVantagensDoBanco,
+  montarSistemaV11,
   reidratar,
   sistemaComBaseV6,
-  sistemaComBaseV10,
+  vantagemDoMotivo,
 } from '@komune/prompts';
 
 import { ErroDaEsteira } from '../fila/esteira';
@@ -117,6 +119,10 @@ const entradaDoBanco = z.object({
     .object({ na_ficha: z.boolean(), ofertas: z.enum(RESPOSTAS_AS_OFERTAS).nullable() })
     .optional()
     .catch(undefined),
+  // As vantagens de mercado aprovadas (27/11/2026, `app.ia_vantagens_de_mercado`), por
+  // código de imóvel; o banco só manda onde a porteira está aberta. Lidas na v11, uma a
+  // uma: forma inesperada vira nenhuma vantagem, e a resposta segue.
+  vantagens_de_mercado: z.unknown().optional(),
   ultima_do_cliente: uuid.nullable().optional(),
   respostas_na_ultima_hora: z.number().optional(),
   mensagens: z
@@ -478,12 +484,19 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   const modelo = (await modeloEscolhido(contexto)) as typeof atendenteImovaV6.modelo;
   // Desde 24/11/2026 (noite), a v9: a v8 com o pedido de visita que vai aos admins.
   // Desde 25/11/2026, a v10: a v9 com o aviso de decisão (a IA pergunta aos admins).
+  // Desde 27/11/2026, a v11: a v10 com o que o cliente busca, a valorização e, onde a
+  // porteira está aberta, as vantagens de mercado aprovadas (o bloco no fim do sistema).
+  const hoje = /^\d{4}-\d{2}-\d{2}/.test(entrada.agora) ? entrada.agora.slice(0, 10) : undefined;
+  const daV11 = comMapa
+    ? montarSistemaV11(base, lerVantagensDoBanco(e.vantagens_de_mercado), hoje === undefined ? {} : { hoje })
+    : null;
   const prompt: PromptVersionado<
     EntradaDoAtendenteV6,
     SaidaDoAtendenteV6 | SaidaDoAtendenteV8 | SaidaDoAtendenteV9 | SaidaDoAtendenteV10
-  > = comMapa
-    ? { ...atendenteImovaV10, modelo, sistema: sistemaComBaseV10(base) }
+  > = daV11 !== null
+    ? { ...atendenteImovaV11, modelo, sistema: daV11.sistema }
     : { ...atendenteImovaV6, modelo, sistema: sistemaComBaseV6(base) };
+  const mercado = daV11 === null ? null : daV11.bloco;
 
   let executada;
   try {
@@ -553,11 +566,28 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
     p_ai_run_id: executada.aiRunId,
     p_prompt_version: executada.promptVersion,
   };
+  // A vantagem que o modelo disse no motivo ("Vantagem: TE0001 (a)"), pela chave do banco:
+  // é o que mais tarde mede o que aquece o cliente. Só quando o bloco foi ao modelo.
+  const vantagemUsada =
+    mercado === null || mercado.vantagens.length === 0 ? null : vantagemDoMotivo(saida.motivo, mercado.vantagens);
   const detalhes = {
     motivo: limparTexto(reidratar(saida.motivo, executada.mapa)),
     confianca: saida.confianca,
     modelo: prompt.modelo,
     base: base.versao ?? null,
+    ...(mercado === null || mercado.vantagens.length === 0
+      ? {}
+      : {
+          mercado: {
+            vantagens_no_bloco: mercado.vantagens.length,
+            imoveis_no_bloco: new Set(mercado.vantagens.map((v) => v.codigo)).size,
+            descartadas: mercado.descartadas.length,
+            usada:
+              vantagemUsada === null
+                ? null
+                : { imovel: vantagemUsada.codigo, letra: vantagemUsada.letra, chave: vantagemUsada.id },
+          },
+        }),
   };
 
   // A resposta ao convite de ofertas por e-mail (v6, 17/11/2026): fica registrada antes
@@ -878,6 +908,8 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
     decisao: pedidoDeDecisao,
     confianca: saida.confianca,
     custo_usd: executada.custoUsd,
+    vantagens_no_bloco: mercado?.vantagens.length ?? 0,
+    vantagem_usada: vantagemUsada?.id ?? null,
   });
   return {
     feito: resultado.ok === true,

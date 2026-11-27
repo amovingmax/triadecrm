@@ -44,6 +44,11 @@ export type FonteDeMercado = {
 /** O valor de `app_settings['mercado']`. */
 export type ChaveDaColeta = {
   ligado?: unknown;
+  /** "IA usa as vantagens com clientes" (etapa 6): padrão desligada. */
+  ia_clientes?: unknown;
+  ia_clientes_mudou_por?: string | null;
+  ia_clientes_mudou_em?: string | null;
+  ia_clientes_motivo?: string | null;
   mudou_por?: string | null;
   mudou_em?: string | null;
   motivo?: string | null;
