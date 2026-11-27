@@ -60,6 +60,7 @@ import {
 
 import { ErroDaEsteira } from '../fila/esteira';
 import { buscarContatoDaFicha } from './banco';
+import { avisarNotasCortadas, blindarBase, blindarChamada, notasCortadas } from './blindagem';
 import { ferramentaBuscarNoMapa } from './busca-no-mapa';
 import { ferramentaBuscarPertoDoImovel } from './perto-do-imovel';
 import { ErroDoModelo, RespostaIlegivelError } from './cliente';
@@ -438,7 +439,20 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   };
   // O endereço do Calendly não vai ao modelo nem pelo caderno (v5, 12/11/2026): uma nota
   // com o link o levava a escrevê-lo na visita. Ele lê "[link da agenda]".
-  const base = { ...lida, caderno: lida.caderno.map((k) => ({ ...k, texto: semOLinkDaAgenda(k.texto) })) };
+  const baseLida = { ...lida, caderno: lida.caderno.map((k) => ({ ...k, texto: semOLinkDaAgenda(k.texto) })) };
+  // A IA nunca para por causa de um número (27/11/2026, "ela sempre deve responder"): o que
+  // a conferência de dado pessoal acusaria na base (a nota "1.338,99, 2.021" de 19/11) sai
+  // desta leitura, em vez de derrubar todas as conversas; a nota vira tarefa para corrigir.
+  const blindada = blindarBase(baseLida);
+  const base = blindada.base;
+  if (blindada.cortes.length > 0) {
+    contexto.logger.warn('a base da IA tinha trecho que parece dado pessoal: tirado desta leitura', {
+      conversation_id: payload.conversation_id,
+      onde: blindada.cortes.map((c) => c.onde).slice(0, 10),
+      tipos: [...new Set(blindada.cortes.flatMap((c) => c.tipos))],
+    });
+    void avisarNotasCortadas(contexto, notasCortadas(baseLida, blindada.cortes));
+  }
   const leadId = leadIdCurto(e.organization_id ?? payload.conversation_id);
 
   // O nome e o telefone do cliente saem pseudonimizados. Sem ficha, o nome do perfil
@@ -489,16 +503,38 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
   // Desde 27/11/2026, a v11: a v10 com o que o cliente busca, a valorização e, onde a
   // porteira está aberta, as vantagens de mercado aprovadas (o bloco no fim do sistema).
   const hoje = /^\d{4}-\d{2}-\d{2}/.test(entrada.agora) ? entrada.agora.slice(0, 10) : undefined;
-  const daV11 = comMapa
-    ? montarSistemaV11(base, lerVantagensDoBanco(e.vantagens_de_mercado), hoje === undefined ? {} : { hoje })
-    : null;
-  const prompt: PromptVersionado<
-    EntradaDoAtendenteV6,
-    SaidaDoAtendenteV6 | SaidaDoAtendenteV8 | SaidaDoAtendenteV9 | SaidaDoAtendenteV10
-  > = daV11 !== null
-    ? { ...atendenteImovaV11, modelo, sistema: daV11.sistema }
-    : { ...atendenteImovaV6, modelo, sistema: sistemaComBaseV6(base) };
-  const mercado = daV11 === null ? null : daV11.bloco;
+  type FontesDoSistema = { base: typeof base; vantagens: ReturnType<typeof lerVantagensDoBanco> };
+  const montarPrompt = (fontes: FontesDoSistema) => {
+    const daV11 = comMapa
+      ? montarSistemaV11(fontes.base, fontes.vantagens, hoje === undefined ? {} : { hoje })
+      : null;
+    const prompt: PromptVersionado<
+      EntradaDoAtendenteV6,
+      SaidaDoAtendenteV6 | SaidaDoAtendenteV8 | SaidaDoAtendenteV9 | SaidaDoAtendenteV10
+    > = daV11 !== null
+      ? { ...atendenteImovaV11, modelo, sistema: daV11.sistema }
+      : { ...atendenteImovaV6, modelo, sistema: sistemaComBaseV6(fontes.base) };
+    return { prompt, mercado: daV11 === null ? null : daV11.bloco };
+  };
+  // Antes de gastar, a mesma conferência da chamada (sem modelo): se ela ainda acusar algo
+  // (nas vantagens, na mensagem do cliente, entre duas mensagens), o trecho sai desta
+  // leitura e a IA responde. Só depois de três tentativas a chamada segue como antes.
+  const conferida = blindarChamada({
+    base: { base, vantagens: lerVantagensDoBanco(e.vantagens_de_mercado) } as FontesDoSistema,
+    entrada,
+    contato,
+    montar: (fontes) => montarPrompt(fontes).prompt,
+  });
+  if (conferida.tentativas > 0) {
+    contexto.logger.warn('a conferência de dado pessoal acusou algo: tirado desta leitura', {
+      conversation_id: payload.conversation_id,
+      tentativas: conferida.tentativas,
+      ainda_acusa: conferida.aindaAcusa,
+      tipos: conferida.tipos,
+    });
+  }
+  const { prompt, mercado } = montarPrompt(conferida.base);
+  const entradaSegura = conferida.entrada;
 
   let executada;
   try {
@@ -506,7 +542,7 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
       ? await executarComFerramentas(
           contexto,
           prompt,
-          entrada,
+          entradaSegura,
           contato,
           vinculos,
           {
@@ -530,7 +566,7 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
           },
           { maxVoltas: MAX_VOLTAS_DO_ATENDENTE_V11 },
         )
-      : await executar(contexto, prompt, entrada, contato, vinculos);
+      : await executar(contexto, prompt, entradaSegura, contato, vinculos);
   } catch (erro) {
     if (erro instanceof ChamadaBloqueadaError) {
       return passarParaGente(

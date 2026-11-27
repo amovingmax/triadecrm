@@ -60,6 +60,7 @@ import {
 import { DialogoDeCorrecao } from './na-conversa';
 import { CartaoDaNota } from './cartao-da-nota';
 import { CHAVE_DAS_NOTAS_SUGERIDAS, lerNotasSugeridas } from './notas-sugeridas';
+import { fraseDaTrava, problemaDoCaderno } from './trava-do-caderno';
 import { ConfiguracaoDaRetomada, PlacarDaRetomada } from './retomada';
 
 /**
@@ -598,6 +599,9 @@ function Caderno() {
   const [abertas, setAbertas] = useState<ReadonlySet<number>>(new Set());
   const idNovo = useId();
   const idCaixa = useId();
+  // A trava do caderno (27/11/2026): o que faria a IA parar não é salvo.
+  const travaDoNovo = problemaDoCaderno(novo);
+  const travaDaEdicao = editando === null ? null : problemaDoCaderno(editando.texto);
   const atualizar = () => void clientes.invalidateQueries({ queryKey: CHAVE_DA_IA });
 
   const escrever = useMutation({
@@ -646,7 +650,9 @@ function Caderno() {
           <p className="mt-0.5 text-[13px] text-muted-foreground">
             O que a IA sabe da Imova além dos anúncios. Ela lê tudo daqui a cada resposta. Entra
             pelo treino (o Janio escreve &ldquo;IA, anota: …&rdquo; na conversa dele), pelas
-            correções e por aqui. Não escreva telefone: ele é tirado antes de chegar à IA.
+            correções, pelas respostas guardadas e por aqui. Não escreva telefone, e-mail nem @,
+            nem 10 algarismos seguidos sem palavra no meio: a nota não é salva, porque faria a
+            IA parar de responder.
           </p>
         </div>
         <Button
@@ -673,12 +679,19 @@ function Caderno() {
             onChange={(e) => setNovo(e.target.value)}
             placeholder="Ex.: A visita aos imóveis é de segunda a sábado, das 8h às 17h."
             className={CAIXA_DE_TEXTO}
+            aria-invalid={travaDoNovo !== null}
+            aria-describedby={travaDoNovo !== null ? `${idNovo}-trava` : undefined}
           />
+          {travaDoNovo !== null ? (
+            <p id={`${idNovo}-trava`} role="alert" className="text-xs font-medium text-destructive-texto">
+              {fraseDaTrava(travaDoNovo)}
+            </p>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               className={BOTAO_PRINCIPAL}
-              disabled={escrever.isPending || novo.trim().length < 3}
+              disabled={escrever.isPending || novo.trim().length < 3 || travaDoNovo !== null}
               onClick={() => escrever.mutate({ texto: novo.trim(), id: null })}
             >
               Anotar no caderno
@@ -719,12 +732,18 @@ function Caderno() {
                     value={editando.texto}
                     onChange={(e) => setEditando({ id: l.id, texto: e.target.value })}
                     className={CAIXA_DE_TEXTO}
+                    aria-invalid={travaDaEdicao !== null}
                   />
+                  {travaDaEdicao !== null ? (
+                    <p role="alert" className="text-xs font-medium text-destructive-texto">
+                      {fraseDaTrava(travaDaEdicao)}
+                    </p>
+                  ) : null}
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       type="button"
                       className={BOTAO_DA_LINHA}
-                      disabled={escrever.isPending || editando.texto.trim().length < 3}
+                      disabled={escrever.isPending || editando.texto.trim().length < 3 || travaDaEdicao !== null}
                       onClick={() => escrever.mutate({ texto: editando.texto.trim(), id: l.id })}
                     >
                       Salvar

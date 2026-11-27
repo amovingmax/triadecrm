@@ -31,6 +31,7 @@ import {
   type EstadoDaIaNaConversa,
   type RespostaDaIa,
 } from './dados';
+import { fraseDaTrava, problemaDoCaderno } from './trava-do-caderno';
 
 /**
  * A IA que atende o cliente, dentro da conversa (Imova, 06/11/2026).
@@ -342,6 +343,9 @@ export function DialogoDeCorrecao({
   const clientes = useQueryClient();
   const [texto, setTexto] = useState('');
   const id = useId();
+  // A trava do caderno (27/11/2026): a correção vira nota, e o que faria a IA parar não entra.
+  // A retomada não vai para o caderno.
+  const trava = resposta?.acao === 'retomou' ? null : problemaDoCaderno(texto);
   const corrigir = useMutation({
     mutationFn: (r: RespostaDaIa) => avaliarResposta(r.id, 'corrigir', texto.trim()),
     onSuccess: (_, r) => {
@@ -385,7 +389,13 @@ export function DialogoDeCorrecao({
           onChange={(e) => setTexto(e.target.value)}
           placeholder="Ex.: o condomínio desse apartamento é R$ 650, e o IPTU já está incluso."
           className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:text-sm"
+          aria-invalid={trava !== null}
         />
+        {trava !== null ? (
+          <p role="alert" className="text-xs font-medium text-destructive-texto">
+            {fraseDaTrava(trava)}
+          </p>
+        ) : null}
         <DialogFooter className="gap-2">
           <Button
             type="button"
@@ -399,7 +409,7 @@ export function DialogoDeCorrecao({
           <Button
             type="button"
             onClick={() => resposta && corrigir.mutate(resposta)}
-            disabled={corrigir.isPending || texto.trim().length < 3}
+            disabled={corrigir.isPending || texto.trim().length < 3 || trava !== null}
             className={cn(BOTAO_DO_DIALOGO, corrigir.isPending && 'opacity-80')}
           >
             Anotar a correção

@@ -68,6 +68,8 @@ insert into t210 select 'sala', id from public.anuncios where codigo = 'PGT210S'
 insert into t210 select 'terreno', id from public.anuncios where codigo = 'PGT210T';
 
 -- A ficha do terreno e a nota geral, como no caderno de produção.
+-- (As fichas e a nota geral que o banco já tenha saem de cena: o teste é dono destas.)
+update public.ia_caderno set ativo = false where papel is not null or texto like '8. A IMOVA E A DOCUMENTAÇÃO%';
 insert into public.ia_caderno (texto, origem, papel, anuncio_ids)
 values ('FICHA 905. TERRENO FRENTE-MAR EM CAMURUPIM, NÍSIA FLORESTA: É o terreno de 810 m². (a) O valor de venda é R$ 520.000 (equipe, 23/11). (b) Fica de frente para o mar.',
         'tela', 'ficha', array[pg_temp.id('terreno')]);

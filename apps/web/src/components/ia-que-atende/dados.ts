@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/client';
 
+import { fraseDaTrava } from './trava-do-caderno';
+
 /**
  * A IA que atende o cliente sozinha (Imova, 06/11/2026): o que a tela lê e o que ela
  * pede ao banco. Toda escrita é por função do banco (`public.ia_*`), que confere o
@@ -41,8 +43,9 @@ const MOTIVOS: Readonly<Record<string, string>> = {
 
 export class ErroDaIa extends Error {
   readonly motivo: string;
-  constructor(motivo: string) {
-    super(MOTIVOS[motivo] ?? 'O servidor recusou o pedido.');
+  constructor(motivo: string, detalhe: { tipo?: string | null; trecho?: string | null } = {}) {
+    // A trava do caderno (27/11/2026) diz o trecho que faria a IA parar.
+    super(motivo === 'trava_a_ia' ? fraseDaTrava(detalhe) : (MOTIVOS[motivo] ?? 'O servidor recusou o pedido.'));
     this.name = 'ErroDaIa';
     this.motivo = motivo;
   }
@@ -52,7 +55,12 @@ async function pedir(funcao: string, argumentos: Record<string, unknown>): Promi
   const { data, error } = await createClient().rpc(funcao as never, argumentos as never);
   if (error) throw new Error(error.message);
   const resposta = (data ?? {}) as Record<string, unknown>;
-  if (resposta.ok === false) throw new ErroDaIa(String(resposta.motivo ?? 'recusado'));
+  if (resposta.ok === false) {
+    throw new ErroDaIa(String(resposta.motivo ?? 'recusado'), {
+      tipo: typeof resposta.tipo === 'string' ? resposta.tipo : null,
+      trecho: typeof resposta.trecho === 'string' ? resposta.trecho : null,
+    });
+  }
   return resposta;
 }
 

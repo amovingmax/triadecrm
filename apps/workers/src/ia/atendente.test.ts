@@ -989,3 +989,44 @@ describe('o aviso de decisão (v10, 25/11/2026)', () => {
     expect(m.chamadas('ia_atendente_pedir_decisao')).toEqual([]);
   });
 });
+
+describe('a IA nunca para por causa de um número (27/11/2026: "ela sempre deve responder")', () => {
+  const resposta = saidaDoModelo({ acao: 'responder', agenda: null, mensagem: 'Tem sim, posso te contar mais.' });
+
+  it('a nota com "1.338,99, 2.021" (a de 19/11) não derruba a resposta: o trecho sai desta leitura', async () => {
+    const { contexto, pedidos, chamadas } = montar(resposta, undefined, {
+      caderno: [
+        { id: 54, texto: 'FICHA 4. TERRENOS EM PIPA: os lotes têm 1.338,99, 2.021 m² e ficam ao lado do parque.', origem: 'tela' },
+      ],
+    });
+    const r = await atenderCliente(contexto, PAYLOAD);
+    expect(r.feito).toBe(true);
+    expect(chamadas('ia_atendente_passar')).toEqual([]);
+    expect(chamadas('ia_atendente_responder')).toHaveLength(1);
+    expect(pedidos[0]?.sistema).toContain('[54] FICHA 4. TERRENOS EM PIPA');
+    expect(pedidos[0]?.sistema).toContain('[número tirado]');
+    expect(pedidos[0]?.sistema).not.toContain('1.338,99, 2.021');
+  });
+
+  it('o número parecido com telefone na mensagem do cliente sai, e a IA responde em vez de passar', async () => {
+    const entrada = entradaNoBanco();
+    const mensagens = (entrada.mensagens as { id: string; texto: string }[]).map((m) =>
+      m.id === ULTIMA ? { ...m, texto: 'O lote tem 1.338,99, 2.021 m²? Quero saber o preço.' } : m,
+    );
+    const { contexto, pedidos, chamadas } = montar(resposta, undefined, { entrada: { ...entrada, mensagens } });
+    const r = await atenderCliente(contexto, PAYLOAD);
+    expect(r.feito).toBe(true);
+    expect(chamadas('ia_atendente_passar')).toEqual([]);
+    expect(pedidos[0]?.mensagem).not.toContain('1.338,99, 2.021');
+    expect(pedidos[0]?.mensagem).toContain('Quero saber o preço.');
+  });
+
+  it('sem nada a tirar, a leitura é a mesma de antes', async () => {
+    const { contexto, pedidos } = montar(resposta, undefined, {
+      caderno: [{ id: 55, texto: 'FICHA 5. TERRENO EM TABATINGA: (a) O valor é R$ 520.000 (equipe, 23/11).', origem: 'tela' }],
+    });
+    await atenderCliente(contexto, PAYLOAD);
+    expect(pedidos[0]?.sistema).toContain('[55] FICHA 5. TERRENO EM TABATINGA: (a) O valor é R$ 520.000 (equipe, 23/11).');
+    expect(pedidos[0]?.sistema).not.toContain('[número tirado]');
+  });
+});
