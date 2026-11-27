@@ -245,11 +245,7 @@ function Corpo({ lead, euId, agora }: { lead: LeadDoPortal; euId: string; agora:
       <div className="flex flex-col gap-5 px-4 pb-4">
         <Acoes>
           {mostraChamarComIA(lead) ? (
-            <BotaoChamarComIA
-              lead={lead}
-              nome={semNome ? null : nome}
-              disabled={ocupado !== null}
-            />
+            <BotaoChamarComIA lead={lead} disabled={ocupado !== null} />
           ) : null}
           {conversa ? (
             <Button asChild className="toque h-11 md:h-9">
@@ -335,8 +331,9 @@ function Corpo({ lead, euId, agora }: { lead: LeadDoPortal; euId: string; agora:
 
         {!mandou ? (
           <p className="rounded-lg bg-muted px-3 py-2 text-sm">
-            Ainda não mandou mensagem. Se chamar no WhatsApp, a conversa chega com a etiqueta deste
-            anúncio.
+            {lead.conversation_id
+              ? 'Já há conversa de WhatsApp com essa pessoa.'
+              : 'Ainda não mandou mensagem. Se chamar no WhatsApp, a conversa chega com a etiqueta deste anúncio.'}
           </p>
         ) : null}
 

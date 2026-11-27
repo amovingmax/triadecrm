@@ -41,11 +41,9 @@ import type { LeadDoPortal } from './leads-rotulos';
  */
 export function BotaoChamarComIA({
   lead,
-  nome,
   disabled,
 }: {
   lead: Pick<LeadDoPortal, 'id'>;
-  nome: string | null;
   disabled?: boolean;
 }) {
   const [aberto, setAberto] = useState(false);
@@ -62,24 +60,14 @@ export function BotaoChamarComIA({
       </Button>
       <Dialog open={aberto} onOpenChange={setAberto}>
         <DialogContent className="sm:max-w-md">
-          {aberto ? (
-            <ConteudoDoChamado leadId={lead.id} nome={nome} aoFechar={() => setAberto(false)} />
-          ) : null}
+          {aberto ? <ConteudoDoChamado leadId={lead.id} aoFechar={() => setAberto(false)} /> : null}
         </DialogContent>
       </Dialog>
     </>
   );
 }
 
-function ConteudoDoChamado({
-  leadId,
-  nome,
-  aoFechar,
-}: {
-  leadId: string;
-  nome: string | null;
-  aoFechar: () => void;
-}) {
+function ConteudoDoChamado({ leadId, aoFechar }: { leadId: string; aoFechar: () => void }) {
   const previa = useQuery({
     queryKey: [...CHAVE_DOS_LEADS, 'chamar', leadId],
     queryFn: () => lerPreviaDoChamado(leadId),
@@ -91,8 +79,8 @@ function ConteudoDoChamado({
       <DialogHeader>
         <DialogTitle>Chamar com a IA</DialogTitle>
         <DialogDescription>
-          Vai pelo WhatsApp da Imova a mensagem abaixo. Se {nome ?? 'a pessoa'} responder, a IA
-          continua a conversa.
+          Vai pelo WhatsApp da Imova a mensagem abaixo. Se a pessoa responder, a IA continua a
+          conversa.
         </DialogDescription>
       </DialogHeader>
       {previa.isPending ? (
