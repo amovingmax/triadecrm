@@ -418,7 +418,7 @@ export function esquecerImoveisDoMapa(): void {
   memoria = null;
 }
 
-async function imoveisComPino(cliente: ClienteDoBanco, busca: BuscaNoMapa, logger: Logger): Promise<readonly ImovelNoMapa[]> {
+export async function imoveisComPino(cliente: ClienteDoBanco, busca: BuscaNoMapa, logger: Logger): Promise<readonly ImovelNoMapa[]> {
   if (memoria !== null && Date.now() - memoria.quando < MEMORIA_MS) return memoria.imoveis;
   const imoveis = await completarPinos(await imoveisDoBanco(cliente), busca, logger);
   memoria = { quando: Date.now(), imoveis };

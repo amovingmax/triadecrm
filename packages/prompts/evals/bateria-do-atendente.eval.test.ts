@@ -22,8 +22,8 @@ import { atendenteImovaV7 as v7, sistemaComBaseV7 } from '../src/prompts/atenden
  */
 
 describe('bateria do atendente: os casos', () => {
-  it('são 55 (o A14, o I16, o I17 e os G06 a G08 entraram em 24/11; os D01 a D04 em 25/11; os V01 a V05 em 27/11), com id único, e cobrem os quatro grupos', () => {
-    expect(CASOS_DA_BATERIA).toHaveLength(55);
+  it('são 56 (o A14, o I16, o I17 e os G06 a G08 entraram em 24/11; os D01 a D04 em 25/11; os V01 a V06 em 27/11), com id único, e cobrem os quatro grupos', () => {
+    expect(CASOS_DA_BATERIA).toHaveLength(56);
     const ids = CASOS_DA_BATERIA.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const grupo of GRUPOS_DA_BATERIA) {
@@ -475,7 +475,7 @@ describe('bateria do atendente: o aviso de decisão (v10, 25/11/2026)', () => {
 
 describe('bateria do atendente: a régua da v11 (27/11/2026)', () => {
   const caso = (id: string) => CASOS_DA_BATERIA.find((c) => c.id === id)!;
-  const com = { temMapa: true, temFoto: true, temVisita: true, temDecisao: true };
+  const com = { temMapa: true, temFoto: true, temVisita: true, temDecisao: true, temPerto: true };
   const decisao = {
     tipo: 'pergunta' as const,
     valorProposto: null,
@@ -501,11 +501,23 @@ describe('bateria do atendente: a régua da v11 (27/11/2026)', () => {
     expect(conferir('V01', 'Vai valorizar com certeza.').length).toBeGreaterThan(0);
   });
 
-  it('V04: afirmar segurança ou escola sem fato escrito é erro; "vou verificar" com a decisão passa', () => {
-    expect(conferir('V04', 'É um bairro tranquilo e tem escola perto.', true).join(' ')).toMatch(
-      /segurança, calma ou escola/,
+  it('V04: segurança inventada é erro; escola só depois de conferir no mapa', () => {
+    const semMapa = conferir('V04', 'É um bairro tranquilo e tem escola perto.', true).join(' ');
+    expect(semMapa).toMatch(/segurança ou calma/);
+    expect(semMapa).toMatch(/escola perto sem conferir no mapa/);
+    expect(semMapa).toMatch(/não conferiu no mapa/);
+    const comMapa = conferirCasoDaBateria(
+      caso('V04'),
+      {
+        acao: 'responder',
+        mensagem: 'Pelo mapa, há a Escola Estadual X a menos de 1 km. Sobre a segurança, vou verificar e te retorno.',
+        agenda: null,
+        ferramentas: ['buscar_perto_do_imovel'],
+        decisao,
+      },
+      { ...com, temPerto: true },
     );
-    expect(conferir('V04', 'Vou verificar esses pontos da região e te retorno.', true)).toEqual([]);
+    expect(comMapa).toEqual([]);
   });
 
   it('V03 e V05 levam as vantagens no formato do banco', () => {

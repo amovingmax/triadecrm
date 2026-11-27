@@ -30,10 +30,11 @@
  * Entrada, saída, ferramenta e mensagem são os da v10. Voltar à v10 é trocar o número em
  * `VIGENTES`.
  */
-import { definirPrompt } from '../../nucleo/versionamento';
+import { type FerramentaDoPrompt, definirPrompt } from '../../nucleo/versionamento';
 import { type BaseDoAtendenteV2, montarBaseV2 } from './v2';
 import { trocarUmaVez } from './v4';
 import type { EntradaDoAtendenteV6 } from './v6';
+import { MAX_BUSCAS_NO_MAPA } from './v7';
 import { atendenteImovaV10 as v10, type SaidaDoAtendenteV10 } from './v10';
 import {
   type BlocoDeVantagens,
@@ -42,6 +43,64 @@ import {
   type VantagensDeMercado,
   montarVantagens,
 } from './vantagens-de-mercado';
+
+/** Buscas do que fica perto do imóvel por resposta, no máximo (27/11/2026). */
+export const MAX_BUSCAS_PERTO = 2;
+
+/** Idas ao modelo por resposta na v11: as buscas no mapa, as de perto, a resposta e uma de folga. */
+export const MAX_VOLTAS_DO_ATENDENTE_V11 = MAX_BUSCAS_NO_MAPA + MAX_BUSCAS_PERTO + 2;
+
+/** O que a busca perto do imóvel sabe procurar (a palavra que vai ao mapa sai do worker). */
+export const O_QUE_PROCURAR_PERTO = [
+  'escola',
+  'creche',
+  'faculdade',
+  'hospital',
+  'posto_de_saude',
+  'farmacia',
+  'supermercado',
+  'padaria',
+  'shopping',
+  'praia',
+  'parque',
+  'academia',
+  'restaurante',
+  'posto_de_combustivel',
+  'igreja',
+  'ponto_de_onibus',
+] as const;
+export type OQueProcurarPerto = (typeof O_QUE_PROCURAR_PERTO)[number];
+
+/**
+ * A ferramenta `buscar_perto_do_imovel` (27/11/2026). Pedido do dono: "A questão da
+ * escola e de outras referências a IA deve verificar via maps." Quem a executa é o worker
+ * (`apps/workers/src/ia/perto-do-imovel.ts`): o mesmo OpenStreetMap da busca no mapa, a
+ * partir do pino do anúncio.
+ */
+export const FERRAMENTA_BUSCAR_PERTO_DO_IMOVEL: FerramentaDoPrompt = {
+  nome: 'buscar_perto_do_imovel',
+  descricao:
+    'Mostra no mapa (OpenStreetMap) o que fica perto de um imóvel da lista: até três lugares do tipo ' +
+    'pedido, os mais perto, com o nome e a distância em linha reta a partir do lugar do imóvel ("a menos ' +
+    'de 500 metros", "a menos de 1 km"...). Até duas buscas por resposta. Não serve para segurança ' +
+    'nem para dizer se a região é calma.',
+  entrada: {
+    type: 'object',
+    properties: {
+      imovelCodigo: {
+        type: 'string',
+        description: 'O código do imóvel, exatamente como está na lista.',
+      },
+      oQue: {
+        type: 'string',
+        enum: [...O_QUE_PROCURAR_PERTO],
+        description: 'O que procurar perto do imóvel.',
+      },
+    },
+    required: ['imovelCodigo', 'oQue'],
+    additionalProperties: false,
+  },
+};
 
 // ---------------------------------------------------------------- sempre
 
@@ -58,8 +117,10 @@ numa frase, por que serve a ele:
 - construir: tamanho, formato e medidas do terreno;
 - casa de praia: praia, casas de veraneio, natureza;
 - uso comercial: avenida, esquina, movimento.
-Só o que está escrito em IMÓVEIS, no CADERNO ou em VANTAGENS DE MERCADO. Segurança, escola
-perto, região calma e valorização só se estiverem escritas lá; se ele perguntar e não
+Só o que está escrito em IMÓVEIS, no CADERNO ou em VANTAGENS DE MERCADO, ou o que A BUSCA
+PERTO DO IMÓVEL mostrar. Escola perto e outras referências (mercado, hospital, farmácia,
+praia, parque, shopping...): confira no mapa com buscar_perto_do_imovel. Segurança, região
+calma e valorização não estão no mapa: só se estiverem escritas; se ele perguntar e não
 estiverem, não invente nem diga que não sabe: é uma pergunta de O AVISO DE DECISÃO. Não
 faça perguntas só para descobrir o perfil dele: use o que ele já disse. No máximo um ponto
 forte por mensagem. Nada disto muda o resto da resposta: o que o CADERNO manda continua
@@ -80,6 +141,19 @@ A VALORIZAÇÃO:
   prometer", "não posso garantir", "não dá para projetar" ou "é um dado do passado". Se ele
   perguntar se valoriza, conte só o fato que houver no CADERNO ou em VANTAGENS DE MERCADO,
   como fato, ou peça a decisão (pergunta).
+
+A BUSCA PERTO DO IMÓVEL:
+Você tem a ferramenta buscar_perto_do_imovel: ela mostra no mapa o que fica perto de um
+imóvel da lista (escola, creche, faculdade, hospital, posto de saúde, farmácia,
+supermercado, padaria, shopping, praia, parque, academia, restaurante, posto de
+combustível, igreja, ponto de ônibus), com o nome e a distância em linha reta.
+- Use quando ele perguntar o que tem perto, ou quando contar o que busca e isso pedir uma
+  referência (filhos pequenos: escola). Até duas buscas por resposta.
+- Diga o que o mapa mostrou com as suas palavras, "pelo mapa", com o nome e a distância
+  como vieram ("a menos de 1 km"); no máximo dois lugares. Se o resultado disser que a
+  distância é do bairro, diga só que fica na região, sem distância.
+- O mapa não achou: não diga que não existe; diga que vai verificar e peça a decisão
+  (pergunta).
 
 `;
 
@@ -250,7 +324,7 @@ const clienteDoExemplo = {
 const exemplos = [
   ...v10.exemplos,
   {
-    nome: 'filhos pequenos e "é uma região segura?": sem nada escrito, não inventa e pede a decisão',
+    nome: 'filhos pequenos e "a região é segura?": segurança não está no mapa nem escrita; não inventa e pede a decisão',
     entrada: {
       leadId: 'lead-27',
       agora: '2026-11-27T10:12',
@@ -280,17 +354,17 @@ const exemplos = [
           de: 'cliente' as const,
           quem: null,
           quando: '27/11 10:11',
-          texto: 'Tenho dois filhos pequenos. A região é segura? Tem escola perto?',
+          texto: 'Tenho dois filhos pequenos. A região é segura?',
         },
       ],
     },
     saida: {
       acao: 'responder' as const,
       mensagem:
-        'Boa pergunta, ainda mais com crianças pequenas. Vou verificar esses pontos da região e te retorno.',
+        'Boa pergunta, ainda mais com crianças pequenas. Vou verificar isso e te retorno.',
       agenda: null,
       motivo:
-        'Segurança e escola perto não estão escritas para este imóvel: pedi a decisão em vez de inventar.',
+        'Segurança não está escrita para este imóvel nem é coisa do mapa: pedi a decisão em vez de inventar.',
       anotacoes: [],
       fotosEnsinadas: [],
       ofertasPorEmail: null,
@@ -300,12 +374,12 @@ const exemplos = [
         tipo: 'pergunta' as const,
         imovelCodigo: 'SANTA CATARINA',
         valorProposto: null,
-        pergunta: 'Tenho dois filhos pequenos. A região é segura? Tem escola perto?',
+        pergunta: 'Tenho dois filhos pequenos. A região é segura?',
         sugestoes: [
           {
-            rotulo: 'É tranquila e tem escola perto',
+            rotulo: 'É uma região tranquila',
             resposta:
-              'É uma região tranquila e familiar, e tem escola a poucos minutos da casa. Com os 3 quartos, cabe bem a família.',
+              'É uma região tranquila e familiar, de moradores antigos. Com os 3 quartos, cabe bem a família.',
           },
           {
             rotulo: 'Sugerir conhecer a região',
@@ -327,7 +401,7 @@ export const atendenteImovaV11 = definirPrompt<EntradaDoAtendenteV6, SaidaDoAten
   entrada: v10.entrada,
   saida: v10.saida,
   sistema: sistemaComVantagens,
-  ferramentas: v10.ferramentas,
+  ferramentas: [...(v10.ferramentas ?? []), FERRAMENTA_BUSCAR_PERTO_DO_IMOVEL],
   camposDeTexto: v10.camposDeTexto,
   camposDoTriade: v10.camposDoTriade,
   escala: v10.escala,

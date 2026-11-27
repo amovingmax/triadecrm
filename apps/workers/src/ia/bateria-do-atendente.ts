@@ -30,7 +30,9 @@ import {
   type SaidaDoAtendenteV9,
   type SaidaDoAtendenteV10,
   MAX_BUSCAS_NO_MAPA,
+  MAX_BUSCAS_PERTO,
   MAX_VOLTAS_DO_ATENDENTE,
+  MAX_VOLTAS_DO_ATENDENTE_V11,
   atendenteImovaV6,
   atendenteImovaV7,
   atendenteImovaV8,
@@ -62,6 +64,7 @@ import {
   soOPrimeiroNome,
 } from './atendente';
 import { type UsoDaBusca, ferramentaBuscarNoMapa } from './busca-no-mapa';
+import { type UsoDoPerto, ferramentaBuscarPertoDoImovel } from './perto-do-imovel';
 import {
   type ContextoDaIa,
   OrcamentoEsgotadoError,
@@ -252,6 +255,7 @@ export async function rodarBateria(
   const comFoto = opcoes.versao >= 8;
   const comVisita = opcoes.versao >= 9;
   const comDecisao = opcoes.versao >= 10;
+  const comPerto = opcoes.versao >= 11;
   const mapa = contexto.mapa;
   if (
     comMapa &&
@@ -320,6 +324,8 @@ export async function rodarBateria(
       let custo = 0;
       // O que a IA procurou no mapa nesta resposta (a própria ferramenta anota).
       const uso: UsoDaBusca = { buscas: 0, consultas: [] };
+      // O que a IA procurou perto do imóvel (v11, 27/11/2026).
+      const usoPerto: UsoDoPerto = { buscas: 0, pedidos: [] };
       try {
         const executada =
           busca !== undefined
@@ -341,8 +347,19 @@ export async function rodarBateria(
                       .filter((f) => f.de === 'cliente')
                       .map((f) => f.texto),
                   }),
+                  ...(comPerto
+                    ? {
+                        buscar_perto_do_imovel: ferramentaBuscarPertoDoImovel({
+                          cliente: contexto.cliente,
+                          busca,
+                          logger: contexto.logger,
+                          maxBuscas: MAX_BUSCAS_PERTO,
+                          uso: usoPerto,
+                        }),
+                      }
+                    : {}),
                 },
-                { maxVoltas: MAX_VOLTAS_DO_ATENDENTE },
+                { maxVoltas: comPerto ? MAX_VOLTAS_DO_ATENDENTE_V11 : MAX_VOLTAS_DO_ATENDENTE },
               )
             : await executar(contexto, doCaso, entrada, contato, {});
         custo += executada.custoUsd;
@@ -350,7 +367,7 @@ export async function rodarBateria(
         const mensagem = semOCalendlyNoTexto(
           soOPrimeiroNome(limparTexto(reidratar(saida.mensagem, executada.mapa)), caso.nome),
         );
-        const buscas = [...uso.consultas];
+        const buscas = [...uso.consultas, ...usoPerto.pedidos.map((p) => `perto: ${p}`)];
         // A foto (v8): a legenda limpa como o worker faz, e se o banco acha a capa (só
         // leitura; a bateria nunca copia nem manda a foto).
         const pedida = 'fotoParaConfirmar' in saida ? saida.fotoParaConfirmar : null;
@@ -397,7 +414,10 @@ export async function rodarBateria(
             acao: saida.acao,
             mensagem,
             agenda: saida.agenda,
-            ferramentas: buscas.map(() => 'buscar_no_mapa'),
+            ferramentas: [
+              ...uso.consultas.map(() => 'buscar_no_mapa'),
+              ...usoPerto.pedidos.map(() => 'buscar_perto_do_imovel'),
+            ],
             foto,
             visita,
             decisao:
@@ -409,7 +429,13 @@ export async function rodarBateria(
                     sugestoes: decisao.sugestoes.length,
                   },
           },
-          { temMapa: comMapa, temFoto: comFoto, temVisita: comVisita, temDecisao: comDecisao },
+          {
+            temMapa: comMapa,
+            temFoto: comFoto,
+            temVisita: comVisita,
+            temDecisao: comDecisao,
+            temPerto: comPerto,
+          },
         );
         if (foto !== null && foto.existe === false) {
           falhas.push(

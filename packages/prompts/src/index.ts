@@ -151,6 +151,11 @@ export {
 export {
   BLOCO_DAS_VANTAGENS,
   BLOCO_DO_QUE_O_CLIENTE_BUSCA,
+  FERRAMENTA_BUSCAR_PERTO_DO_IMOVEL,
+  MAX_BUSCAS_PERTO,
+  MAX_VOLTAS_DO_ATENDENTE_V11,
+  O_QUE_PROCURAR_PERTO,
+  type OQueProcurarPerto,
   type SistemaDaV11,
   atendenteImovaV11,
   montarSistemaV11,

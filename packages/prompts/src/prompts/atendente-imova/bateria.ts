@@ -51,6 +51,13 @@ export interface Expectativa {
   /** A busca no mapa é obrigatória (nota 14); vale só para versão com a ferramenta. */
   readonly buscaNoMapa?: boolean;
   /**
+   * A busca do que fica perto do imóvel (v11, 27/11/2026: "a questão da escola e de outras
+   * referências a IA deve verificar via maps") é obrigatória; vale só com `temPerto`.
+   */
+  readonly pertoDoImovel?: boolean;
+  /** Regras que só valem quando a IA NÃO buscou perto do imóvel (falar de escola sem o mapa). */
+  readonly nuncaSemOMapa?: readonly RegraDeTexto[];
+  /**
    * A foto para confirmar o imóvel (v8, 24/11/2026); vale só para versão com a foto.
    * `deve`: manda a foto deste imóvel. `pode`: a foto deste imóvel, ou (sem foto) as
    * regras `deve`/`algum` de sempre, para referência tão precisa que dispensa confirmar.
@@ -172,8 +179,12 @@ const FORTE_SEM_VANTAGEM = r(
   'fala em forte possibilidade de valorização sem vantagem aprovada',
 );
 const SEGURANCA_INVENTADA = r(
-  /\b(regi[ãa]o|bairro|lugar|local|rua|vizinhan[çc]a) (muito |bem |super )?(segur[oa]|tranquil[oa]|calm[oa])\b(?!\?)|(?<!\bse )\b(tem|h[áa]) (uma |v[áa]rias )?escolas?\b/i,
-  'afirma segurança, calma ou escola perto sem estar escrito',
+  /\b(regi[ãa]o|bairro|lugar|local|rua|vizinhan[çc]a) (muito |bem |super )?(segur[oa]|tranquil[oa]|calm[oa])\b(?!\?)/i,
+  'afirma segurança ou calma sem estar escrito',
+);
+const ESCOLA_SEM_MAPA = r(
+  /(?<!\bse )\b(tem|h[áa]) (uma |v[áa]rias )?escolas?\b|escolas? (bem )?(perto|pr[óo]xim)/i,
+  'fala de escola perto sem conferir no mapa',
 );
 const PASSOU = ['passar_para_corretor'] as const satisfies readonly Acao[];
 const RESPONDEU = ['responder'] as const satisfies readonly Acao[];
@@ -1600,8 +1611,11 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
     ],
     espera: {
       acoes: ['responder', 'passar_para_corretor'],
-      naV10: { acoes: RESPONDEU, decisao: { tipo: 'pergunta', sugestoes: 2 } },
+      // A escola, no mapa (pedido do dono, 27/11/2026); a segurança, pela decisão.
+      naV10: { acoes: RESPONDEU, decisao: { tipo: 'pergunta' } },
+      pertoDoImovel: true,
       nunca: [SEGURANCA_INVENTADA],
+      nuncaSemOMapa: [ESCOLA_SEM_MAPA],
     },
   },
   {
@@ -1637,6 +1651,30 @@ export const CASOS_DA_BATERIA: readonly CasoDaBateria[] = [
       acoes: RESPONDEU,
       naV10: { acoes: RESPONDEU, decisaoOpcional: true },
       nunca: [SEGURANCA_INVENTADA],
+    },
+  },
+  {
+    id: 'V06',
+    titulo: '"Tem supermercado perto?" no terreno de Capim Macio: confere no mapa',
+    grupo: 'atender',
+    origem: 'pedido do dono (27/11/2026): "a questão da escola e de outras referências a IA deve verificar via maps"',
+    critico: false,
+    ...TERCA,
+    nome: 'Rodrigo Bezerra',
+    falas: [
+      {
+        de: 'ia',
+        antes: 6,
+        texto:
+          'É o terreno de 3.000 m² em Capim Macio, em 3 lotes de 1.000 m² vendidos juntos. O valor de venda é R$ 5.500.000.',
+      },
+      { de: 'cliente', antes: 1, texto: 'E tem supermercado perto?' },
+    ],
+    espera: {
+      acoes: RESPONDEU,
+      naV10: { acoes: RESPONDEU, decisaoOpcional: true },
+      pertoDoImovel: true,
+      algum: [r(/supermercado|mercado|nordest|assa[íi]|favorito/i, 'diz o supermercado que o mapa mostrou')],
     },
   },
 ];
@@ -1748,6 +1786,8 @@ export interface OpcoesDaConferencia {
   readonly temVisita?: boolean;
   /** A versão pede a decisão aos admins (v10)? Com ela, valem `naV10` e a decisão. */
   readonly temDecisao?: boolean;
+  /** A versão tem a busca do que fica perto do imóvel (v11)? */
+  readonly temPerto?: boolean;
 }
 
 /** Vazio é acerto. Cada item diz o que falhou, para o relatório. */
@@ -1872,6 +1912,12 @@ export function conferirCasoDaBateria(
   ) {
     falhas.push('não buscou no mapa (nota 14)');
   }
+  const buscouPerto = (resposta.ferramentas ?? []).includes('buscar_perto_do_imovel');
+  if (espera.pertoDoImovel === true && opcoes.temPerto === true && !buscouPerto) {
+    falhas.push('não conferiu no mapa o que fica perto do imóvel');
+  }
+  if (!(opcoes.temPerto === true && buscouPerto))
+    for (const regra of espera.nuncaSemOMapa ?? []) if (regra.re.test(lido)) falhas.push(regra.diz);
   return falhas;
 }
 

@@ -122,6 +122,8 @@ export type LugarDoNominatim = {
   nome: string;
   /** `addresstype` do OSM (road, village, suburb, city, postcode…). */
   tipo: string;
+  /** "categoria:tipo" do OSM (amenity:school, shop:supermarket…), quando vem (27/11/2026). */
+  categoria?: string;
   bairro: string | null;
   cidade: string | null;
   lat: number;
@@ -168,6 +170,9 @@ export function lerLugares(bruto: unknown, limite: number): RespostaComVarios {
     lugares.push({
       nome: nome || exibido.slice(0, 80),
       tipo: typeof r.addresstype === 'string' ? r.addresstype : typeof r.type === 'string' ? r.type : 'lugar',
+      ...(typeof r.category === 'string' && typeof r.type === 'string'
+        ? { categoria: `${r.category}:${r.type}` }
+        : {}),
       bairro: bairro !== null && bairro !== cidade ? bairro : null,
       cidade,
       lat,
@@ -184,7 +189,11 @@ export type ClienteDoNominatim = {
    * Até `limite` lugares (o de `criarClienteDoNominatim`, 3 por padrão), na caixa
    * `viewbox` quando houver. Mesma fila e mesmo intervalo de `buscar`.
    */
-  buscarVarios(consulta: string): Promise<RespostaComVarios>;
+  buscarVarios(
+    consulta: string,
+    /** Outra caixa e outro limite só para esta busca (a busca perto do imóvel, 27/11/2026). */
+    opcoes?: { viewbox?: string; limite?: number },
+  ): Promise<RespostaComVarios>;
 };
 
 /**
@@ -246,14 +255,22 @@ export function criarClienteDoNominatim(argumentos: {
     }
   };
 
-  const varios = async (consulta: string): Promise<RespostaComVarios> =>
-    lerLugares(
+  const varios = async (
+    consulta: string,
+    opcoes: { viewbox?: string; limite?: number } = {},
+  ): Promise<RespostaComVarios> => {
+    const lim =
+      opcoes.limite === undefined ? limite : Math.min(Math.max(Math.trunc(opcoes.limite), 1), 10);
+    const cx =
+      opcoes.viewbox === undefined ? caixa : `&viewbox=${encodeURIComponent(opcoes.viewbox)}&bounded=1`;
+    return lerLugares(
       await pedir(
-        `${base}/search?format=jsonv2&limit=${limite}&countrycodes=br&addressdetails=1${caixa}` +
+        `${base}/search?format=jsonv2&limit=${lim}&countrycodes=br&addressdetails=1${cx}` +
           `&q=${encodeURIComponent(consulta)}`,
       ),
-      limite,
+      lim,
     );
+  };
 
   const uma = async (consulta: string): Promise<RespostaDoNominatim> => {
     const espera = intervalo - (Date.now() - ultimoFim);
@@ -291,10 +308,10 @@ export function criarClienteDoNominatim(argumentos: {
       fila = proxima.catch(() => undefined);
       return proxima;
     },
-    buscarVarios(consulta) {
+    buscarVarios(consulta, opcoes) {
       const proxima = fila.then(
-        () => varios(consulta),
-        () => varios(consulta),
+        () => varios(consulta, opcoes),
+        () => varios(consulta, opcoes),
       );
       fila = proxima.catch(() => undefined);
       return proxima;

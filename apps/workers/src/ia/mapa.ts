@@ -20,6 +20,8 @@ export interface LugarNoMapa {
   readonly nome: string;
   /** `addresstype` do OpenStreetMap. */
   readonly tipo: string;
+  /** "categoria:tipo" do OpenStreetMap (amenity:school...), quando veio (27/11/2026). */
+  readonly categoria?: string;
   /** 'ponto' dá distância; 'cidade' (cidade inteira, CEP da cidade) só diz a cidade. */
   readonly nivel: 'ponto' | 'cidade';
   readonly bairro: string | null;
@@ -30,6 +32,15 @@ export interface LugarNoMapa {
 
 export interface BuscaNoMapa {
   buscar(consulta: string): Promise<{ readonly lugares: readonly LugarNoMapa[]; readonly doCache: boolean }>;
+  /**
+   * O que fica numa caixa ("oeste,norte,leste,sul"), pelo termo do mapa ("escola"), com o
+   * mesmo cache (chave `perto <termo> <caixa>`). Devolve até 10; quem chama escolhe os mais
+   * perto. A busca perto do imóvel (27/11/2026).
+   */
+  buscarNaCaixa?(
+    termo: string,
+    caixa: string,
+  ): Promise<{ readonly lugares: readonly LugarNoMapa[]; readonly doCache: boolean }>;
 }
 
 export interface ImovelNoMapa {
@@ -82,6 +93,7 @@ function lugarDoCache(valor: unknown): LugarNoMapa | null {
   return {
     nome: v.nome,
     tipo,
+    ...(typeof v.categoria === 'string' ? { categoria: v.categoria } : {}),
     nivel: v.nivel === 'cidade' || v.nivel === 'ponto' ? v.nivel : nivelDoLugar(tipo, v.nome),
     bairro: typeof v.bairro === 'string' ? v.bairro : null,
     cidade: typeof v.cidade === 'string' ? v.cidade : null,
@@ -122,6 +134,41 @@ export function criarBuscaNoMapa(argumentos: {
         p_licenca: resposta.licenca ?? 'Data © OpenStreetMap contributors, ODbL 1.0',
       });
       if (erroDeGravacao) logger.warn('o cache do mapa não gravou', { erro: erroDeGravacao.message });
+      return { lugares, doCache: false };
+    },
+    async buscarNaCaixa(termo, caixa) {
+      // O cache guarda até 3 lugares por chave; aqui vão os 10 da caixa em 4 chaves de 3,
+      // para não ir ao mapa de novo (a ordem é a do OpenStreetMap; quem chama ordena).
+      const chave = (i: number) => `perto ${termo} ${caixa} ${i}`;
+      const guardados: LugarNoMapa[] = [];
+      let completo = true;
+      for (let i = 0; i < 4; i++) {
+        const { data, error } = await cliente.rpc('ia_lugar_no_mapa_ler', { p_consulta: chave(i) });
+        if (error || !Array.isArray(data)) {
+          completo = false;
+          break;
+        }
+        guardados.push(...data.map(lugarDoCache).filter((l): l is LugarNoMapa => l !== null));
+        if (data.length < 3) break;
+      }
+      if (completo) return { lugares: guardados, doCache: true };
+      const resposta = await nominatim.buscarVarios(termo, { viewbox: caixa, limite: 10 });
+      const lugares = resposta.lugares.map(
+        (l): LugarNoMapa => ({ ...l, nivel: nivelDoLugar(l.tipo, l.nome) }),
+      );
+      for (let i = 0; i < 4; i++) {
+        const parte = lugares.slice(i * 3, i * 3 + 3);
+        const { error } = await cliente.rpc('ia_lugar_no_mapa_gravar', {
+          p_consulta: chave(i),
+          p_resultados: parte,
+          p_licenca: resposta.licenca ?? 'Data © OpenStreetMap contributors, ODbL 1.0',
+        });
+        if (error) {
+          logger.warn('o cache do mapa não gravou', { erro: error.message });
+          break;
+        }
+        if (parte.length < 3) break;
+      }
       return { lugares, doCache: false };
     },
   };

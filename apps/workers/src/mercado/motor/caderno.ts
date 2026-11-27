@@ -606,3 +606,27 @@ export const ARG_LUGAR: Record<
   },
   'nisia-floresta-tabatinga': { setores: 'da praia de Tabatinga', ocasional: 'casa de praia' },
 };
+
+/**
+ * O caderno da rodada de verdade: o do protótipo com o que o dono liberou depois.
+ *   - 27/11/2026: "O terreno de Pipa pode ter o m² comparado sim" — sai a trava de preço
+ *     da FICHA 4 e o "Não diga" do m² e da comparação de preço (a soma dos terrenos
+ *     continua proibida).
+ * O teste de ouro continua com `ARG_CADERNO`, a cópia literal.
+ */
+export const CADERNO_DO_DONO: Record<string, EntradaDoCaderno> = Object.fromEntries(
+  Object.entries(ARG_CADERNO).map(([ref, e]) => {
+    if (ref !== 'TE0005') return [ref, e];
+    const { preco_bloqueado: _fora, ...motor } = e.motor ?? {};
+    return [
+      ref,
+      {
+        ...e,
+        motor,
+        nao_diga: (e.nao_diga ?? []).map((t) =>
+          t === 'm², soma dos terrenos ou comparação de preço (FICHA 4)' ? 'soma dos terrenos (FICHA 4)' : t,
+        ),
+      },
+    ];
+  }),
+);

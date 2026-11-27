@@ -5,7 +5,7 @@
  * números obrigatórios, mesmos bloqueios, mesmo "Não diga". O teste de ouro
  * compara o dossiê inteiro, imóvel por imóvel.
  */
-import { ARG_CADERNO, ARG_LUGAR } from './caderno';
+import { ARG_LUGAR } from './caderno';
 import {
   apos,
   brlCurto,
@@ -237,7 +237,8 @@ export function montarVantagens(
   opcoes: OpcoesDasVantagens = {},
 ): Dossie {
   const ORDEM_IMOVEIS = opcoes.ordem ?? ORDEM_DO_PROTOTIPO;
-  const LIMIAR = (opcoes.regras ?? REGRAS_DO_DONO).limiarPreco;
+  const REGRAS = opcoes.regras ?? REGRAS_DO_DONO;
+  const LIMIAR = REGRAS.limiarPreco;
   const R = M.out;
   const X = R.extras;
   const coleta = B.coleta;
@@ -355,7 +356,7 @@ export function montarVantagens(
   }
 
   for (const ref of ORDEM_IMOVEIS) {
-    const cad = ARG_CADERNO[ref];
+    const cad = REGRAS.caderno[ref];
     const fich = B.fichas.find((f) => f.codigo === ref);
     const r = R.imoveis.find((x) => x.ref === ref);
     const cand = (id: string): Candidato | undefined => r?.candidatos.find((x) => x.id === id);
@@ -407,7 +408,11 @@ export function montarVantagens(
     /* preço (P1): vantagem só quando o nosso ganha; senão, o bloqueio com o número */
     const ve = (r.preco.veredito || {}) as Record<string, unknown>;
     const esc = r.preco.aneis?.find((a) => a.anel === r.preco.anel);
-    if (r.preco.vantagem && r.preco.vantagem.status === 'usar') {
+    const aConferirVai =
+      REGRAS.precoAConferirVaiAoDono &&
+      r.preco.vantagem?.status === 'conferir' &&
+      !(r.preco.conferir || []).some((s) => /possível o mesmo/.test(s));
+    if (r.preco.vantagem && (r.preco.vantagem.status === 'usar' || aConferirVai)) {
       const v = r.preco.vantagem;
       V.push({
         id: 'P1.m2',
@@ -416,7 +421,10 @@ export function montarVantagens(
         nivel: 'preco',
         eixo: r.preco.anel ? 'mesmo_tipo_regioes_vizinhas' : 'mesma_regiao_mesmo_tipo',
         forca: v.forca,
-        status: 'usar',
+        status: v.status === 'conferir' ? 'conferir' : 'usar',
+        ...(v.status === 'conferir'
+          ? { rigor: { conferir: (r.preco.conferir || []).join('; ') } }
+          : {}),
         texto_base: `Dos ${v.n} ${baseNome(r.grupo, true)} de tamanho parecido à venda que acompanhamos em ${mes}, ${v.kBom} pedem mais pelo m².`,
         gatilhos: ['caro', 'mais_barato', 'comparacao'],
         so_com_preco_dito: true,

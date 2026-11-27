@@ -12,7 +12,7 @@
  *     comparação" e nenhum A1 sai (o protótipo sempre tinha o modelo);
  *   - a lista de imóveis e o dia da rodada vêm de fora (`OpcoesDoMotor`).
  */
-import { ARG_CADERNO } from './caderno';
+
 import {
   binCdf,
   bh,
@@ -343,6 +343,8 @@ export const okC = (c: unknown): boolean => c === 'A' || c === 'B';
 export const bairroLimpo = (a: { bairro?: unknown }): string =>
   String(a.bairro || '')
     .replace(/\s*\(.*\)\s*/g, '')
+    // Resto de HTML do site de origem ("Praia da Pipa &rsaquo;", 27/11/2026).
+    .replace(/&[a-z]+;|[›»]/gi, '')
     .trim() || '?';
 
 /** O motor tem o modelo de preço desta rodada? Sem ele, preço e A1 não saem. */
@@ -1556,7 +1558,7 @@ export function rodarMotor(B: BaseDoMotor, opcoes: OpcoesDoMotor = {}): SaidaDoM
     'natal-potengi': 'Potengi',
   };
   for (const ref of ALVO) {
-    const cad = ARG_CADERNO[ref];
+    const cad = REGRAS.caderno[ref];
     const cod = cad?.unidade || ref;
     const M = cad?.motor || {};
     const im0 = B.ims.find((x) => x.codigo === cod);

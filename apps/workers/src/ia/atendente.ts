@@ -47,7 +47,8 @@ import {
   TIPOS_DA_AGENDA,
   FRASE_DA_VISITA,
   MAX_BUSCAS_NO_MAPA,
-  MAX_VOLTAS_DO_ATENDENTE,
+  MAX_BUSCAS_PERTO,
+  MAX_VOLTAS_DO_ATENDENTE_V11,
   atendenteImovaV6,
   atendenteImovaV11,
   lerVantagensDoBanco,
@@ -60,6 +61,7 @@ import {
 import { ErroDaEsteira } from '../fila/esteira';
 import { buscarContatoDaFicha } from './banco';
 import { ferramentaBuscarNoMapa } from './busca-no-mapa';
+import { ferramentaBuscarPertoDoImovel } from './perto-do-imovel';
 import { ErroDoModelo, RespostaIlegivelError } from './cliente';
 import { type FotoPreparada, prepararFotoDoImovel, textoComALegenda } from './foto-do-imovel';
 import { type DecisaoPreparada, falaDaDecisao, prepararDecisao } from './decisao';
@@ -517,8 +519,16 @@ export async function atenderCliente(contexto: ContextoDaIa, bruto: unknown): Pr
               // escreveu barra um lugar longe. Fica no worker; não vai ao modelo nem ao mapa.
               falasDoCliente: (e.mensagens ?? []).filter((m) => m.de === 'cliente').map((m) => m.texto ?? ''),
             }),
+            // O que fica perto do imóvel (v11, 27/11/2026: "a questão da escola e de outras
+            // referências a IA deve verificar via maps"): o mesmo mapa, do lugar do imóvel.
+            buscar_perto_do_imovel: ferramentaBuscarPertoDoImovel({
+              cliente: contexto.cliente,
+              busca: mapa,
+              logger: contexto.logger,
+              maxBuscas: MAX_BUSCAS_PERTO,
+            }),
           },
-          { maxVoltas: MAX_VOLTAS_DO_ATENDENTE },
+          { maxVoltas: MAX_VOLTAS_DO_ATENDENTE_V11 },
         )
       : await executar(contexto, prompt, entrada, contato, vinculos);
   } catch (erro) {
