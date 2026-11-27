@@ -17,6 +17,7 @@ import { conselheiroDoLeadV1 } from './prompts/conselheiro-do-lead/v1';
 import { canalDeChegadaV1 } from './prompts/canal-de-chegada/v1';
 import { resumoDaPassagemV1 } from './prompts/resumo-da-passagem/v1';
 import { respostaDaDecisaoV1 } from './prompts/resposta-da-decisao/v1';
+import { notaDaRespostaV1 } from './prompts/nota-da-resposta/v1';
 import { classificarIntencaoV1 } from './prompts/classificar-intencao/v1';
 import { fichaDaConversaV1 } from './prompts/ficha-da-conversa/v1';
 import { leituraDoClienteV1 } from './prompts/leitura-do-cliente/v1';
@@ -96,6 +97,9 @@ export const CATALOGO = {
   // Só da Imova (25/11/2026): a resposta que um admin escreveu no aviso de decisão, dita
   // ao cliente pela IA (só o tom muda).
   'resposta-da-decisao': { 1: respostaDaDecisaoV1 },
+  // Só da Imova (27/11/2026): a nota que guardaria no caderno a resposta de um admin a uma
+  // pergunta do aviso de decisão. Só sugere; quem guarda é a gestão, com um clique.
+  'nota-da-resposta': { 1: notaDaRespostaV1 },
 } as const;
 
 export type IdDePrompt = keyof typeof CATALOGO;
@@ -169,6 +173,7 @@ export const VIGENTES = {
   'retomar-conversa': 2,
   'resumo-da-passagem': 1,
   'resposta-da-decisao': 1,
+  'nota-da-resposta': 1,
 } as const satisfies Record<IdDePrompt, number>;
 
 /** Uma versão específica, com o tipo daquela versão. */

@@ -14,6 +14,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { EMPRESA } from '@/lib/empresa';
+import { CartaoDaNota } from '@/components/ia-que-atende/cartao-da-nota';
+import {
+  CHAVE_DAS_NOTAS_SUGERIDAS,
+  apareceNoCanto,
+  lerNotasSugeridas,
+} from '@/components/ia-que-atende/notas-sugeridas';
 
 import {
   type Aviso,
@@ -44,6 +50,12 @@ import {
  */
 
 const RITMO_MS = 30_000;
+/**
+ * Depois de responder uma pergunta, a IA leva alguns segundos para escrever a nota
+ * sugerida (27/11/2026): por 45 segundos o cartão procura a cada 4.
+ */
+const RITMO_DA_NOTA_MS = 4_000;
+const ESPERA_DA_NOTA_MS = 45_000;
 const CHAVE_DAS_VISTAS = 'komune.avisos.decisoes-vistas.v1';
 
 function lerVistas(usuarioId: string): Set<string> | null {
@@ -93,6 +105,18 @@ export function VigiaDeDecisoes({ usuarioId, ligado }: { usuarioId: string; liga
   const consultas = useQueryClient();
   const [recolhido, setRecolhido] = useState(false);
   const vistasNaMemoria = useRef<Set<string> | null>(null);
+  // A IA aprende com as respostas (27/11/2026): o cartão "Guardar para os próximos
+  // clientes?" aparece aqui para quem respondeu; o X só esconde aqui.
+  const [esperandoNotaAte, setEsperandoNotaAte] = useState(0);
+  const [escondidas, setEscondidas] = useState<ReadonlySet<string>>(new Set());
+  const notas = useQuery({
+    queryKey: CHAVE_DAS_NOTAS_SUGERIDAS,
+    queryFn: lerNotasSugeridas,
+    enabled: ligado,
+    staleTime: 3_000,
+    refetchInterval: () => (Date.now() < esperandoNotaAte ? RITMO_DA_NOTA_MS : RITMO_MS),
+    refetchOnWindowFocus: true,
+  });
 
   const decisoes = useQuery({
     queryKey: CHAVE_DAS_DECISOES,
@@ -149,13 +173,33 @@ export function VigiaDeDecisoes({ usuarioId, ligado }: { usuarioId: string; liga
   const atualizar = useCallback(() => {
     void consultas.invalidateQueries({ queryKey: CHAVE_DAS_DECISOES });
   }, [consultas]);
-
-  if (!ligado || lista.length === 0) return null;
+  const atualizarNotas = useCallback(() => {
+    void consultas.invalidateQueries({ queryKey: CHAVE_DAS_NOTAS_SUGERIDAS });
+  }, [consultas]);
+  const respondeuPergunta = useCallback(() => {
+    setRecolhido(false);
+    setEsperandoNotaAte(Date.now() + ESPERA_DA_NOTA_MS);
+    void consultas.invalidateQueries({ queryKey: CHAVE_DAS_NOTAS_SUGERIDAS });
+  }, [consultas]);
 
   // O relógio do cartão é a última leitura (a cada 30 s): "há 3 min" sem relógio próprio.
   const agora = decisoes.dataUpdatedAt;
+  const noCanto = ligado
+    ? (notas.data ?? []).filter(
+        (n) => !escondidas.has(n.id) && apareceNoCanto(n, notas.dataUpdatedAt || agora),
+      )
+    : [];
+
+  if (!ligado || (lista.length === 0 && noCanto.length === 0)) return null;
+
   const titulo =
-    lista.length === 1 ? 'A IA precisa da sua decisão' : `${lista.length} decisões para a IA`;
+    lista.length === 0
+      ? noCanto.length === 1
+        ? 'Guardar no caderno?'
+        : `${noCanto.length} respostas para guardar`
+      : lista.length === 1
+        ? 'A IA precisa da sua decisão'
+        : `${lista.length} decisões para a IA`;
 
   return (
     <aside aria-label="Decisões para a IA" className="pointer-events-auto">
@@ -177,7 +221,22 @@ export function VigiaDeDecisoes({ usuarioId, ligado }: { usuarioId: string; liga
         {!recolhido && (
           <ul className="max-h-[min(60dvh,38rem)] space-y-2 overflow-y-auto px-3 pb-3">
             {lista.map((d) => (
-              <CartaoDaDecisao key={d.id} decisao={d} agora={agora} aoMudar={atualizar} />
+              <CartaoDaDecisao
+                key={d.id}
+                decisao={d}
+                agora={agora}
+                aoMudar={atualizar}
+                aoResponderPergunta={respondeuPergunta}
+              />
+            ))}
+            {noCanto.map((n) => (
+              <CartaoDaNota
+                key={n.id}
+                nota={n}
+                noCanto
+                aoMudar={atualizarNotas}
+                aoFechar={() => setEscondidas((atual) => new Set([...atual, n.id]))}
+              />
             ))}
           </ul>
         )}
@@ -229,10 +288,13 @@ function CartaoDaDecisao({
   decisao: d,
   agora,
   aoMudar,
+  aoResponderPergunta,
 }: {
   decisao: DecisaoDaIa;
   agora: number;
   aoMudar: () => void;
+  /** Respondeu uma pergunta: a nota sugerida chega em alguns segundos (27/11/2026). */
+  aoResponderPergunta: () => void;
 }) {
   const [modo, setModo] = useState<Modo | null>(null);
   const [valorDigitado, setValorDigitado] = useState('');
@@ -255,6 +317,7 @@ function CartaoDaDecisao({
       if (r.ok || r.motivo === 'ja_decidido' || r.motivo === 'nao_existe') {
         setModo(null);
         aoMudar();
+        if (r.ok && d.tipo === 'pergunta') aoResponderPergunta();
       } else setErro(aviso.descricao ?? aviso.titulo);
     } catch (e) {
       toast.error('Não deu para responder', {

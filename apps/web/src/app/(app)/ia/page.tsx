@@ -16,8 +16,14 @@ export const metadata: Metadata = { title: 'IA que atende' };
  * caderno; ligar, desligar e configurar é de admin e gestor, e o Postgres confere
  * de novo em cada função (`app.admin_ou_gestor`).
  */
-export default async function Pagina() {
+export default async function Pagina({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   if (!EMPRESA.modulos.iaQueAtende) notFound();
   await requireRole(...PAPEIS_DO_CRM);
-  return <TelaDaIa />;
+  // "Ver no caderno", do cartão da nota guardada (27/11/2026), abre direto na aba.
+  const { aba } = await searchParams;
+  return <TelaDaIa abaInicial={aba === 'caderno' ? 'caderno' : 'respostas'} />;
 }

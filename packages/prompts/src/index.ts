@@ -197,6 +197,13 @@ export {
 } from './prompts/resposta-da-decisao/v1';
 
 export {
+  type EntradaDaNotaDaResposta,
+  type SaidaDaNotaDaResposta,
+  motivoParaNaoSugerirANota,
+  notaDaRespostaV1,
+} from './prompts/nota-da-resposta/v1';
+
+export {
   BASE_DO_ENSAIO_V5,
   CENARIOS_DE_VISITA_V5,
   CENARIOS_DO_ATENDENTE_V5,

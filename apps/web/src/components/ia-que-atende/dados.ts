@@ -324,7 +324,8 @@ export async function carregarRespostasRecentes(limite = 40): Promise<RespostaDa
 export interface LinhaDoCaderno {
   readonly id: number;
   readonly texto: string;
-  readonly origem: 'treino' | 'correcao' | 'tela';
+  /** `resposta`: nasceu de uma resposta guardada no aviso de decisão (27/11/2026). */
+  readonly origem: 'treino' | 'correcao' | 'tela' | 'resposta';
   readonly criadoEm: string;
 }
 
@@ -338,7 +339,10 @@ export async function carregarCaderno(): Promise<LinhaDoCaderno[]> {
   return ((data ?? []) as Record<string, unknown>[]).map((l) => ({
     id: numero(l.id),
     texto: String(l.texto ?? ''),
-    origem: l.origem === 'treino' || l.origem === 'correcao' ? l.origem : 'tela',
+    origem:
+      l.origem === 'treino' || l.origem === 'correcao' || l.origem === 'resposta'
+        ? l.origem
+        : 'tela',
     criadoEm: String(l.criado_em),
   }));
 }

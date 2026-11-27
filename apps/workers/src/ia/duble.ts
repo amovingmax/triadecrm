@@ -44,7 +44,8 @@ export type FluxoDoDuble =
   | 'conselheiro_imovel'
   | 'retomada'
   | 'resumo_passagem'
-  | 'resposta_decisao';
+  | 'resposta_decisao'
+  | 'nota_resposta';
 
 export class EsquemaDesconhecidoError extends Error {
   constructor(campos: readonly string[]) {
@@ -73,6 +74,8 @@ export function fluxoDoEsquema(esquema: Record<string, unknown>): FluxoDoDuble {
   if (campos.has('porquePassou')) return 'resumo_passagem';
   // A resposta escrita pelo admin no aviso de decisão (Imova, 25/11/2026): só a mensagem.
   if (campos.has('mensagem') && campos.size === 1) return 'resposta_decisao';
+  // A nota que guardaria a resposta do admin no caderno (Imova, 27/11/2026).
+  if (campos.has('viraNota')) return 'nota_resposta';
   if (campos.has('textoLimpo')) return 'transcricao';
   // A IA que atende o cliente da Imova (06/11/2026): é a única que devolve uma ação
   // e as anotações do treino.
@@ -1002,6 +1005,34 @@ function responderDecisaoNoDuble(mensagem: string): Record<string, unknown> {
   return { mensagem: limitar(`Simulação: ${resposta}`, 300) };
 }
 
+/**
+ * A nota da resposta no dublê: horário combinado ("às 10h", "amanhã") não vira nota; o resto
+ * vira a nota do imóvel com o texto da resposta, e o nome da ficha quando ela não existe.
+ */
+function notaDaRespostaNoDuble(mensagem: string): Record<string, unknown> {
+  const resposta = /A RESPOSTA DA IMOVA: (.*)/.exec(mensagem)?.[1]?.trim() ?? '';
+  const semImovel = mensagem.includes('IMÓVEL: (nenhum');
+  if (/amanh[ãa]|às \d/i.test(resposta)) {
+    return {
+      viraNota: false,
+      porque: 'Simulação: combinado com um cliente.',
+      textoDoImovel: null,
+      textoGeral: null,
+      alcance: 'imovel',
+      tituloDaFicha: null,
+    };
+  }
+  const texto = limitar(`Simulação: ${resposta}`, 300);
+  return {
+    viraNota: true,
+    porque: 'Simulação: fato do imóvel.',
+    textoDoImovel: semImovel ? null : texto,
+    textoGeral: semImovel ? texto : null,
+    alcance: semImovel ? 'geral' : 'imovel',
+    tituloDaFicha: mensagem.includes('JÁ TEM FICHA NO CADERNO: não') ? 'IMÓVEL DE SIMULAÇÃO' : null,
+  };
+}
+
 const RESPOSTAS: Readonly<
   Record<FluxoDoDuble, (mensagem: string, pedido: PedidoAoModelo) => Record<string, unknown>>
 > = {
@@ -1020,6 +1051,7 @@ const RESPOSTAS: Readonly<
   retomada: retomarNoDuble,
   resumo_passagem: resumirPassagemNoDuble,
   resposta_decisao: responderDecisaoNoDuble,
+  nota_resposta: notaDaRespostaNoDuble,
 };
 
 // ---------------------------------------------------------------------------

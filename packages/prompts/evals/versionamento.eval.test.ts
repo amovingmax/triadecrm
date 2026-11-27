@@ -148,6 +148,8 @@ describe('catálogo do Tríade', () => {
       // A resposta que um admin escreveu no aviso de decisão, dita ao cliente pela IA, só
       // da Imova (25/11/2026).
       'resposta-da-decisao',
+      // A nota que guardaria no caderno a resposta de um admin, só da Imova (27/11/2026).
+      'nota-da-resposta',
     ]);
   });
 

@@ -68,6 +68,10 @@ Opções de "ai":
                          Cinco passagens (visita, preço, "quero uma pessoa", procura que não
                          temos, FGTS) pelo resumo-da-passagem@v1 de verdade e pela conferência
                          do worker. Imprime o relatório e o JSON. Não grava resumo.
+  --ensaio=nota [--repeticoes=1] [--teto=0.5]
+                         Doze respostas de admins no aviso de decisão pelo nota-da-resposta@v1
+                         de verdade e pela rede do worker: vira nota quando deve, o alcance e
+                         o fato. Imprime o relatório e o JSON. Não grava sugestão nem caderno.
 
 Opções de "rotas":
   --geocodificar         Faz UMA passada de geocodificação no Nominatim (1 req/s) e sai.

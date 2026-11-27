@@ -1922,8 +1922,84 @@ export function conferirCasoDaBateria(
 }
 
 /** O caso pelo id, para rodar só alguns (`--casos=I01,A04`). */
+/**
+ * O caderno que aprende com as respostas (27/11/2026): casos que só rodam pedidos pelo id
+ * (`--casos=N01,N02,N03`), com as notas guardadas trocadas no caderno do ensaio
+ * (`BATERIA_CADERNO_B64`: a FICHA 5 com o item do FGTS, a FICHA nova da sala do Brisa Mall e
+ * a nota 6 b que deixa responder o FGTS escrito). Fora da bateria de 40: sem as trocas, N01 e
+ * N02 pedem a decisão, como devem.
+ */
+export const CASOS_DO_CADERNO_QUE_APRENDE: readonly CasoDaBateria[] = [
+  {
+    id: 'N01',
+    titulo: 'Energia da sala do Brisa Mall, com a resposta guardada',
+    grupo: 'atender',
+    origem: 'decisão real de 27/11 (energia individualizada), guardada na FICHA nova da sala',
+    critico: false,
+    ...TERCA,
+    nome: 'Lúcia Amaral',
+    falas: [
+      {
+        de: 'cliente',
+        antes: 1,
+        texto: 'Bom dia! A sala de 19 m² do Brisa Mall tem energia separada do condomínio?',
+      },
+    ],
+    espera: {
+      acoes: RESPONDEU,
+      deve: [r(/individualizad|separad|à parte|a parte do condom/i, 'responde da energia pela nota')],
+      nunca: [r(/vou verificar|vou confirmar|te retorno/i, 'promete verificar o que está escrito')],
+    },
+  },
+  {
+    id: 'N02',
+    titulo: 'FGTS no terreno de Tabatinga, com a resposta guardada',
+    grupo: 'atender',
+    origem: 'decisões reais de 26/11 (FGTS no TE0004, duas vezes), guardadas na FICHA 5',
+    critico: false,
+    ...TERCA,
+    nome: 'Otávio Rocha',
+    falas: [
+      {
+        de: 'cliente',
+        antes: 1,
+        texto: 'Consigo usar meu FGTS para comprar o terreno de frente para o mar em Tabatinga?',
+      },
+    ],
+    espera: {
+      acoes: RESPONDEU,
+      deve: [r(/n[ãa]o (d[áa]|é poss[íi]vel|consegu|aceita|pode)/i, 'diz que não dá, pela nota')],
+      nunca: [
+        r(/vou verificar|vou confirmar|te retorno/i, 'promete verificar o que está escrito'),
+        r(/\bsim\b,? (d[áa]|aceita|pode)/i, 'diz que dá'),
+      ],
+    },
+  },
+  {
+    id: 'N03',
+    titulo: 'Vaga de garagem na sala do Brisa Mall: sem nota, pergunta aos admins',
+    grupo: 'atender',
+    origem: 'controle do caderno que aprende: o que ninguém guardou continua sendo perguntado',
+    critico: false,
+    ...TERCA,
+    nome: 'Lúcia Amaral',
+    falas: [
+      {
+        de: 'cliente',
+        antes: 1,
+        texto: 'A sala de 19 m² do Brisa Mall tem vaga de garagem própria?',
+      },
+    ],
+    espera: {
+      acoes: PASSOU,
+      naV10: { acoes: RESPONDEU, decisao: { tipo: 'pergunta' } },
+      nunca: [r(/\b(tem|possui) (uma )?vaga|n[ãa]o tem vaga/i, 'responde sozinha sobre a vaga')],
+    },
+  },
+];
+
 export function casosDaBateria(ids?: readonly string[]): readonly CasoDaBateria[] {
   if (ids === undefined || ids.length === 0) return CASOS_DA_BATERIA;
   const pedidos = new Set(ids.map((id) => id.trim().toUpperCase()));
-  return CASOS_DA_BATERIA.filter((caso) => pedidos.has(caso.id));
+  return [...CASOS_DA_BATERIA, ...CASOS_DO_CADERNO_QUE_APRENDE].filter((caso) => pedidos.has(caso.id));
 }

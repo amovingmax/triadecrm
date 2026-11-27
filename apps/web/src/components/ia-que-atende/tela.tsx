@@ -58,6 +58,8 @@ import {
   type TomDaSituacao,
 } from './formas';
 import { DialogoDeCorrecao } from './na-conversa';
+import { CartaoDaNota } from './cartao-da-nota';
+import { CHAVE_DAS_NOTAS_SUGERIDAS, lerNotasSugeridas } from './notas-sugeridas';
 import { ConfiguracaoDaRetomada, PlacarDaRetomada } from './retomada';
 
 /**
@@ -82,13 +84,16 @@ import { ConfiguracaoDaRetomada, PlacarDaRetomada } from './retomada';
  * de escrever, e "Tirar" passou para dentro da edição da nota.
  */
 
-type Aba = 'respostas' | 'caderno' | 'configuracao';
+export type Aba = 'respostas' | 'caderno' | 'configuracao';
 
-const ABAS: readonly { id: Aba; rotulo: string }[] = [
-  { id: 'respostas', rotulo: 'Respostas' },
-  { id: 'caderno', rotulo: 'Caderno' },
-  { id: 'configuracao', rotulo: 'Configuração' },
-];
+/** O Caderno diz quantas notas a IA sugeriu e ninguém decidiu (27/11/2026). */
+function abas(sugeridas: number): readonly { id: Aba; rotulo: string }[] {
+  return [
+    { id: 'respostas', rotulo: 'Respostas' },
+    { id: 'caderno', rotulo: sugeridas > 0 ? `Caderno · ${sugeridas}` : 'Caderno' },
+    { id: 'configuracao', rotulo: 'Configuração' },
+  ];
+}
 
 /** O que muda a IA (ligar, modo, anotar): 44px no celular, 40 no computador. */
 const BOTAO_PRINCIPAL = 'toque h-11 md:h-10';
@@ -129,12 +134,13 @@ const ROTULO_DA_ACAO: Readonly<Record<string, string>> = {
   retomou: 'retomou o contato',
 };
 
-export function TelaDaIa() {
-  const [aba, setAba] = useState<Aba>('respostas');
+export function TelaDaIa({ abaInicial = 'respostas' }: { abaInicial?: Aba } = {}) {
+  const [aba, setAba] = useState<Aba>(abaInicial);
   const [filtro, setFiltro] = useState<FiltroDasRespostas>('Todas');
   const [quantas, setQuantas] = useState(RESPOSTAS_POR_VEZ);
   const painel = useQuery({ queryKey: CHAVE_DO_PAINEL, queryFn: () => carregarPainel(7) });
   const p = painel.data;
+  const sugeridas = useQuery({ queryKey: CHAVE_DAS_NOTAS_SUGERIDAS, queryFn: lerNotasSugeridas });
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -158,7 +164,12 @@ export function TelaDaIa() {
           da casca, que tem 56px no celular e 72 do `md` para cima. A faixa vai de
           ponta a ponta da página, com o fundo da tela esfumado por trás. */}
       <div className="sticky top-14 z-20 -mx-4 flex flex-col gap-2.5 bg-background/90 px-4 py-2.5 backdrop-blur-md md:top-[72px] md:-mx-5 md:px-5">
-        <SeletorDeAba itens={ABAS} ativo={aba} aoTrocar={setAba} rotulo="Partes da IA que atende" />
+        <SeletorDeAba
+          itens={abas(sugeridas.data?.length ?? 0)}
+          ativo={aba}
+          aoTrocar={setAba}
+          rotulo="Partes da IA que atende"
+        />
         {aba === 'respostas' ? (
           <FaixaDeslizante rotulo="Filtrar respostas" ativo={filtro} sangria>
             {FILTROS_DAS_RESPOSTAS.map((f) => (
@@ -185,6 +196,7 @@ export function TelaDaIa() {
           assinatura={p?.config.assinatura ?? 'Imova'}
         />
       ) : null}
+      {aba === 'caderno' ? <SugeridasPelaIa /> : null}
       {aba === 'caderno' ? <Caderno /> : null}
       {aba === 'configuracao' && p ? <Configuracao painel={p} /> : null}
     </div>
@@ -535,7 +547,44 @@ const ROTULO_DA_ORIGEM: Readonly<Record<LinhaDoCaderno['origem'], string>> = {
   treino: 'do treino',
   correcao: 'correção',
   tela: 'escrito pela equipe',
+  resposta: 'aprendida de uma resposta',
 };
+
+/**
+ * As respostas que a IA sugeriu guardar e que ninguém decidiu no aviso (27/11/2026): o
+ * mesmo cartão do canto, para toda a gestão.
+ */
+function SugeridasPelaIa() {
+  const clientes = useQueryClient();
+  const consulta = useQuery({ queryKey: CHAVE_DAS_NOTAS_SUGERIDAS, queryFn: lerNotasSugeridas });
+  const lista = consulta.data ?? [];
+  if (lista.length === 0) return null;
+  const atualizar = () => {
+    void clientes.invalidateQueries({ queryKey: CHAVE_DAS_NOTAS_SUGERIDAS });
+    void clientes.invalidateQueries({ queryKey: CHAVE_DA_IA });
+  };
+  return (
+    <section aria-label="Sugeridas pela IA" className={cn(CARTAO, 'ring-2 ring-primary/40')}>
+      <header>
+        <h2 className={TITULO_DO_CARTAO}>
+          Sugeridas pela IA
+          <span className="numerico inline-grid h-[22px] min-w-[22px] place-items-center rounded-full bg-muted px-1.5 text-xs font-semibold text-muted-foreground">
+            {lista.length}
+          </span>
+        </h2>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          Respostas de vocês no aviso de decisão que a IA quer guardar e que ninguém escolheu.
+          Só entram no caderno com o clique de alguém da gestão.
+        </p>
+      </header>
+      <ul className="flex flex-col gap-3">
+        {lista.map((n) => (
+          <CartaoDaNota key={n.id} nota={n} aoMudar={atualizar} />
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 /** Acima disto a nota passa de duas linhas no celular e ganha o "abrir" ao toque. */
 const NOTA_LONGA = 90;

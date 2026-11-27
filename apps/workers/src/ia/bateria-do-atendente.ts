@@ -267,12 +267,19 @@ export async function rodarBateria(
   }
 
   const lida = baseDoBanco.parse(await rpc(contexto, 'ia_atendente_base', {}));
-  const trocas = new Map((opcoes.trocasDoCaderno ?? []).map((n) => [n.id, n.texto]));
+  // Id negativo é nota NOVA, só no ensaio (27/11/2026: a FICHA que nasce de uma resposta
+  // guardada); id positivo troca a nota que existe.
+  const trocas = new Map(
+    (opcoes.trocasDoCaderno ?? []).filter((n) => n.id > 0).map((n) => [n.id, n.texto]),
+  );
+  const novas = (opcoes.trocasDoCaderno ?? [])
+    .filter((n) => n.id < 0)
+    .map((n) => ({ id: 900_000 - n.id, texto: n.texto, origem: 'resposta' }));
   const faltam = [...trocas.keys()].filter((id) => !lida.caderno.some((k) => k.id === id));
   if (faltam.length > 0) throw new Error(`nota do caderno que não existe: ${faltam.join(', ')}`);
   const base = {
     ...lida,
-    caderno: lida.caderno.map((k) => ({
+    caderno: [...lida.caderno, ...novas].map((k) => ({
       ...k,
       texto: semOLinkDaAgenda(trocas.get(k.id) ?? k.texto),
     })),

@@ -360,6 +360,18 @@ describe('preços e conta por chamada', () => {
         semCache: 0.00007,
         comCache: 0.00002,
       },
+      {
+        // A nota que guardaria no caderno a resposta de um admin (Imova, 27/11/2026): uma
+        // chamada por pergunta respondida no aviso de decisão, no Haiku 5.5. Com o
+        // raciocínio e o esquema da saída, perto de US$ 0,005; poucas por dia.
+        id: 'nota-da-resposta',
+        modelo: 'claude-haiku-5-5',
+        tokensDeSistema: 836,
+        tokensDaMensagem: 109,
+        tokensDeSaida: 80,
+        semCache: 0.00013,
+        comCache: 0.00006,
+      },
     ]);
   });
 });

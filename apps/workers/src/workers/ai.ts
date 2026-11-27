@@ -51,6 +51,7 @@ import {
 import { ENSAIOS, eEnsaio, ensaiarAtendente, relatorioDoEnsaio } from '../ia/ensaio-do-atendente';
 import { ensaiarRetomada, relatorioDaRetomada } from '../ia/ensaio-da-retomada';
 import { ensaiarResumo, relatorioDoResumo } from '../ia/ensaio-do-resumo';
+import { ensaiarNota, relatorioDaNota } from '../ia/ensaio-da-nota';
 import type { ContextoDaIa } from '../ia/execucao';
 import { criarBuscaNoMapa, nominatimDaIa } from '../ia/mapa';
 
@@ -231,6 +232,23 @@ export async function runAi(ctx: WorkerContext<'ai'>): Promise<number> {
     process.stdout.write(
       `\n=====RESUMO-JSON=====\n${JSON.stringify(r)}\n=====FIM-RESUMO-JSON=====\n`,
     );
+    return 0;
+  }
+
+  // `--ensaio=nota` (27/11/2026): doze respostas de admins pelo nota-da-resposta@v1 de
+  // verdade, com a rede do worker. Não grava sugestão nem caderno; grava só ai_runs.
+  if (pedidoDeEnsaio === 'nota') {
+    const repeticoes = Math.min(5, Math.max(1, Math.trunc(Number(opcoes.repeticoes) || 1)));
+    const tetoUsd = Math.min(2, Math.max(0.05, Number(opcoes.teto) || 0.5));
+    const r = await ensaiarNota(contexto, { repeticoes, tetoUsd });
+    logger.info('ensaio da nota concluído', {
+      prompt: r.promptVersion,
+      respostas: r.respostas.length,
+      certas: r.respostas.filter((x) => x.certo).length,
+      custo_usd: r.custoUsd,
+    });
+    process.stdout.write(relatorioDaNota(r));
+    process.stdout.write(`\n=====NOTA-JSON=====\n${JSON.stringify(r)}\n=====FIM-NOTA-JSON=====\n`);
     return 0;
   }
 
