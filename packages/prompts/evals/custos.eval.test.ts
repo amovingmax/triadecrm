@@ -366,10 +366,10 @@ describe('preços e conta por chamada', () => {
         // raciocínio e o esquema da saída, perto de US$ 0,005; poucas por dia.
         id: 'nota-da-resposta',
         modelo: 'claude-haiku-5-5',
-        tokensDeSistema: 836,
+        tokensDeSistema: 874,
         tokensDaMensagem: 109,
         tokensDeSaida: 80,
-        semCache: 0.00013,
+        semCache: 0.00014,
         comCache: 0.00006,
       },
     ]);

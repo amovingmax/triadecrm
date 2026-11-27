@@ -70,6 +70,8 @@ interface CasoDaNota {
   readonly fato?: RegExp;
   /** O que nenhuma nota pode ter. */
   readonly nunca?: RegExp;
+  /** As duas notas (este imóvel e todos), para o cartão dar a escolha. */
+  readonly ambas?: boolean;
 }
 
 const CASOS: readonly CasoDaNota[] = [
@@ -108,6 +110,7 @@ const CASOS: readonly CasoDaNota[] = [
     vira: true,
     alcance: 'geral',
     fato: /FGTS/,
+    ambas: true,
   },
   {
     id: 'A04',
@@ -239,6 +242,9 @@ export function falhaDaNota(caso: CasoDaNota, s: SaidaDaNotaDaResposta): string 
   }
   if (caso.nunca !== undefined && [s.textoDoImovel, s.textoGeral].some((t) => t !== null && caso.nunca!.test(t))) {
     return 'a nota tem o que não pode';
+  }
+  if (caso.ambas === true && (s.textoDoImovel === null || s.textoGeral === null)) {
+    return 'sem as duas notas (este imóvel e todos)';
   }
   if (caso.imovel !== null && !caso.temFicha && (s.tituloDaFicha ?? '').trim() === '') {
     return 'sem o nome da ficha nova';

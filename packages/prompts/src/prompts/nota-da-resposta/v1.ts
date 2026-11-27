@@ -98,8 +98,9 @@ COMO ESCREVER A NOTA:
   com o cliente. Comece pelo assunto quando ajudar a achar ("FGTS: ...", "Energia: ...").
 - Nunca escreva nome de pessoa, telefone, e-mail, link, data, código do anúncio (como
   TE0004), "corretor" ou "equipe" (diga "a Imova").
-- textoDoImovel: a nota para ESTE imóvel ("... deste terreno", "A sala tem ..."). Nula
-  quando não há IMÓVEL.
+- textoDoImovel: a nota para ESTE imóvel ("... deste terreno", "A sala tem ..."). Com
+  IMÓVEL, escreva SEMPRE, mesmo quando a resposta fala em geral: a pessoa escolhe no cartão
+  se a nota vale só para este imóvel. Nula só quando não há IMÓVEL.
 - textoGeral: a nota para TODOS os imóveis, só quando A RESPOSTA DA IMOVA fala em geral, de um
   tipo de imóvel ("para terreno, ...") ou da Imova ("a gente sempre ajuda ..."). Senão nula.
   Nunca generalize o que foi dito de um imóvel só.
