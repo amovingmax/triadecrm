@@ -500,6 +500,8 @@ export function rodarMotor(B: BaseDoMotor, opcoes: OpcoesDoMotor = {}): SaidaDoM
     perto3(a, im) &&
     Math.abs(a.preco / im.preco - 1) <= 0.03;
   const talvezMesmo = (a: AnuncioDaBase, im: Imovel): boolean =>
+    // A equipe já decidiu que não é o mesmo (par "não é" ainda valendo): conta como parecido.
+    !(a.nao_e_de ?? []).some((c) => c === im.codigo || c === im.codigo_crm) &&
     a.regiao === im.regiao &&
     temNum(im.preco) &&
     perto3(a, im) &&

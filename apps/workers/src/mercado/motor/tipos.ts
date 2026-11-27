@@ -39,6 +39,12 @@ export interface AnuncioDaBase {
   /** Dia da última coleta automática que viu o anúncio; nulo = só do levantamento manual (regra R3). */
   ultima_coleta_auto?: string | null;
   dist_praia_m?: number | null;
+  /**
+   * Os imóveis nossos para os quais a equipe decidiu que este anúncio NÃO é o mesmo
+   * (`mercado_par_decidir` "não é", ainda valendo). Para eles, nunca "possível o mesmo
+   * imóvel" (27/11/2026, o TE0008 e o anúncio de R$ 600 mil do Chaves na Mão).
+   */
+  nao_e_de?: readonly string[];
   [campo: string]: unknown;
 }
 

@@ -123,6 +123,8 @@ export interface AnuncioDoBanco {
   origem?: string;
   visto_em?: string | null;
   possivel_mesmo_imovel?: boolean;
+  /** Imóveis nossos com par decidido "não é" e ainda valendo (migração 20261127160000). */
+  nao_e_de?: string[] | null;
 }
 export interface EntradaDoBanco {
   hoje: string;
@@ -287,6 +289,7 @@ export function prepararAnuncios(lista: AnuncioDoBanco[]): AnuncioDaBase[] {
       // Só do levantamento manual (origem manual): fica de fora da conta "sem os manuais" (R3).
       ultima_coleta_auto: x.origem === 'manual' ? null : (x.visto_em ?? null),
       dist_praia_m: null,
+      nao_e_de: Array.isArray(x.nao_e_de) ? x.nao_e_de.filter((c) => typeof c === 'string') : [],
     };
     const g = grupoDe(a);
     const ar = areaRef(a);
